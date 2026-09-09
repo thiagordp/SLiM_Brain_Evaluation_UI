@@ -626,6 +626,104 @@ def _persist(ctx: Ctx, question: spec.Question, object_id: str,
     )
 
 
+# ------------------------------------------------- what the widgets hold now
+#: Streamlit populates widget state from the client *before* it re-runs the
+#: script, so at the top of a run `st.session_state` already holds the answer
+#: the evaluator just gave while `ctx.responses` still holds the previous one.
+#: Everything drawn above the question widgets was therefore a interaction
+#: behind — a subsection that had just been completed still read 3/4, and a
+#: finished claim still counted as unfinished.
+#:
+#: These helpers read that difference. They never write to `ctx.responses`:
+#: `question_widget` decides whether to persist by comparing the widget against
+#: the cache, so seeding the cache here would make it see no change and the
+#: write would never be queued.
+ANSWER, COMMENT = "|a", "|c"
+
+
+def widget_base(ctx: Ctx, object_id: str, key: str) -> str:
+    """Where one criterion's widgets live in session state.
+
+    One definition, used by the widget that writes it and by the live view that
+    reads it, so the two cannot drift apart.
+    """
+    return f"{ctx.review_id}|{object_id}|{key}"
+
+
+def _held(base: str, suffix: str):
+    """The value on screen for one widget, or None if it has never rendered."""
+    try:
+        return st.session_state[base + suffix]
+    except (KeyError, AttributeError):
+        return None
+
+
+def live_answers(ctx: Ctx, items) -> tuple[dict, list]:
+    """The responses as the widgets on screen already have them.
+
+    Returns the overlaid mapping and the items whose widgets differ from the
+    cache — which is to say, what the evaluator has just changed. The items
+    rather than their sections, because a page groups them its own way: the
+    claim page by `question.section`, the Dataset page by which of its two
+    groups the criterion belongs to.
+
+    Every field completeness depends on is carried, not only the scale answer:
+    a criterion answered ``No`` is not complete until its comment is written, so
+    overlaying the answer alone would leave the same lag on the commonest path
+    there is.
+    """
+    answers = dict(ctx.responses)
+    touched = []
+    for item in items:
+        question = item.question
+        base = widget_base(ctx, item.object_id, question.question_key)
+        answer, comment = _held(base, ANSWER), _held(base, COMMENT)
+        if answer is None and comment is None:
+            continue                       # never rendered; nothing to overlay
+        stored = ctx.responses.get(item.lookup, {})
+        if question.free_text:
+            comment = stored.get("comment_evidence")
+        row = {
+            **stored,
+            "answer": stored.get("answer") if answer is None else answer,
+            "comment_evidence": (stored.get("comment_evidence")
+                                 if comment is None else comment),
+        }
+        if _differs(row, stored, ("answer", "comment_evidence")):
+            touched.append(item)
+        answers[item.lookup] = row
+    return answers, touched
+
+
+def live_edges(ctx: Ctx, claim_id: str, relations) -> tuple[dict, bool]:
+    """The same, for the one-judgment-per-edge rows of E · Relations."""
+    edges = dict(ctx.edge_responses)
+    touched = False
+    for relation in relations:
+        edge_key = store.edge_key_of(relation)
+        base = widget_base(ctx, claim_id, edge_key)
+        answer, comment = _held(base, ANSWER), _held(base, COMMENT)
+        if answer is None and comment is None:
+            continue
+        stored = ctx.edge_responses.get(edge_key, {})
+        row = {
+            **stored,
+            "label_correct": (stored.get("label_correct") if answer is None
+                              else answer),
+            "comment_correct_label": (stored.get("comment_correct_label")
+                                      if comment is None else comment),
+        }
+        if _differs(row, stored, ("label_correct", "comment_correct_label")):
+            touched = True
+        edges[edge_key] = row
+    return edges, touched
+
+
+def _differs(row: dict, stored: dict, fields) -> bool:
+    """None and "" are the same absence, as everywhere else in the save path."""
+    return any((row.get(f) or "") != (stored.get(f) or "") for f in fields)
+
+
 def _remember(ctx: Ctx, question: spec.Question, object_id: str,
               answer, comment, applicability: str) -> None:
     """Mirror a queued write into the in-session view of the responses."""
@@ -659,7 +757,7 @@ def _criterion_header(question: spec.Question, note: str) -> None:
 
 
 def question_widget(ctx: Ctx, question: spec.Question, object_id: str,
-                    *, note: str = "") -> None:
+                    *, note: str = "", evidence=None) -> None:
     """One criterion: wording, definition, answer, comment. Autosaves on change.
 
     The workbook's free-text and comment fields are kept exactly as they are —
@@ -668,9 +766,14 @@ def question_widget(ctx: Ctx, question: spec.Question, object_id: str,
     A criterion the application has determined inapplicable shows a sentence
     instead of a control and records ``N/A`` once, so the stored row says
     "inapplicable" rather than looking unanswered.
+
+    ``evidence`` draws the material the judgment is made against, between the
+    question and the controls. Some criteria are answered by comparing the
+    output with the Source's own words, and asking for that comparison without
+    showing the words means answering from memory.
     """
     stored = ctx.response(question.question_key, object_id)
-    base = f"{ctx.review_id}|{object_id}|{question.question_key}"
+    base = widget_base(ctx, object_id, question.question_key)
 
     if _auto_na_for(ctx, question, object_id):
         _criterion_header(question, note)
@@ -683,6 +786,8 @@ def question_widget(ctx: Ctx, question: spec.Question, object_id: str,
         return
 
     _criterion_header(question, note)
+    if evidence is not None:
+        evidence()
 
     answer = stored.get("answer")
     comment = stored.get("comment_evidence") or ""

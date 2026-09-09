@@ -9,6 +9,7 @@ context in the modal, never the thing parsed for an answer.
 """
 from __future__ import annotations
 
+import functools
 import html
 
 import streamlit as st
@@ -149,6 +150,29 @@ def _quotation(text: str, location: str) -> None:
     )
 
 
+def _anchors(claim: dict) -> None:
+    """The Claim's anchors, as quotation cards. One rendering, two places.
+
+    They belong in B, where HE-06 asks whether they ground the Claim at all, and
+    again beside HE-05, which asks whether the Claim keeps the force of what
+    they say — a comparison nobody should have to make from memory.
+    """
+    quotes = claim.get("quotes") or []
+    if not quotes:
+        st.caption("No anchor was recorded for this claim.")
+    for quote in quotes:
+        _quotation(quote.get("quote", ""), quote.get("location", ""))
+
+
+def _modality_evidence(claim: dict) -> None:
+    """The anchors again, under HE-05, where the force is judged."""
+    quotes = claim.get("quotes") or []
+    st.caption(f"The Source's own words ({len(quotes)}), repeated from "
+               f"B · Grounding so the comparison is here."
+               if quotes else "The Source's own words")
+    _anchors(claim)
+
+
 def grounding_panel(ctx: Ctx, claim: dict) -> None:
     """What HE-06 and HE-07 are about: the anchors, and the premise beside them.
 
@@ -160,10 +184,7 @@ def grounding_panel(ctx: Ctx, claim: dict) -> None:
     with st.container(border=True):
         quotes = claim.get("quotes") or []
         st.markdown(f"**Anchors** ({len(quotes)})" if quotes else "**Anchors**")
-        if not quotes:
-            st.caption("No anchor was recorded for this claim.")
-        for quote in quotes:
-            _quotation(quote.get("quote", ""), quote.get("location", ""))
+        _anchors(claim)
 
     with st.container(border=True):
         st.markdown("**Premise**")
@@ -263,7 +284,7 @@ def _relation_card(ctx: Ctx, claim: dict, relation: dict, question) -> None:
     other_source = other.get("source", "")
     edge_key = store.edge_key_of(relation)
     stored = ctx.edge_responses.get(edge_key, {})
-    base = f"{ctx.review_id}|{claim['id']}|{edge_key}"
+    base = ui.widget_base(ctx, claim["id"], edge_key)
 
     with st.container(border=True):
         left, middle, right = st.columns([4, 2, 4], vertical_alignment="top")
@@ -357,8 +378,14 @@ def _questions_of(ctx: Ctx, claim: dict, subsection: str) -> None:
         if question.question_key == "CLAIM_HE21" and created:
             note = "Candidate created for this claim: " + ", ".join(
                 f"`{c['id']}` {c.get('label', '')}" for c in created)
+        # HE-05 asks whether the Claim preserves the modality of the Source, so
+        # the Source's words are shown with the question rather than a
+        # subsection away.
+        evidence = (functools.partial(_modality_evidence, claim)
+                    if question.question_key == "CLAIM_HE05" else None)
         with st.container(border=True):
-            ui.question_widget(ctx, question, claim["id"], note=note)
+            ui.question_widget(ctx, question, claim["id"], note=note,
+                               evidence=evidence)
             if question.question_key == "CLAIM_HE25":
                 ui.wiki_button("Compare claims from this paper", ui.SOURCE_CLAIMS,
                                ctx.source_id, key=f"wiki_dup|{claim['id']}",
@@ -385,8 +412,22 @@ def claims_section(ctx: Ctx) -> None:
 
     # Every claim is directly selectable, in any order. The marker says how each
     # one stands; it never restricts which can be opened.
-    states = progress.claim_states(ctx.brain, ctx.source_id, ctx.responses,
-                                   ctx.edge_responses)
+    # Everything on this page is drawn from what the widgets hold now, not from
+    # what was cached before the evaluator's last click. `question_widget`
+    # mirrors a change into `ctx.responses` as it renders, so anything computed
+    # from the cache above the widgets is one interaction behind.
+    claim_at = current_index(idx_key, len(claims))
+    live_items = progress.applicable(progress.claim_items(
+        ctx.brain, ctx.source_id, claims[claim_at]["id"], ctx.responses))
+    answers, changed = ui.live_answers(ctx, live_items)
+    edges, touched_edge = ui.live_edges(
+        ctx, claims[claim_at]["id"],
+        ctx.brain.relations_of(claims[claim_at]["id"]))
+    touched = {item.question.section for item in changed}
+    if touched_edge:
+        touched.add(spec.SUB_RELATIONS)
+
+    states = progress.claim_states(ctx.brain, ctx.source_id, answers, edges)
     index = st.selectbox(
         "Go to claim", list(range(len(claims))),
         format_func=lambda i: (
@@ -424,8 +465,9 @@ def claims_section(ctx: Ctx) -> None:
     ui.scale_note(spec.RESPONSE_SCALE_NOTE)
 
     parts = progress.claim_subsection_progress(
-        ctx.brain, ctx.source_id, claim["id"], ctx.responses, ctx.edge_responses)
-    open_label = _first_unfinished(ctx, claim, parts)
+        ctx.brain, ctx.source_id, claim["id"], answers, edges)
+    open_label = _open_subsection(
+        f"claim_open|{ctx.review_id}|{claim['id']}", parts, touched)
     for label, done, total, state in parts:
         count = f"{done}/{total}" if total else "none applicable"
         with st.expander(f"{BADGE[state] if total else '—'}  {label} · {count}",
@@ -439,7 +481,7 @@ def claims_section(ctx: Ctx) -> None:
                 _questions_of(ctx, claim, label)
 
     done, total = progress.claim_progress(ctx.brain, ctx.source_id, claim["id"],
-                                          ctx.responses, ctx.edge_responses)
+                                          answers, edges)
     claim_tally.markdown(
         f"<div style='text-align:right'><strong>{done}/{total}</strong>"
         f" applicable items complete</div>", unsafe_allow_html=True)
@@ -447,21 +489,30 @@ def claims_section(ctx: Ctx) -> None:
     _claim_nav(ctx, claims, index, idx_key, done, total)
 
 
-def _first_unfinished(ctx: Ctx, claim: dict, parts) -> str:
-    """Which subsection opens by default — decided once per claim.
+def _open_subsection(key: str, parts, touched) -> str:
+    """Which subsection is open — decided by where the evaluator is working.
 
-    Recomputing it every run would fight the evaluator: answering a question in
-    C reruns the page, C becomes complete, and the section they are working in
-    would close under them. Fixing the choice when the claim is first opened
-    also keeps the `expanded` argument stable across reruns, which is what lets
-    Streamlit honour the sections they have opened or closed by hand.
+    It used to be pinned when the claim was first opened and never moved, so
+    answering inside C closed C and reopened A on every single answer.
+
+    Now an interaction makes that subsection the active one and it stays open
+    while anything in it is still missing: a ``No`` waiting for its comment, or
+    a parent that has just revealed a conditional follow-up. Once it is
+    genuinely complete the next incomplete one opens instead, which is the part
+    of the old behaviour the evaluator asked to keep.
     """
-    key = f"claim_open|{ctx.review_id}|{claim['id']}"
-    if key not in st.session_state:
-        unfinished = [label for label, _, total, state in parts
-                      if total and state != progress.COMPLETE]
-        st.session_state[key] = unfinished[0] if unfinished else parts[0][0]
-    return st.session_state[key]
+    if touched:
+        st.session_state[key] = sorted(touched)[0] if len(touched) > 1 \
+            else next(iter(touched))
+    state_of = {label: (total, state) for label, _, total, state in parts}
+    active = st.session_state.get(key)
+    if active in state_of:
+        total, state = state_of[active]
+        if total and state != progress.COMPLETE:
+            return active
+    unfinished = [label for label, _, total, state in parts
+                  if total and state != progress.COMPLETE]
+    return unfinished[0] if unfinished else parts[0][0]
 
 
 def _claim_nav(ctx: Ctx, claims, index: int, idx_key: str, done: int, total: int) -> None:
@@ -586,20 +637,26 @@ def _tally(column, done: int, total: int, noun: str = "questions"):
         f" {noun} complete</div>", unsafe_allow_html=True)
 
 
+def _subsection_parts(ctx: Ctx, groups, object_id: str, answers) -> list:
+    """Each Dataset subsection's count and state, from the live answers."""
+    parts = []
+    for label, questions in groups:
+        wanted = {q.criterion_id for q in questions}
+        items = [i for i in progress.applicable(
+            progress.dataset_items(ctx.brain, ctx.source_id, answers))
+            if i.object_id == object_id and i.question.criterion_id in wanted]
+        done = sum(1 for i in items if progress.item_complete(i, answers))
+        state = (progress.COMPLETE if items and done == len(items)
+                 else progress.INCOMPLETE if done else progress.AVAILABLE)
+        parts.append((label, done, len(items), state))
+    return parts
+
+
 def _subsection(ctx: Ctx, label: str, questions, object_id: str,
-                open_key: str, first_open: bool) -> None:
+                done: int, total: int, state: str, expanded: bool) -> None:
     """One collapsible group of criteria, carrying its own state and count."""
-    items = [i for i in progress.applicable(
-        progress.dataset_items(ctx.brain, ctx.source_id, ctx.responses))
-        if i.object_id == object_id
-        and i.question.criterion_id in {q.criterion_id for q in questions}]
-    done = sum(1 for i in items if progress.item_complete(i, ctx.responses))
-    state = (progress.COMPLETE if items and done == len(items)
-             else progress.INCOMPLETE if done else progress.AVAILABLE)
-    if open_key not in st.session_state:
-        st.session_state[open_key] = first_open
-    with st.expander(f"{BADGE[state]}  {label} · {done}/{len(items)}",
-                     expanded=st.session_state[open_key]):
+    with st.expander(f"{BADGE[state]}  {label} · {done}/{total}",
+                     expanded=expanded):
         for question in questions:
             with st.container(border=True):
                 ui.question_widget(ctx, question, object_id)
@@ -626,6 +683,13 @@ def datasets_section(ctx: Ctx) -> None:
         dataset = datasets[index]
         did = dataset["id"]
         ui.reset_wiki(f"{ctx.source_id}|dataset|{did}")
+
+        # As on the claim page: what the widgets hold now, so a count drawn
+        # above them is not one interaction behind.
+        live_items = [i for i in progress.applicable(
+            progress.dataset_items(ctx.brain, ctx.source_id, ctx.responses))
+            if i.object_id == did]
+        answers, changed = ui.live_answers(ctx, live_items)
 
         st.markdown(f"##### Dataset {index + 1} of {len(datasets)} · `{did}`")
         with st.container(border=True):
@@ -654,12 +718,24 @@ def datasets_section(ctx: Ctx) -> None:
         ui.scale_note(spec.RESPONSE_SCALE_NOTE)
 
         questions = spec.dataset_questions()
-        node = [q for q in questions if q.criterion_id.startswith("HE-14")]
-        attributes = [q for q in questions if q.criterion_id.startswith("HE-15")]
-        _subsection(ctx, SUB_DATASET_NODE, node, did,
-                    f"ds_open_a|{ctx.review_id}|{did}", True)
-        _subsection(ctx, SUB_DATASET_ATTRIBUTES, attributes, did,
-                    f"ds_open_b|{ctx.review_id}|{did}", False)
+        groups = [
+            (SUB_DATASET_NODE,
+             [q for q in questions if q.criterion_id.startswith("HE-14")]),
+            (SUB_DATASET_ATTRIBUTES,
+             [q for q in questions if q.criterion_id.startswith("HE-15")]),
+        ]
+        parts = _subsection_parts(ctx, groups, did, answers)
+        # HE-14.3 is asked for the Source as a whole, below both groups, so an
+        # edit to it belongs to neither and must not pull one of them open.
+        of_group = {q.criterion_id: label for label, group in groups
+                    for q in group}
+        touched = {of_group[i.question.criterion_id] for i in changed
+                   if i.question.criterion_id in of_group}
+        open_label = _open_subsection(
+            f"ds_open|{ctx.review_id}|{did}", parts, touched)
+        for (label, group), (_, done, total, state) in zip(groups, parts):
+            _subsection(ctx, label, group, did, done, total, state,
+                        expanded=label == open_label)
 
         if len(datasets) > 1:
             nav = st.columns([2, 2, 3])

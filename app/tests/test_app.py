@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import atexit
 import collections
+import html
 import pathlib
 import re
 import shutil
@@ -3937,6 +3938,348 @@ def test_login_rerun_end_to_end():
     check(not at.exception, "a further rerun is uneventful")
 
 
+# ============================================ interaction state (production)
+def _subsection_label(at, prefix: str) -> str:
+    return next(e.label for e in at.expander if e.label.startswith(prefix)
+                or prefix in e.label)
+
+
+def _is_open(at, prefix: str) -> bool:
+    return next(e.proto.expanded for e in at.expander if prefix in e.label)
+
+
+def _answer(at, question_key: str, value: str):
+    return next(r for r in at.radio
+                if r.key.endswith(f"{question_key}|a")).set_value(value).run()
+
+
+def _write(at, question_key: str, text: str, suffix: str = "c"):
+    return next(t for t in at.text_area
+                if t.key.endswith(f"{question_key}|{suffix}")).set_value(text).run()
+
+
+def test_progress_is_fresh_on_the_interaction():
+    """Progress showed the state before the click. Reported from production.
+
+    Everything above the question widgets was computed from the response cache,
+    and `question_widget` mirrors a change into that cache while it renders — so
+    answering the fourth question in A left the header reading 3/4.
+    """
+    print("\n== progress is current on the interaction that caused it ==")
+    fresh_db()
+    source_id, evaluator, phase = "SRC-0009", "vaclav", manifest.TRAINING
+    rid = _started(evaluator, "Vaclav", phase, source_id)
+    claims = BRAIN.claims_of(source_id)
+
+    at = _open_claim(evaluator, "Vaclav", phase, source_id, 0)
+    for key in ("CLAIM_HE03", "CLAIM_HE25", "CLAIM_HE04"):
+        at = _answer(at, key, "Yes")
+    check("A · Claim · 3/4" in _subsection_label(at, "A · Claim"),
+          f"three of four answered reads 3/4 ({_subsection_label(at, 'A · Claim')})")
+
+    at = _answer(at, "CLAIM_HE05", "Yes")
+    label = _subsection_label(at, "A · Claim")
+    check("4/4" in label, f"the fourth answer reads 4/4 at once ({label})")
+    check(label.startswith("✓"), f"and is marked complete ({label})")
+
+    # A required comment is part of completeness, so it must be overlaid too:
+    # No -> the comment is required -> typing it completes the criterion.
+    at = _answer(at, "CLAIM_HE08_1", "No")
+    before = _subsection_label(at, "C · Attributes")
+    check("0/5" in before, f"No alone does not complete the criterion ({before})")
+    at = _write(at, "CLAIM_HE08_1", "the type is wrong, p.4")
+    after = _subsection_label(at, "C · Attributes")
+    check("1/5" in after,
+          f"typing the required comment completes it on that interaction ({after})")
+
+    # A conditional free-text answer is an answer, and completes its parent.
+    at = _answer(at, "CLAIM_HE20", "No")
+    at = _write(at, "CLAIM_HE20", "the mapping misses the technique dimension")
+    concepts = _subsection_label(at, "D · Concepts")
+    at = _write(at, "CLAIM_HE20B", "CPT-large-language-models", suffix="a")
+    check(_subsection_label(at, "D · Concepts") != concepts,
+          f"HE-20.b moves D on the interaction that fills it in "
+          f"({concepts} -> {_subsection_label(at, 'D · Concepts')})")
+
+    # A relation's comment, on a claim with exactly one edge.
+    single = next(i for i, c in enumerate(claims)
+                  if len(BRAIN.relations_of(c["id"])) == 1)
+    at = _open_claim(evaluator, "Vaclav", phase, source_id, single)
+    edge = next(r for r in at.radio if r.key.endswith("|a")
+                and "CLAIM_HE" not in r.key)
+    at = edge.set_value("In part").run()
+    check("0/1" in _subsection_label(at, "E · Relations"),
+          "an edge judged In part is not complete without its comment")
+    comment = next(t for t in at.text_area if t.key.endswith("|c")
+                   and "CLAIM_HE" not in t.key)
+    at = comment.set_value("the label should be COMPATIBLE_WITH").run()
+    relations = _subsection_label(at, "E · Relations")
+    check("1/1" in relations,
+          f"the relation comment completes E at once ({relations})")
+
+
+
+def test_claim_tally_increments_immediately():
+    """Finishing a claim's last item must move the paper's count on that click."""
+    print("\n== the paper's claim tally is current too ==")
+    fresh_db()
+    source_id, evaluator, phase = "SRC-0009", "vaclav", manifest.TRAINING
+    rid = _started(evaluator, "Vaclav", phase, source_id)
+    claims = BRAIN.claims_of(source_id)
+    target = claims[0]["id"]
+
+    # Everything but one item, written straight to storage so the page starts
+    # one answer short of a complete claim.
+    items = progress.applicable(progress.claim_items(
+        BRAIN, source_id, target, store.load_responses(rid)))
+    last = items[-1]
+    for item in items[:-1]:
+        store.save_response(
+            rid, object_type=item.object_type, object_id=item.object_id,
+            question_key=item.question.question_key,
+            criterion_id=item.question.criterion_id,
+            field_subitem=item.question.field_subitem,
+            answer="Yes", comment=None, source_id=source_id)
+    for edge in BRAIN.relations_of(target):
+        store.save_edge_response(
+            rid, host_claim_id=target, edge_key=store.edge_key_of(edge),
+            edge_from=edge.get("from"), edge_to=edge.get("to"),
+            other_claim_id=edge["other_claim_id"], edge_type=edge["type"],
+            label_correct="Yes", comment=None, source_id=source_id)
+    ui.forget_responses(rid)
+
+    at = _open_claim(evaluator, "Vaclav", phase, source_id, 0)
+    check(f"0 of {len(claims)} claims complete" in _tagless(rendered_text(at)),
+          "one item short, the paper counts no complete claim")
+    at = _answer(at, last.question.question_key, "Yes")
+    check(f"1 of {len(claims)} claims complete" in _tagless(rendered_text(at)),
+          f"the last answer increments the paper's tally at once "
+          f"({[c.value for c in at.caption if 'claims complete' in c.value]})")
+
+
+def test_subsection_stays_open_while_incomplete():
+    """The section being worked in closed on every answer. Reported from production.
+
+    `_first_unfinished` pinned one subsection per claim when it was first opened
+    and never moved it, so answering inside C closed C and reopened A.
+    """
+    print("\n== the subsection being worked in stays open ==")
+    fresh_db()
+    source_id, evaluator, phase = "SRC-0009", "vaclav", manifest.TRAINING
+    _started(evaluator, "Vaclav", phase, source_id)
+
+    at = _open_claim(evaluator, "Vaclav", phase, source_id, 0)
+    check(_is_open(at, "A · Claim"), "a fresh claim opens at the first unfinished")
+
+    # One of five in C: C is now where the work is.
+    at = _answer(at, "CLAIM_HE08_1", "Yes")
+    check(_is_open(at, "C · Attributes"), "answering in C opens C")
+    check(not _is_open(at, "A · Claim"), "and leaves A closed")
+    at = _answer(at, "CLAIM_HE08_2", "Yes")
+    check(_is_open(at, "C · Attributes"), "a second answer keeps it open")
+
+    # No, with the comment still to write.
+    at = _answer(at, "CLAIM_HE08_3", "No")
+    check(_is_open(at, "C · Attributes"),
+          "No does not close it while the comment is required")
+    at = _write(at, "CLAIM_HE08_3", "the basis is literature, not argument")
+    check(_is_open(at, "C · Attributes"),
+          "and it stays open with items still unanswered")
+
+    # The last item of C: it may close, and the next incomplete opens.
+    at = _answer(at, "CLAIM_HE08_4", "Yes")
+    at = _answer(at, "CLAIM_HE08_5", "Yes")
+    check("5/5" in _subsection_label(at, "C · Attributes"), "C is complete")
+    check(not _is_open(at, "C · Attributes"), "so C may close")
+    opened = [e.label for e in at.expander if "·" in e.label and e.proto.expanded]
+    check(len(opened) == 1 and "C · Attributes" not in opened[0],
+          f"and the next incomplete subsection opens ({opened})")
+
+    # A parent whose No reveals a conditional keeps its subsection open.
+    at = _answer(at, "CLAIM_HE20", "No")
+    check(_is_open(at, "D · Concepts"),
+          "answering No on HE-20 opens D and keeps it open")
+    check(any(t.key.endswith("CLAIM_HE20B|a") for t in at.text_area),
+          "with the conditional follow-up visible")
+    at = _write(at, "CLAIM_HE20", "a dimension is missing")
+    check(_is_open(at, "D · Concepts"), "the comment does not close it")
+    check(any(t.key.endswith("CLAIM_HE20B|a") for t in at.text_area),
+          "and the follow-up is still there to answer")
+
+    # Relations behave the same way.
+    claims = BRAIN.claims_of(source_id)
+    several = next(i for i, c in enumerate(claims)
+                   if len(BRAIN.relations_of(c["id"])) > 1)
+    at = _open_claim(evaluator, "Vaclav", phase, source_id, several)
+    edge = next(r for r in at.radio if r.key.endswith("|a")
+                and "CLAIM_HE" not in r.key)
+    at = edge.set_value("No").run()
+    check(_is_open(at, "E · Relations"), "judging an edge opens E")
+    comment = next(t for t in at.text_area if t.key.endswith("|c")
+                   and "CLAIM_HE" not in t.key)
+    at = comment.set_value("the direction is reversed").run()
+    check(_is_open(at, "E · Relations"),
+          "and its comment keeps E open while other edges are unjudged")
+
+
+def test_dataset_subsection_interaction_state():
+    """The Dataset page had both faults, for the same two reasons."""
+    print("\n== the Dataset subsections behave the same ==")
+    fresh_db()
+    source_id, evaluator, phase = "SRC-0009", "vaclav", manifest.TRAINING
+    _started(evaluator, "Vaclav", phase, source_id)
+
+    at = open_section(evaluator, "Vaclav", phase, source_id, "datasets")
+    check(_is_open(at, views.SUB_DATASET_NODE),
+          "a fresh dataset opens at the node questions")
+
+    at = _answer(at, "DATASET_HE15_1", "Yes")
+    label = _subsection_label(at, views.SUB_DATASET_ATTRIBUTES)
+    check("1/7" in label, f"the count moves on that interaction ({label})")
+    check(_is_open(at, views.SUB_DATASET_ATTRIBUTES),
+          "and the attributes group is where the work is")
+    check(not _is_open(at, views.SUB_DATASET_NODE), "so the node group closes")
+
+    at = _answer(at, "DATASET_HE15_2", "No")
+    check(_is_open(at, views.SUB_DATASET_ATTRIBUTES),
+          "No keeps it open for the comment")
+    at = _write(at, "DATASET_HE15_2", "the jurisdiction is CA, not CA-QC")
+    check("2/7" in _subsection_label(at, views.SUB_DATASET_ATTRIBUTES),
+          "which completes the criterion at once")
+    check(_is_open(at, views.SUB_DATASET_ATTRIBUTES), "and it stays open")
+
+    # HE-14.3 is asked for the Source, below both groups: it belongs to neither.
+    at = _answer(at, "SOURCE_HE14_3", "Yes")
+    check(_is_open(at, views.SUB_DATASET_ATTRIBUTES),
+          "answering the Source-level recall question pulls neither group open")
+
+
+def test_rapid_answers_survive_a_refresh():
+    """An evaluator felt an answer had not saved. Check storage, not the display.
+
+    Several answers in quick succession, the progress they produce read back
+    immediately from the session cache, and then the same answers read back from
+    storage after a flush and a forced re-read.
+    """
+    print("\n== rapid answers reach storage ==")
+    fresh_db()
+    source_id, evaluator, phase = "SRC-0009", "vaclav", manifest.TRAINING
+    rid = _started(evaluator, "Vaclav", phase, source_id)
+    claim = BRAIN.claims_of(source_id)[0]
+
+    given = {
+        "CLAIM_HE03": ("Yes", None),
+        "CLAIM_HE25": ("No", "CLM-0009-004 carries the same contention"),
+        "CLAIM_HE04": ("In part", "the referent of 'this approach' is unresolved"),
+        "CLAIM_HE05": ("Yes", None),
+        "CLAIM_HE08_1": ("Yes", None),
+    }
+    at = _open_claim(evaluator, "Vaclav", phase, source_id, 0)
+    for key, (answer, comment) in given.items():
+        at = _answer(at, key, answer)
+        if comment:
+            at = _write(at, key, comment)
+
+    check("4/4" in _subsection_label(at, "A · Claim"),
+          f"the page shows the work as done ({_subsection_label(at, 'A · Claim')})")
+
+    session = ss(at, "_save_queue")
+    if session is not None:
+        check(session.flush(timeout=20), "every queued write reaches storage")
+        check(session.unresolved == 0,
+              f"with nothing unresolved ({session.unresolved})")
+    flush(at)
+
+    # Forget everything this session remembers and read storage back.
+    ui.forget_responses(rid)
+    store.forget_reviews()
+    store.forget_row_index()
+    stored = store.load_responses(rid)
+    lost = []
+    for key, (answer, comment) in given.items():
+        row = stored.get(f"{key}|{claim['id']}", {})
+        if (row.get("answer") or "") != answer:
+            lost.append((key, "answer", row.get("answer"), answer))
+        if comment and (row.get("comment_evidence") or "") != comment:
+            lost.append((key, "comment", row.get("comment_evidence"), comment))
+    check(not lost, f"every answer and comment is in storage exactly as given {lost}")
+
+    items = progress.applicable(progress.claim_items(
+        BRAIN, source_id, claim["id"], stored))
+    from_storage = sum(1 for i in items if progress.item_complete(i, stored))
+    parts = dict((label, (done, total)) for label, done, total, _ in
+                 progress.claim_subsection_progress(
+                     BRAIN, source_id, claim["id"], stored,
+                     store.load_edge_responses(rid)))
+    check(parts["A · Claim"] == (4, 4),
+          f"and storage agrees that A is complete ({parts['A · Claim']})")
+    check(from_storage == 5,
+          f"with all five answers counted from storage ({from_storage})")
+
+
+def test_he05_shows_the_anchors():
+    """HE-05 asks whether the Claim keeps the Source's force. Show the words.
+
+    The evaluator was reading the anchors in B, scrolling back to A to answer
+    HE-05, and holding the wording in their head in between.
+    """
+    print("\n== HE-05 carries the anchors it is judged against ==")
+    fresh_db()
+    source_id, evaluator, phase = "SRC-0009", "vaclav", manifest.TRAINING
+    _started(evaluator, "Vaclav", phase, source_id)
+    claim = BRAIN.claims_of(source_id)[0]
+    quotes = claim.get("quotes") or []
+    check(len(quotes) > 1, f"this claim has several anchors ({len(quotes)})")
+
+    at = _open_claim(evaluator, "Vaclav", phase, source_id, 0)
+    drawn = [m.value for m in at.markdown]
+    header = next(i for i, m in enumerate(drawn) if m.startswith("**HE-05**"))
+    following = next((i for i, m in enumerate(drawn)
+                      if i > header and m.startswith("**HE-")), len(drawn))
+    between = " ".join(drawn[header:following])
+
+    for quote in quotes:
+        check(html.escape(quote["quote"]) in between,
+              f"the anchor is under HE-05, not a subsection away "
+              f"({quote['quote'][:44]!r})")
+        check(html.escape(quote["location"]) in between,
+              f"with its location ({quote['location']})")
+
+    # Shown, not moved: B · Grounding still has them.
+    whole = " ".join(drawn)
+    check(whole.count(html.escape(quotes[0]["quote"])) == 2,
+          f"and they are still in B as well "
+          f"({whole.count(html.escape(quotes[0]['quote']))} occurrences)")
+
+    # Nothing about the criterion itself changed.
+    he05 = next(q for q in spec.questions_for(spec.SUB_VALIDITY)
+                if q.criterion_id == "HE-05")
+    check(he05.question_text in " ".join(
+              rendered_text(at).split()), "the question is asked unchanged")
+    check(he05.answer_options == ("Yes", "In part", "No"),
+          f"on the unchanged scale {he05.answer_options}")
+    check(any(r.key.endswith("CLAIM_HE05|a") for r in at.radio),
+          "and it is still answerable")
+
+    # Repeating them on screen must not write anything.
+    at = flush(at)
+    stored = store.load_responses(
+        store.review_id(phase, evaluator, source_id))
+    answered = [k for k, v in stored.items() if (v.get("answer") or "").strip()
+                and v.get("applicability") != spec.AUTO_NA]
+    check(not answered, f"showing the anchors records nothing {answered[:3]}")
+
+    # Every claim in this Brain has an anchor, so the empty case is a guard
+    # rather than a case. If that ever stops being true this says so, and the
+    # guard — one caption instead of a blank block — starts to matter.
+    bare = [c["id"] for c in BRAIN.claims.values() if not (c.get("quotes") or [])]
+    check(not bare, f"no claim in this Brain is anchorless ({len(bare)})")
+    source = (APP_DIR / "views.py").read_text(encoding="utf-8")
+    body = source.split("def _anchors(")[1].split("\ndef ")[0]
+    check("No anchor was recorded for this claim." in body,
+          "and one that was would say so rather than showing nothing")
+
+
 def test_pending_individual_split():
     """An undivided pool is named as pending, not passed over in silence."""
     print("\n== a phase awaiting division says so ==")
@@ -4492,8 +4835,11 @@ def test_ui_reads_once_per_session():
         radios = criterion_radios(at)
         check(radios, f"{len(radios)} answer controls on the page")
         book.reset()
-        radios[0].set_value("Yes").run()
-        radios[1].set_value("In part").run()
+        # Re-fetched between answers: an answer re-arranges the page — the
+        # subsection being worked in opens and the others close — so a handle
+        # taken before the click belongs to a tree that no longer exists.
+        criterion_radios(at)[0].set_value("Yes").run()
+        criterion_radios(at)[1].set_value("In part").run()
         _settle(at)
         check(book.calls["read_tab:RESPONSES"] == 0,
               f"answering never falls back to a whole-tab read ({dict(book.calls)})")
@@ -4504,9 +4850,8 @@ def test_ui_reads_once_per_session():
 
         # and once that index exists, further answers cost only their own write
         book.reset()
-        radios = criterion_radios(at)
-        radios[2].set_value("No").run()
-        radios[3].set_value("Yes").run()
+        criterion_radios(at)[2].set_value("No").run()
+        criterion_radios(at)[3].set_value("Yes").run()
         _settle(at)
         check(book.calls["read_tab:RESPONSES"] == 0,
               f"two more answers read no whole tab ({dict(book.calls)})")
@@ -6392,6 +6737,12 @@ def main() -> None:
     test_quota_is_temporary_not_a_fault()
     test_storage_guard_handler_cannot_raise()
     test_login_rerun_end_to_end()
+    test_progress_is_fresh_on_the_interaction()
+    test_claim_tally_increments_immediately()
+    test_subsection_stays_open_while_incomplete()
+    test_dataset_subsection_interaction_state()
+    test_rapid_answers_survive_a_refresh()
+    test_he05_shows_the_anchors()
     test_pending_individual_split()
     test_store_isolation()
     test_citation_line()
