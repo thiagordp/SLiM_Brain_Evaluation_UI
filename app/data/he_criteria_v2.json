@@ -1,0 +1,112 @@
+{
+  "_meta": {
+    "eval_spec_version": "2.0",
+    "source": "Review-Evaluation-Changes.md — team calibration meeting, 2026-09-07",
+    "note": "Overrides applied over the verbatim workbook extract in he_criteria.json. Only the criteria the meeting actually changed appear here; everything else keeps its workbook text. Each entry cites the section of the change document it comes from. The workbook itself is not modified."
+  },
+  "SOURCE_HE08_1": {
+    "_from": "§2 HE-08.1 — remove order of dominance",
+    "question": "Are the selected `contribution_type` values correct, complete, and pertinent to the publication?",
+    "check": "Every value in contribution_type applies to the publication, no applicable value is missing, and no value is included that is not pertinent. Values are NOT ranked: do not judge which contribution is dominant. Closed list: doctrinal | normative | theoretical | empirical_quantitative | empirical_qualitative | technical | survey.",
+    "definition": "Schema definition (schema/source.md, as amended 2026-09-07) — contribution_type: one or more of the closed list. The requirement to assign them \"in order of dominance\" is REMOVED: where a publication is, for example, both theoretical and technical, no reliable ranking exists and none is asked for. doctrinal: describes, systematises or interprets existing law (lex lata). normative: argues what the law or policy should be (lex ferenda), including reform proposals and ethical arguments. theoretical: builds or criticises concepts, taxonomies or frameworks without primarily describing law or reporting data. empirical_quantitative: reports measurements, experiments, benchmarks, statistics or surveys with numerical results. empirical_qualitative: reports interviews, case studies, content analysis or observation. technical: proposes or evaluates a system, model, dataset or method. survey: reviews other literature as its main contribution."
+  },
+  "SOURCE_HE08_2": {
+    "_from": "§2 HE-08.2 — general vs undetermined; ordering removed",
+    "question": "Is `source_jurisdiction` a correct representation of the legal system(s) in which the publication is situated?",
+    "check": "source_jurisdiction names the legal system(s) the work is actually situated in. Values are NOT ranked. Distinguish two different states that were previously conflated:\n\n• general — the publication genuinely does not situate itself in any particular legal system (most technical papers);\n• undetermined — the source does not give enough information to determine one.\n\nThese are different epistemic states and should not be used interchangeably.",
+    "definition": "Schema definition (schema/source.md; extract-claims, Jurisdiction; as amended 2026-09-07) — source_jurisdiction: the legal system(s) the work is situated in, inferred from the law it treats as its own, the authors' affiliations as printed, and the venue. Codes: ISO 3166-1 alpha-2 for states, EU for the European Union, CoE for the Council of Europe system, INT for public international law; a sub-unit (US-CA) only when the source adds it. The requirement to list values \"in order of dominance\" is REMOVED. It is a different field from claim_jurisdiction, which is never inferred from it."
+  },
+  "CLAIM_HE03": {
+    "_from": "§3 HE-03 — wording cleanup only",
+    "question": "Does this extracted item qualify as one claim under the schema's semantic one-proposition test?"
+  },
+  "CLAIM_HE25": {
+    "_from": "§3 HE-25 — restatement renamed to duplicate/distinct",
+    "field": "Distinct claim",
+    "question": "Is this claim distinct from the other claims extracted from this paper?",
+    "check": "The Brain has not extracted the same substantive claim twice from this paper. Yes = it is a distinct contention; No = it duplicates another CLM of this source (give that id in the comment).\n\nThe defect being assessed is duplication BY THE BRAIN, not repetition by the paper:\n• duplication is judged within one source only;\n• the paper repeating a proposition in its own prose is irrelevant — the system should extract that proposition once;\n• an equivalent claim made by a different paper is NOT a failure here: those remain separate claim nodes.",
+    "definition": "Schema definition (extract-claims, What to extract; as clarified 2026-09-07) — a proposition already extracted from this source is not extracted again. Distinctness is decided by the semantic one-proposition test of schema/claim.md, not by a difference in wording: two records of the same source that state the same contention are one claim. The criterion was previously called \"not a restatement\", which wrongly suggested it was about the source repeating itself."
+  },
+  "CLAIM_HE04": {
+    "_from": "§3 HE-04 — wording cleanup only",
+    "question": "Is the claim intelligible on its own, without needing the source context?"
+  },
+  "CLAIM_HE05": {
+    "_from": "§3 HE-05 — modality reframed as preservation of force",
+    "question": "Does the claim preserve the source's modality or strength without materially hardening or softening it?",
+    "check": "The force of the proposition is preserved. What matters is the strength asserted, not the exact words used. Three broad categories:\n\n• reality / assertion — is, reports a finding;\n• possibility / qualification — may, can, suggests;\n• requirement / normativity — should, ought, must.\n\nA defect is movement between these categories, for example: possibility becoming certainty; a suggestion becoming a demonstrated finding; a recommendation becoming a factual description. Harmless lexical variation within the same category — one expression of a requirement replaced by another — is NOT a defect.",
+    "definition": "Schema definition (schema/claim.md, statement; extract-claims, Formulation; as amended 2026-09-07) — the statement is written in the source's own modality. The rule is not lexical identity but preservation of force: nothing may be hardened or softened. Do not upgrade \"suggests\" to \"shows\", and do not downgrade a requirement into a description."
+  },
+  "CLAIM_HE06": {
+    "_from": "§4 HE-06 — anchors are textual grounding, not full warrant",
+    "field": "Textual grounding of the claim",
+    "question": "Do the anchors provide sufficient textual grounding to show that the source makes this claim?",
+    "check": "The anchors show where in the source the claim is expressed. They are a provenance and anti-hallucination device.\n\n• anchors are verbatim passages from the source;\n• together they must ground the material components of the claim;\n• they need NOT reproduce the whole reasoning or the full evidentiary basis for the claim — that is not what anchors are for;\n• they must not stitch unrelated passages into a proposition the source never makes.\n\nDo not fail an anchor set merely because the argument supporting the claim is longer than the quoted text.",
+    "definition": "Schema definition (schema/claim.md, quotes; as clarified 2026-09-07) — 1 to 3 anchors, each {quote, location, quote_translation?}. The quote is a verbatim passage from the source's own markdown conversion, in the original language, at most 50 words, each anchor grounding a component of the one proposition; two anchors may corroborate the same component, but the anchor set must never stitch independent ideas into a proposition the source does not argue. location is a page number or, without pagination, section heading plus paragraph ordinal (e.g. \"3.2, para 4\"); quote_translation only when the original is not in English. The earlier word \"warrant\" was read as requiring the anchors to carry the entire argument; they are short by design."
+  },
+  "CLAIM_HE07": {
+    "_from": "§4 HE-07 — defensible reconstruction; dominance removed",
+    "question": "Is the premise a defensible reconstruction of the ground or reason the source gives for this claim?",
+    "check": "The premise states the ground the source actually gives, in one sentence, and does not commit the legal-basis-as-outcome failure (naming the instrument or case as if it were the reasoning). N/A when basis is none_stated and premise is correctly empty.\n\nThe standard is defensibility, not identity: you are not asking whether you would have reconstructed the ground in exactly these words, but whether this is a defensible reconstruction of what the source offers.\n\nDivision of labour: anchor = the source's text; claim = the extracted proposition; premise = the extracted ground or reason for it.",
+    "definition": "Schema definition (schema/claim.md, premise; as amended 2026-09-07) — premise: the ground the source gives for the claim, in one sentence. basis is the closed-list category of ground (what kind of support the source offers); premise is the free-text content of that ground (which case, which provision, which result, which argument). It is filled whenever the source states a ground and is empty exactly when basis is none_stated; where the source offers several kinds of ground, premise may carry the others. The legal-basis-as-outcome failure (extract-claims) is a legal basis read as a substantive finding — a provision cited for procedure treated as an outcome."
+  },
+  "CLAIM_HE08_1": {
+    "_from": "§5 HE-08.1 — defensible classification",
+    "question": "Is `claim_type` a defensible classification of what the claim does?",
+    "check": "claim_type is a defensible value for what the statement does. Closed list: descriptive | interpretive | normative | empirical | conceptual | predictive | methodological.\n\nThere is not always a single objectively correct answer. Where the assigned type is defensible but another type would also be plausible, that is not a failure. Score below Yes only where the classification is not defensible, or captures only part of what the claim does."
+  },
+  "CLAIM_HE08_2": {
+    "_from": "§5 HE-08.2 — scope made explicit; source-grounded",
+    "question": "If this claim describes judicial, legislative, or regulatory practice, is the assigned `positive_form` defensible? Otherwise, select N/A.",
+    "check": "positive_form applies ONLY to descriptive claims about legal practice — what courts, legislators or regulators do. If the claim does not describe such practice, the correct answer is N/A.\n\nThe five values classify the SOURCE'S characterization of that practice: general_rule (courts generally decide X in way Y), trend (increasingly, over time), split (disagreement between courts or jurisdictions), frequency (courts have often confronted X), existence (at least one court has decided X).\n\nJudge against what the paper says, not against your own knowledge of what courts actually do. The anchors should normally carry the textual basis for the chosen form. Where the source describes something mixed — a trend that is also a split — and the label captures only part of it, use In part."
+  },
+  "CLAIM_HE08_3": {
+    "_from": "§5 HE-08.3 — dominance removed; defensible classification",
+    "question": "Does `basis` give a defensible classification of the ground the source offers for this claim?",
+    "check": "basis records the kind of ground the source offers: case_law | legislation | dataset_or_experiment | argument | literature | none_stated. The requirement to pick the \"dominant\" ground is REMOVED: where a source offers several kinds, any defensible classification is acceptable and the others may be carried by the premise.\n\nWhen basis is case_law, judge separately whether basis_qualifier (holding | dictum | unclear) is defensible under the source's own characterization of the case — not under what is actually true of it.",
+    "definition": "Schema definition (schema/claim.md, as amended 2026-09-07) — basis is always filled and records what the source offers for the claim: case_law | legislation | dataset_or_experiment | argument | literature | none_stated (the source offers no ground). basis_qualifier is set only when basis is case_law — holding | dictum | unclear — and records what the source claims the case stands on, not what is true."
+  },
+  "CLAIM_HE08_4": {
+    "_from": "§5 HE-08.4 — legal scope vs evidence origin; ordering removed",
+    "question": "Are `claim_jurisdiction` and its related jurisdiction flags a defensible representation of the claim's legal scope?",
+    "check": "claim_jurisdiction names the legal system(s) the CLAIM is about — its legal scope. Values are NOT ranked.\n\nKeep two things apart:\n• the LEGAL SCOPE of the claim — which legal system the proposition is about;\n• the GEOGRAPHIC ORIGIN of the evidence — which materials it happens to rest on.\n\nA general claim supported entirely by US material does not thereby become a claim about US law; that case is geographical_proxy:US. claim_jurisdiction is never carried over from the source's jurisdiction. Reasonable inference from the surrounding source material is acceptable and is marked with jurisdiction_inferred; outside-world knowledge alone must not be used to invent a jurisdiction. jurisdiction_relation is set when there is more than one entry.",
+    "definition": "Schema definition (schema/claim.md; extract-claims, Jurisdiction; as amended 2026-09-07) — claim_jurisdiction: the legal system(s) the claim is about. Codes: ISO 3166-1 alpha-2 for states, EU, CoE, INT; a sub-unit (US-CA) only when the source adds it. Three special values: general (the source presents the claim as tied to no legal system); undetermined (the source does not say and context does not settle it — never resolved by falling back on the source jurisdiction); geographical_proxy:<code> (the claim itself is general but its evidence comes entirely from one jurisdiction's materials — the code marks the origin of the evidence, not the legal scope). jurisdiction_relation, only when there is more than one entry: eu_law_in_member_state, comparative, cumulative. jurisdiction_inferred: true when the jurisdiction was assigned from the claim's surrounding text or the materials the source cites on the point. The requirement to list values \"in order of dominance\" is REMOVED."
+  },
+  "CLAIM_HE08_5": {
+    "_from": "§5 HE-08.5 — wording only",
+    "question": "Is `temporal_reference` correct for the claim?"
+  },
+  "CLAIM_HE12": {
+    "_from": "§6 HE-12 — reasonable inference allowed; anchor-preference moved to HE-21",
+    "question": "Are all concepts mapped to this claim substantively relevant, either explicit in the source or reasonably inferable from it?",
+    "check": "Every concept mapped to this claim is one the claim substantively concerns.\n\nA mapping is acceptable when it is explicitly supported by the source, and also when it is a reasonable inference from the paper or the claim. The Brain is not a literal keyword extractor: a concept need not appear verbatim in the text. A mapping is wrong when it is neither stated nor reasonably inferable.\n\nWhether a candidate concept should have been created at all is NOT judged here — that is HE-21.",
+    "definition": "Schema definition (schema/concept.md; map-concepts; as clarified 2026-09-07) — a concept is a notion that claims are about, in three families (concept_type): legal_task, technique_class, normative_concern, plus other for a candidate none of them fits. Anchor concepts are given in advance and define the field; candidate concepts are created during extraction. No concept is ever created for a jurisdiction, an instrument, a court, a person, an institution or a paper — these are attributes or sources."
+  },
+  "CLAIM_HE21": {
+    "_from": "§6 HE-21 — wording only",
+    "question": "If a candidate concept was created, was it necessary because no existing anchor concept captured the claim without distortion?"
+  },
+  "CLAIM_HE20": {
+    "_from": "§6 HE-20 — bounded to mapping-relevant concepts",
+    "question": "Are all mapping-relevant concepts materially engaged by this claim represented in its concept mapping?",
+    "check": "A proposition can be connected to an arbitrarily large set of broader, narrower, implicit and downstream concepts. This criterion is bounded by the purpose of the artifact — a systematic mapping review.\n\nDo NOT require:\n• every concept that could logically be inferred;\n• every broader or narrower concept;\n• every concept associated with a technique merely because that technique could be used for the task.\n\nDO require concepts whose omission would materially impair how this claim is represented in the mapping. The question is not \"could I connect this claim to another concept?\" but \"is a materially important concept missing?\"",
+    "definition": "Schema definition (schema/concept.md; as clarified 2026-09-07) — map every claim to at least one concept, and to at most 3 concepts per concept_type value, other included. Leave any concept_type the claim does not engage absent. The families are legal_task, technique_class and normative_concern (plus other); the concept is never imputed to a claim that does not concern it."
+  },
+  "SOURCE_HE19_1": {
+    "_from": "§11 HE-19.1 — wording only",
+    "question": "Were all central theses or hypotheses advanced by the source extracted as claims?"
+  },
+  "SOURCE_HE20S": {
+    "_from": "§7 — new source-level conceptual coverage question",
+    "field": "Conceptual coverage of the source",
+    "question": "Across all claims extracted from this paper, are the mapping-relevant concepts addressed by the source adequately represented?",
+    "check": "Judged across the whole source, once every claim has been seen.\n\nClaim-level concept recall (HE-20) cannot see that a concept absent from one claim may be carried by another claim of the same paper. This question asks the complementary question: taking the paper as a whole, is the conceptual coverage adequate for a systematic mapping review?\n\nThe same bound applies as in HE-20: mapping-relevant concepts materially engaged by the source, not every concept that could logically be connected to it.",
+    "definition": "Added 2026-09-07 following calibration. It has no counterpart in HE_review_form.xlsx: the workbook has claim recall (HE-19) but no equivalent review of conceptual coverage across the source, and evaluators repeatedly needed one while judging individual claims."
+  },
+  "SOURCE_HE20S_B": {
+    "_from": "§7 — follow-up to the coverage question",
+    "field": "Concepts NOT represented",
+    "question": "List the concept(s) that should have been represented across this source (existing CPT id, or the label a candidate should have carried).",
+    "check": "Shown when the coverage question is answered No or In part. List what is MISSING, not what is present. Write \"none\" if nothing is missing."
+  }
+}

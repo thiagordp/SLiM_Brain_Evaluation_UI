@@ -1,0 +1,384 @@
+{
+  "_meta": {
+    "eval_spec_version": "3.0",
+    "source": "Design/1.login.md … Design/10.final_page.md — page-by-page UI and instrument review, 2026-09-08",
+    "note": "Third and final override layer. Merged over he_criteria_v2.json, which is itself merged over the verbatim workbook extract in he_criteria.json. Only criteria whose visible wording, definition, title or comment placeholder was settled during the page-by-page review appear here. The workbook is not modified. Where an entry sets \"definition\" to the empty string it deliberately suppresses the inherited schema prose, because the \"check\" text below already carries the complete guidance the evaluator needs.",
+    "derived": "Each criterion's optional \"derived\" list names the definition sentences that were inferred from the page-by-page review rather than quoted from it. Everything else in \"check\" and \"definition\" appears verbatim in Design/*.md, he_criteria_v2.json or the workbook extract. app/tests/fidelity.py enforces this: an undeclared sentence, or a declaration that no longer matches, fails the suite — so prose can be added, but not silently."
+  },
+  "SOURCE_HE08_1": {
+    "_from": "Design/5.source_evaluation.md §6",
+    "field": "Contribution type",
+    "question": "Do the selected `contribution_type` values correctly and completely represent the publication's contribution, including its most pertinent type or types?",
+    "check": "**How to judge**\n\nAssess whether:\n\n* every selected contribution type applies to the publication;\n* no applicable contribution type is missing; and\n* the selected values include the publication's most pertinent contribution type\n  or types.\n\n**Do not evaluate the order of the selected values.**\n\n**Contribution types**\n\n* **doctrinal** — describes, systematises or interprets existing law (*lex lata*);\n* **normative** — argues what law, policy or practice should be, including reform\n  or ethical recommendations;\n* **theoretical** — develops or critiques concepts, taxonomies or frameworks\n  without primarily reporting empirical results;\n* **empirical_quantitative** — reports measurements, experiments, benchmarks,\n  statistics or other numerical results;\n* **empirical_qualitative** — reports interviews, case studies, qualitative content\n  analysis or observation;\n* **technical** — proposes or evaluates a system, model, dataset or method. A\n  publication may be technical even when it proposes a method without implementing\n  it;\n* **survey** — reviews existing literature as its main contribution.",
+    "definition": "",
+    "placeholder": "Explain what is incorrect or missing. Where possible, give the corrected classification and the relevant page or section of the source.",
+    "derived": [
+      "publication may be technical even when it proposes a method without implementing"
+    ]
+  },
+  "SOURCE_HE08_2": {
+    "_from": "Design/5.source_evaluation.md §7",
+    "field": "Source jurisdiction",
+    "question": "Does `source_jurisdiction` correctly represent the legal system or systems in which the publication is situated?",
+    "check": "**How to judge**\n\n`source_jurisdiction` describes the legal setting of the **publication as a whole**.\nIt is different from `claim_jurisdiction`, which is evaluated later for individual\nclaims.\n\nAssess whether the recorded value correctly reflects the legal system or systems in\nwhich the publication is situated.\n\n* **general** — the publication is genuinely not situated in any particular legal\n  system;\n* **undetermined** — the publication does not provide enough information to\n  determine a legal system.\n\nThese represent different situations and should not be treated as interchangeable.\n\nWhen a specific jurisdiction is used:\n\n* use the relevant country code;\n* use `EU` for the European Union, `CoE` for the Council of Europe system and `INT`\n  for public international law;\n* use a sub-national unit only where the publication itself warrants that level of\n  specificity.\n\nDo not assign a jurisdiction merely because the paper discusses an isolated case,\nstatute or example from that jurisdiction.",
+    "definition": "",
+    "placeholder": "Explain what is incorrect or missing. Where possible, give the corrected jurisdiction and the relevant page or section of the source."
+  },
+  "CLAIM_HE03": {
+    "_from": "Design/6.claim_evaluation.md §A",
+    "field": "Claim definition",
+    "question": "Does this extracted item qualify as a single claim under the Brain's claim definition?",
+    "check": "A Claim is a central thesis or hypothesis that the paper advances as part of its\ncontribution. It must express one contention that stands or falls together.\n\nThe test is semantic, not grammatical. Parts should be separated when a reader could\naccept one and reject the other, when they require different Claim types or\njurisdictions, or when one could be challenged without challenging the other. A\nmulti-part thesis may remain one Claim when its parts jointly form one contention.\n\nSentence count does not determine Claim boundaries.",
+    "definition": "",
+    "placeholder": "Explain what is wrong — for example which distinct contentions should have been separated, or which fragments should have been one Claim."
+  },
+  "CLAIM_HE25": {
+    "_from": "Design/6.claim_evaluation.md §A",
+    "field": "No duplicate Claim",
+    "question": "Is this Claim distinct from every other Claim extracted from this paper?",
+    "check": "Evaluate the extracted Claim set, not repetition in the original paper. Two Claims\nare duplicates when the Brain has created two Claim records for the same contention\nfrom this paper.\n\nDifferent wording alone does not make two Claims distinct. If the same proposition\nhas been extracted more than once, the answer is No.",
+    "definition": "",
+    "placeholder": "Identify the other Claim ID where possible, and say why the two records carry the same contention."
+  },
+  "CLAIM_HE04": {
+    "_from": "Design/6.claim_evaluation.md §A",
+    "field": "Independent intelligibility",
+    "question": "Can this Claim be understood on its own, without missing context from the paper?",
+    "check": "The statement should contain enough information to be intelligible independently of\nits original paragraph. References such as “this work”, “this approach”, “the\nauthors”, or unresolved pronouns should be replaced by their intended referents\nwhere necessary.\n\nAdditional wording may clarify the same proposition, but must not introduce another\nproposition.",
+    "definition": "",
+    "placeholder": "Identify what cannot be understood without the paper, and how the statement should have been written."
+  },
+  "CLAIM_HE05": {
+    "_from": "Design/6.claim_evaluation.md §A",
+    "field": "Modality preserved",
+    "question": "Does the Claim preserve the strength and modality of the source?",
+    "check": "The Claim should preserve how strongly and in what mode the source expresses the\nproposition. A possibility should remain a possibility; a recommendation should\nremain a recommendation; a reported finding should remain a finding.\n\nFor example, “may” must not become “will”, “suggests” must not become “shows”, and\n“should” must not become “must”.\n\nWhat matters is the strength asserted, not the exact words used.",
+    "definition": "",
+    "placeholder": "Quote the source's own formulation and say whether the Claim hardens or softens it, with the relevant page or section."
+  },
+  "CLAIM_HE06": {
+    "_from": "Design/6.claim_evaluation.md §B",
+    "field": "Textual grounding",
+    "question": "Do the anchors provide sufficient textual grounding for this Claim in the source?",
+    "check": "Anchors are verbatim passages that show where the Claim is grounded in the source\ntext. Their purpose is to establish that the Claim is stated or defensibly\nrepresented in the paper.\n\nThey do **not** need to reproduce every argument or reason supporting the Claim.\n\nTaken together, they should cover the substantive content of the Claim sufficiently\nto make its attribution to the source defensible. They must not combine unrelated\npassages into a proposition the source does not make.\n\nEach anchor should have a valid source location.",
+    "definition": "",
+    "placeholder": "Say which part of the Claim is not grounded, or which anchor does not support what it is cited for, and give the correct passage or location."
+  },
+  "CLAIM_HE07": {
+    "_from": "Design/6.claim_evaluation.md §B",
+    "field": "Premise",
+    "question": "Is the premise a defensible reconstruction of the ground the source gives for this Claim?",
+    "check": "The premise states, in one sentence, the reason or ground that the source gives for\nthe Claim.\n\nUnlike an anchor, the premise is a structured reconstruction rather than a verbatim\nquotation. It should accurately represent the source's reasoning without adding a\nground that the source does not provide.\n\nThe premise should be consistent with `basis`. If the source states no ground and\n`basis` is `none_stated`, the premise should be empty and this criterion is not\napplicable.\n\nMerely naming a case, provision or dataset is not sufficient when the source gives a\nmore specific reason or result.\n\nThe standard is defensibility, not identity: another reconstruction being possible\nis not a defect.",
+    "definition": "",
+    "placeholder": "State the ground the source actually gives, and where it is given.",
+    "derived": [
+      "another reconstruction being possible"
+    ]
+  },
+  "CLAIM_HE08_1": {
+    "_from": "Design/6.claim_evaluation.md §C",
+    "field": "Claim type",
+    "question": "Is `claim_type` a defensible classification of what this Claim does?",
+    "check": "| Value | Meaning |\n|---|---|\n| `descriptive` | states what the law is, what courts/regulators do, or what a practice is |\n| `interpretive` | offers a reading of a legal text, judgment or concept |\n| `normative` | states what law, policy, design or practice should be |\n| `empirical` | reports a finding from data, experiment, benchmark, interviews or observation |\n| `conceptual` | defines, distinguishes or classifies a notion |\n| `predictive` | states what will or is likely to happen |\n| `methodological` | states how something should be studied, measured or built |\n\nThere is not always a single objectively correct answer. Where the assigned type is\ndefensible but another type would also be plausible, that is not a defect.",
+    "definition": "",
+    "placeholder": "Give the type you consider correct and say why the assigned one is not defensible.",
+    "derived": [
+      "defensible but another type would also be plausible, that is not a defect."
+    ]
+  },
+  "CLAIM_HE08_2": {
+    "_from": "Design/6.claim_evaluation.md §C",
+    "field": "Positive form",
+    "question": "If this Claim describes legal practice, is `positive_form` correctly assigned? Otherwise, is it correctly marked `not_applicable`?",
+    "check": "`positive_form` applies only when a Claim describes what courts, legislators or\nregulators do.\n\nFor such Claims:\n\n* `general_rule` — a general pattern of decision or practice;\n* `trend` — change over time;\n* `split` — disagreement between courts or jurisdictions;\n* `frequency` — how often something occurs;\n* `existence` — at least one relevant instance exists.\n\nFor other Claims, the correct value is `not_applicable`. Answer **Yes** when\n`not_applicable` is itself the correct value.\n\nEvaluate what **the source represents**, not whether the described legal practice is\nobjectively true.",
+    "definition": "",
+    "placeholder": "Say whether the Claim describes legal practice, and give the value you consider correct.",
+    "derived": [
+      "`not_applicable` is itself the correct value."
+    ]
+  },
+  "CLAIM_HE08_3": {
+    "_from": "Design/6.claim_evaluation.md §C",
+    "field": "Basis",
+    "question": "Is `basis` a defensible classification of the ground the source gives for this Claim, and is `basis_qualifier` correct where applicable?",
+    "check": "`basis` classifies the kind of ground the source offers:\n\n`case_law` · `legislation` · `dataset_or_experiment` · `argument` · `literature` ·\n`none_stated`\n\nAsk whether the recorded category is a defensible description of the ground used by\nthe source. Do not require a uniquely dominant ground where more than one defensible\nreading exists.\n\n`basis_qualifier` applies only when `basis = case_law` and records whether the source\ntreats the relevant proposition as a `holding`, `dictum`, or `unclear`. Answer\n**Yes** when it is correctly left empty.",
+    "definition": "",
+    "placeholder": "Give the basis you consider correct and the page or section where the source offers that ground.",
+    "derived": [
+      "Do not require a uniquely dominant ground where more than one defensible",
+      "**Yes** when it is correctly left empty."
+    ]
+  },
+  "CLAIM_HE08_4": {
+    "_from": "Design/6.claim_evaluation.md §C",
+    "field": "Claim jurisdiction",
+    "question": "Do the jurisdiction fields correctly represent the legal scope of this Claim and how that scope was determined?",
+    "check": "`claim_jurisdiction` concerns the Claim itself and must not simply be copied from the\nSource's jurisdiction.\n\n* `general` — the Claim is not tied to a particular legal system;\n* `undetermined` — the source and its context do not permit the jurisdiction to be\n  determined;\n* `geographical_proxy:<code>` — the Claim itself is general but its supporting\n  materials come entirely from the named jurisdiction.\n\nKeep the **legal scope** of the Claim apart from the **geographic origin of the\nevidence**. Values are not ranked.\n\nWhere more than one jurisdiction is recorded, `jurisdiction_relation` explains their\nrelationship. `jurisdiction_inferred` is true when the jurisdiction was derived from\ncontext rather than stated directly.\n\nEvaluate all of these fields together.",
+    "definition": "",
+    "placeholder": "Give the jurisdiction values you consider correct, and say which of the three fields is wrong.",
+    "derived": [
+      "* `general` — the Claim is not tied to a particular legal system;",
+      "* `undetermined` — the source and its context do not permit the jurisdiction to be",
+      "* `geographical_proxy:<code>` — the Claim itself is general but its supporting",
+      "Keep the **legal scope** of the Claim apart from the **geographic origin of the"
+    ]
+  },
+  "CLAIM_HE08_5": {
+    "_from": "Design/6.claim_evaluation.md §C",
+    "field": "Temporal reference",
+    "question": "Does `temporal_reference` correctly represent the time or period described by this Claim?",
+    "check": "Use a specific date or period when the source explicitly situates the legal or\nfactual state in time. Otherwise the correct value is `as_of_publication`.\n\nThe Claim should record what the source said at the time of publication and must not\nbe updated retrospectively using later developments.",
+    "definition": "",
+    "placeholder": "Give the period the source states and where it states it."
+  },
+  "CLAIM_HE12": {
+    "_from": "Design/6.claim_evaluation.md §D",
+    "field": "Concept correctness",
+    "question": "Is every Concept currently mapped to this Claim a defensible mapping?",
+    "check": "Evaluate the mappings that are already present. Each mapped Concept should represent\na notion that this Claim substantively concerns.\n\nA mapping is acceptable when it is explicitly supported by the source, and also when\nit is a reasonable inference from the paper or the Claim. The Brain is not a literal\nkeyword extractor: a concept need not appear verbatim.\n\nAn existing anchor should be used where it captures the Claim without distortion. A\nnon-anchor Concept is not automatically wrong: when both an anchor and another\nConcept apply, both may be mapped.\n\nDo not use this criterion to judge whether a relevant Concept is **missing**; that is\nevaluated separately under Concept completeness.",
+    "definition": "",
+    "placeholder": "Name the mapped Concept(s) that do not belong and say why the Claim does not substantively concern them."
+  },
+  "CLAIM_HE21": {
+    "_from": "Design/6.claim_evaluation.md §D",
+    "field": "Candidate concept necessary",
+    "question": "Was creating this candidate Concept necessary because no existing anchor or equivalent Concept captured the Claim without distortion?",
+    "check": "A candidate Concept should be created only when the Claim cannot be adequately\nrepresented by the existing anchor set and no equivalent Concept already exists under\nanother name.\n\nA new Concept should therefore add a genuinely needed notion rather than duplicate or\nrename an existing one.",
+    "definition": "",
+    "placeholder": "Name the existing anchor or Concept that would have captured the Claim."
+  },
+  "CLAIM_HE20": {
+    "_from": "Design/6.claim_evaluation.md §D; scale settled 2026-09-08",
+    "field": "Concept completeness",
+    "question": "Are all Concepts needed to represent what this Claim substantively concerns for mapping purposes included in its mapping?",
+    "check": "Evaluate whether a substantively relevant mapping dimension has been omitted.\n\nThe Claim should be mapped to the concepts it genuinely engages in the relevant\nfamilies: legal task, technique class and normative concern, plus another family\nwhere required.\n\nDo not penalise the Brain merely because an additional Concept could be associated\nwith the Claim in the abstract. A missing Concept matters where its omission would\nleave out information that is relevant to mapping what the paper is about.\n\n**Answer Yes or No.** Either every mapping-relevant Concept this Claim needs is\nrepresented, or at least one is missing — in which case name it below. There is\nno middle value: a partial answer would record that something is absent without\nsaying what, which is precisely what the follow-up asks for.",
+    "definition": "",
+    "placeholder": "Name the mapping dimension that is missing.",
+    "derived": [
+      "**Answer Yes or No.** Either every mapping-relevant Concept this Claim needs is",
+      "represented, or at least one is missing — in which case name it below.",
+      "a partial answer would record that something is absent without",
+      "saying what, which is precisely what the follow-up asks for."
+    ]
+  },
+  "CLAIM_HE20B": {
+    "_from": "Design/6.claim_evaluation.md §D",
+    "field": "Missing Concepts",
+    "question": "If the mapping is incomplete, list the missing Concept(s).",
+    "check": "Shown when Concept completeness is answered No or In part. List what is **missing**,\nnot what is present.",
+    "definition": "",
+    "placeholder": "Enter an existing Concept ID where known, or the label that a missing candidate Concept should have.",
+    "derived": [
+      "Shown when Concept completeness is answered No or In part."
+    ]
+  },
+  "DATASET_HE14_1": {
+    "_from": "Design/7.datasets_evaluation.md §A",
+    "field": "Warranted Dataset node",
+    "question": "Does this Dataset node correspond to a dataset, benchmark, or corpus that the Source actually uses or introduces?",
+    "check": "**How to judge**\n\nA Dataset node is warranted only when the Source actually **uses or introduces** the\ndataset, benchmark, or corpus.\n\nDo not count:\n\n* a passing mention;\n* a dataset mentioned only in related work;\n* a dataset belonging to a cited publication but not used by this Source; or\n* a dataset that the Source merely discusses.\n\nA Dataset node should exist when the Source's relationship to it warrants a `USES`\nrelation.",
+    "definition": "",
+    "placeholder": "Explain why the node should or should not exist, and identify the relevant page or section of the Source."
+  },
+  "DATASET_HE14_2": {
+    "_from": "Design/7.datasets_evaluation.md §A",
+    "field": "Introduced by / used by",
+    "question": "Do `introduced_by` and `used_by` correctly represent how this Dataset relates to the Sources in the Brain?",
+    "check": "`introduced_by` identifies who introduces the Dataset:\n\n* the relevant Source ID when a Source in the Brain introduces it;\n* `external` when the Dataset originated outside the Brain corpus.\n\n`used_by` lists the Source IDs that use the Dataset.\n\nFor the Source currently under evaluation, verify that its use or introduction of the\nDataset is represented correctly. The Dataset record and the Source→Dataset relation\nshould be consistent.",
+    "definition": "",
+    "placeholder": "Explain which `introduced_by` or `used_by` value is incorrect or missing and give the corrected value where possible."
+  },
+  "DATASET_HE15_1": {
+    "_from": "Design/7.datasets_evaluation.md §B",
+    "field": "Language",
+    "question": "Does `language` correctly identify the language or languages of the texts in this Dataset?",
+    "check": "`language` records the ISO 639-1 code or codes of the texts contained in the Dataset,\nas supported by the Source.\n\nJudge the language of the **Dataset contents**, not the language in which the paper\nitself is written.\n\nEvaluate whether the attribute accurately represents the Dataset as described by the Source. Do not infer information the Source does not provide. Where the recorded value is `not_applicable` or `not_stated`, answer **Yes** if that is itself correct.",
+    "definition": "",
+    "placeholder": "Give the language code(s) the Source supports, and where it states them.",
+    "derived": [
+      "Evaluate whether the attribute accurately represents the Dataset as described by the Source.",
+      "Do not infer information the Source does not provide.",
+      "Where the recorded value is `not_applicable` or `not_stated`, answer **Yes** if that is itself correct."
+    ]
+  },
+  "DATASET_HE15_2": {
+    "_from": "Design/7.datasets_evaluation.md §B",
+    "field": "Jurisdiction",
+    "question": "Does `jurisdiction` correctly identify the legal system or systems from which the Dataset's texts come?",
+    "check": "`jurisdiction` describes the legal origin or scope of the **Dataset's contents**.\n\nIt is different from:\n\n* `source_jurisdiction`, which concerns the publication; and\n* `claim_jurisdiction`, which concerns an individual Claim.\n\nJurisdictions use the same coding convention as Claim jurisdictions: country codes,\n`EU`, `CoE`, or `INT`.\n\nEvaluate whether the attribute accurately represents the Dataset as described by the Source. Do not infer information the Source does not provide. Where the recorded value is `not_applicable` or `not_stated`, answer **Yes** if that is itself correct.",
+    "definition": "",
+    "placeholder": "Give the jurisdiction(s) of the Dataset's contents, and where the Source states them.",
+    "derived": [
+      "Evaluate whether the attribute accurately represents the Dataset as described by the Source.",
+      "Do not infer information the Source does not provide.",
+      "Where the recorded value is `not_applicable` or `not_stated`, answer **Yes** if that is itself correct."
+    ]
+  },
+  "DATASET_HE15_3": {
+    "_from": "Design/7.datasets_evaluation.md §B",
+    "field": "Document types",
+    "question": "Does `document_types` correctly describe the kinds of documents contained in the Dataset?",
+    "check": "`document_types` describes what the Dataset's texts or items are. Examples include\n`judgments`, `statutes`, `contracts`, `exam questions`, `synthetic`.\n\nThe recorded value should reflect the Dataset as described by the Source rather than\nintroduce a broader or different category.\n\nEvaluate whether the attribute accurately represents the Dataset as described by the Source. Do not infer information the Source does not provide. Where the recorded value is `not_applicable` or `not_stated`, answer **Yes** if that is itself correct.",
+    "definition": "",
+    "placeholder": "Give the document types the Source describes, and where.",
+    "derived": [
+      "Evaluate whether the attribute accurately represents the Dataset as described by the Source.",
+      "Do not infer information the Source does not provide.",
+      "Where the recorded value is `not_applicable` or `not_stated`, answer **Yes** if that is itself correct."
+    ]
+  },
+  "DATASET_HE15_4": {
+    "_from": "Design/7.datasets_evaluation.md §B",
+    "field": "Size",
+    "question": "Does `size` correctly reproduce the Dataset size stated by the Source, including its unit?",
+    "check": "Record the size as the Source states it, together with the relevant unit. Examples of\nunits include documents, cases, questions, sentence pairs, tokens and annotated items.\n\nDo not convert, estimate, or infer a different size when the Source does not provide\nit.\n\nEvaluate whether the attribute accurately represents the Dataset as described by the Source. Do not infer information the Source does not provide. Where the recorded value is `not_applicable` or `not_stated`, answer **Yes** if that is itself correct.",
+    "definition": "",
+    "placeholder": "Give the size and unit as the Source states them, and where.",
+    "derived": [
+      "units include documents, cases, questions, sentence pairs, tokens and annotated items.",
+      "Evaluate whether the attribute accurately represents the Dataset as described by the Source.",
+      "Do not infer information the Source does not provide.",
+      "Where the recorded value is `not_applicable` or `not_stated`, answer **Yes** if that is itself correct."
+    ]
+  },
+  "DATASET_HE15_5": {
+    "_from": "Design/7.datasets_evaluation.md §B",
+    "field": "Annotation",
+    "question": "Does `annotation` correctly describe how the Dataset was annotated?",
+    "check": "The permitted values are:\n\n* `none` — no annotation;\n* `automatic` — annotation was produced automatically;\n* `human_single` — human annotation without multiple independent annotators;\n* `human_multiple` — annotation involved multiple human annotators.\n\nJudge the annotation process described by the Source.\n\nEvaluate whether the attribute accurately represents the Dataset as described by the Source. Do not infer information the Source does not provide. Where the recorded value is `not_applicable` or `not_stated`, answer **Yes** if that is itself correct.",
+    "definition": "",
+    "placeholder": "Give the annotation value you consider correct and where the Source describes the process.",
+    "derived": [
+      "Evaluate whether the attribute accurately represents the Dataset as described by the Source.",
+      "Do not infer information the Source does not provide.",
+      "Where the recorded value is `not_applicable` or `not_stated`, answer **Yes** if that is itself correct."
+    ]
+  },
+  "DATASET_HE15_6": {
+    "_from": "Design/7.datasets_evaluation.md §B",
+    "field": "Agreement reported",
+    "question": "Does `agreement_reported` correctly indicate whether the Source reports an inter-annotator agreement measure for this Dataset?",
+    "check": "The permitted values are:\n\n* `yes` — the Source reports an inter-annotator agreement figure;\n* `no` — inter-annotator agreement is relevant but no figure is reported;\n* `not_applicable` — inter-annotator agreement does not apply to the Dataset's\n  annotation setup.\n\nThis field records whether agreement is **reported**, not whether the reported\nagreement is high or satisfactory.\n\nEvaluate whether the attribute accurately represents the Dataset as described by the Source. Do not infer information the Source does not provide. Where the recorded value is `not_applicable` or `not_stated`, answer **Yes** if that is itself correct.",
+    "definition": "",
+    "placeholder": "Say whether the Source reports an agreement figure, and where.",
+    "derived": [
+      "Evaluate whether the attribute accurately represents the Dataset as described by the Source.",
+      "Do not infer information the Source does not provide.",
+      "Where the recorded value is `not_applicable` or `not_stated`, answer **Yes** if that is itself correct."
+    ]
+  },
+  "DATASET_HE15_7": {
+    "_from": "Design/7.datasets_evaluation.md §B",
+    "field": "Availability",
+    "question": "Does `availability` correctly represent the Dataset's access status as reported by the Source?",
+    "check": "The permitted values are:\n\n* `public` — publicly accessible;\n* `on_request` — available by request;\n* `proprietary` — access is restricted or proprietary;\n* `not_stated` — the Source does not state its availability.\n\nJudge what the Source reports. Do not infer availability from outside knowledge or\nfrom whether the Dataset can currently be found online.\n\nEvaluate whether the attribute accurately represents the Dataset as described by the Source. Do not infer information the Source does not provide. Where the recorded value is `not_applicable` or `not_stated`, answer **Yes** if that is itself correct.",
+    "definition": "",
+    "placeholder": "Give the availability the Source reports, and where.",
+    "derived": [
+      "Evaluate whether the attribute accurately represents the Dataset as described by the Source.",
+      "Do not infer information the Source does not provide.",
+      "Where the recorded value is `not_applicable` or `not_stated`, answer **Yes** if that is itself correct."
+    ]
+  },
+  "SOURCE_HE14_3": {
+    "_from": "Design/7.datasets_evaluation.md §C; N/A added 2026-09-08",
+    "field": "Dataset completeness",
+    "question": "Has the Brain created a Dataset node for every dataset, benchmark, or corpus that this Source actually uses or introduces?",
+    "check": "Consider the full Source, not any one Dataset record.\n\nEvery dataset, benchmark, or corpus that the Source actually uses or introduces should\nbe represented by a Dataset node.\n\nDo **not** count as missing:\n\n* passing mentions;\n* datasets discussed only as related work;\n* datasets belonging only to cited publications; or\n* datasets that the Source discusses but does not use or introduce.\n\nThis question is asked even when the Brain created no Dataset node at all: zero\nnodes is not automatically correct.\n\n**Answer N/A only when the Source genuinely neither uses nor introduces any\ndataset, benchmark or corpus.** That is a judgement about the paper, and only\nyou can make it — the Brain having produced no Dataset node is not evidence for\nit, because that absence may be the very failure this question is asking about.\nN/A needs no comment.\n\nOtherwise: **Yes** when every dataset the Source uses or introduces is\nrepresented; **In part** when some are represented and one or more are missing;\n**No** when the representation is materially incomplete. For In part and No,\nname the missing Dataset(s).",
+    "definition": "",
+    "placeholder": "List the missing Dataset(s) and, where possible, give the page or section showing that the Source uses or introduces them.",
+    "derived": [
+      "Consider the full Source, not any one Dataset record.",
+      "This question is asked even when the Brain created no Dataset node at all:",
+      "nodes is not automatically correct.",
+      "**Answer N/A only when the Source genuinely neither uses nor introduces any",
+      "dataset, benchmark or corpus.** That is a judgement about the paper, and only",
+      "you can make it — the Brain having produced no Dataset node is not evidence for",
+      "it, because that absence may be the very failure this question is asking about.",
+      "**Yes** when every dataset the Source uses or introduces is",
+      "**In part** when some are represented and one or more are missing;",
+      "**No** when the representation is materially incomplete.",
+      "name the missing Dataset(s)."
+    ]
+  },
+  "SOURCE_HE18_1": {
+    "_from": "Design/8.citation_evaluation.md §5",
+    "field": "CITES accuracy",
+    "question": "Do all outgoing CITES edges shown above correspond to citations that this paper actually makes to the indicated Brain Sources, with the correct direction from this paper to the cited Source?",
+    "check": "**How to judge**\n\nA CITES edge records that one Source cites another Source represented in the Brain.\n\nFor every outgoing edge shown above, verify that:\n\n* the current paper actually cites the indicated publication;\n* the cited publication has been matched to the correct Brain Source; and\n* the edge runs from the citing Source to the cited Source.\n\nDo not evaluate whether the citation is approving, critical, important or\nsubstantively correct. CITES records the **existence of the citation**, not its\nargumentative role.\n\nCitations to publications outside the Brain and citations to primary legal sources do\nnot belong here.",
+    "definition": "",
+    "placeholder": "Identify any spurious or incorrectly matched citation and explain the problem."
+  },
+  "SOURCE_HE18_2": {
+    "_from": "Design/8.citation_evaluation.md §6",
+    "field": "CITES completeness",
+    "question": "Are all citations made by this paper to other Sources represented in the Brain captured by outgoing CITES edges?",
+    "check": "Compare the paper's citations with the Sources represented in the Brain.\n\nA missing edge is a defect when:\n\n1. this paper cites another publication; and\n2. that publication is represented as a Source in the Brain; but\n3. no outgoing CITES edge is present.\n\nDo not count as missing:\n\n* citations to publications outside the Brain;\n* legislation;\n* case law;\n* regulatory guidance; or\n* other primary legal materials.\n\nUse **Browse Brain Sources** to check which publications are in the Brain.",
+    "definition": "",
+    "placeholder": "Briefly explain which citation or citations appear to be missing.",
+    "derived": [
+      "Use **Browse Brain Sources** to check which publications are in the Brain."
+    ]
+  },
+  "SOURCE_HE18_3": {
+    "_from": "Design/8.citation_evaluation.md §7",
+    "field": "Missing or spurious CITES edges",
+    "question": "List the CITES edges that are missing or spurious.",
+    "check": "Shown when CITES accuracy or CITES completeness is answered No or In part.\n\nFor a **missing** edge, identify the cited Source ID or publication. For a **spurious**\nedge, identify the incorrectly linked cited Source.\n\nCITES records carry no separate edge id, so the target Source ID is the stable\nidentifier to use.",
+    "definition": "",
+    "placeholder": "Missing: SRC-xxxx — [title]\nSpurious: SRC-yyyy — [title]",
+    "derived": [
+      "Shown when CITES accuracy or CITES completeness is answered No or In part.",
+      "CITES records carry no separate edge id, so the target Source ID is the stable"
+    ]
+  },
+  "SOURCE_HE19_1": {
+    "_from": "Design/9.claim_recall.md §3",
+    "field": "Claim recall",
+    "question": "Does the extracted Claim set capture all central theses or hypotheses that the Source advances as part of its contribution?",
+    "check": "**How to judge**\n\nAssess the extracted Claims against the **full paper**, not only its abstract,\nintroduction or conclusion.\n\nA central thesis or hypothesis is missing when the paper advances it as part of its\ncontribution but no extracted Claim adequately represents it.\n\nDo not count as missing:\n\n* a restatement of an already extracted Claim;\n* headings or signposting;\n* facts about the paper itself;\n* mandatory boilerplate;\n* uncommented quotations from primary legal sources; or\n* graph metadata.\n\nApply the same standard to doctrinal, theoretical, empirical and technical papers. The\nnumber of expected Claims depends on the paper; there is no target Claim count.\n\n* **Yes** — no central contribution-level Claim is missing.\n* **In part** — the main contribution is represented, but one or more relevant central\n  Claims are omitted.\n* **No** — the extracted set materially fails to represent the paper's central\n  contribution.",
+    "definition": "",
+    "placeholder": "Summarise what the extracted set fails to represent; list the individual missing Claims in the field below."
+  },
+  "SOURCE_HE19_3": {
+    "_from": "Design/9.claim_recall.md §4",
+    "field": "Missing Claims",
+    "question": "List each central Claim that is missing from the Brain.",
+    "check": "Shown when Claim recall is answered No or In part.\n\nGive a one-line formulation of the missing Claim and the page or section where the\nSource advances it.",
+    "definition": "",
+    "placeholder": "1. [Missing Claim] — p. 6 / Section 3.2\n2. [Missing Claim] — p. 11 / Conclusion",
+    "derived": [
+      "Shown when Claim recall is answered No or In part."
+    ]
+  },
+  "SOURCE_HE20S": {
+    "_from": "Design/9.claim_recall.md §6",
+    "field": "Source conceptual coverage",
+    "question": "Taken across all extracted Claims, does the Concept mapping adequately represent the concepts that this Source materially engages for systematic mapping?",
+    "check": "**How to judge**\n\nAssess conceptual coverage at the **Source level**, after reviewing all Claims.\n\nThe question is whether the Concept mappings, taken together, preserve the dimensions\nof the paper that matter for the systematic mapping review.\n\nA Concept does not need to appear on every individual Claim that could plausibly be\nrelated to it. Do not penalise the Brain merely because another conceptual association\nis possible.\n\nMark a deficiency when a concept materially engaged by the paper is absent from the\nSource's mappings altogether, or is represented so incompletely that the paper would be\nmischaracterised in the resulting map.\n\nThis is different from Claim-level Concept recall: an omission on one Claim may be\nharmless at Source level when the same mapping-relevant concept is adequately\nrepresented elsewhere in the paper.",
+    "definition": "Added during the 2026-09-07 calibration and settled in the page-by-page review. It has no counterpart in HE_review_form.xlsx: the workbook has claim recall (HE-19) but no equivalent review of conceptual coverage across the source.",
+    "placeholder": "Summarise which dimension of the paper the mapping fails to represent; list the individual Concepts in the field below.",
+    "derived": [
+      "Added during the 2026-09-07 calibration and settled in the page-by-page review."
+    ]
+  },
+  "SOURCE_HE20S_B": {
+    "_from": "Design/9.claim_recall.md §8",
+    "field": "Missing mapping-relevant Concepts",
+    "question": "List the Concept or Concepts needed to complete the Source-level mapping.",
+    "check": "Shown when Source conceptual coverage is answered No or In part. List what is\n**missing**, not what is present.",
+    "definition": "",
+    "placeholder": "CPT-xxxx — [reason it is materially engaged by the Source]\nor\n[proposed Concept label] — no suitable existing Concept found",
+    "derived": [
+      "Shown when Source conceptual coverage is answered No or In part."
+    ]
+  },
+  "EDGE_HE16": {
+    "_from": "Design/6.claim_evaluation.md §E",
+    "field": "Relation label",
+    "question": "Is the relation label correct for the relationship between these two Claims?",
+    "check": "* **SUPPORTS** — explicit source-grounded support;\n* **ATTACKS** — explicit source-grounded opposition;\n* **COMPATIBLE_WITH** — inferred reinforcement without citation grounding;\n* **IN_TENSION_WITH** — inferred tension without citation grounding;\n* **SAME_AS** — same proposition, Claim type and jurisdiction.\n\nExtracted and inferred relations are different forms of evidence and must not be\ntreated interchangeably.",
+    "definition": "",
+    "placeholder": "Give the label you consider correct, and say why."
+  }
+}

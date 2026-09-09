@@ -1,0 +1,12 @@
+# HE Evaluation Interface
+streamlit>=1.40
+pandas>=2.0
+PyYAML>=6.0
+
+# Live storage on a deployed run (Google Sheets). Not needed for local dry runs.
+gspread>=6.0
+google-auth>=2.30
+
+# Needed at runtime: Admin -> Exports writes the combined workbook with it.
+# Also used off-line to rebuild the criterion text from HE_review_form.xlsx.
+openpyxl>=3.1

@@ -1,0 +1,94 @@
+# Secrets — never commit these.
+# The whole .streamlit directory is ignored, not just secrets.toml: key material
+# in other formats (.p12, .pem) tends to get dropped in beside it. A key was
+# once committed here and had to be rotated; these patterns are deliberately
+# wider than the one file that caused it.
+.streamlit/
+secrets.toml
+*.p12
+*.pem
+*.key
+*.pfx
+*.jks
+id_rsa*
+*service-account*.json
+*service_account*.json
+*credentials*.json
+*client_secret*.json
+*-[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]*.json
+.env
+.env.*
+
+# Local development store. Not used when Google Sheets is configured, and never
+# a safe live store on Streamlit Community Cloud. The -wal, -shm and -journal
+# companions matter as much as the file itself: committing one without the
+# others yields a database that will not open.
+app/data/evaluations.sqlite
+app/data/evaluations.sqlite-*
+*.sqlite
+*.sqlite-*
+*.db
+
+# The app never reads PDFs: they are distributed to evaluators as ZIPs by the
+# Splitter. Keeping them out holds the deployment under 5 MB instead of 58 MB.
+brain/raw/
+
+# Brain projections the app does not read at runtime (see README, five sources).
+brain/wiki/log.md
+brain/wiki/index.md
+brain/wiki/coverage.md
+brain/wiki/structure.md
+brain/wiki/hypotheses.md
+brain/wiki/absences.jsonl
+brain/schema/
+brain/tools/
+brain/.claude/
+
+# Working documents, not needed by the deployed app
+Conversation_ChatGPT.md
+Review-Evaluation-Changes.md
+
+# Python and tooling
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.ipynb_checkpoints/
+
+# Virtual environments. The project is run from a named conda environment; a
+# venv checked in here would be both huge and wrong for anyone else's machine.
+.venv/
+venv/
+env/
+ENV/
+
+# Editors and operating systems
+.idea/
+.vscode/
+*.swp
+*~
+.DS_Store
+Thumbs.db
+
+# Scratch left by an interrupted edit or merge
+*.bak
+*.orig
+*.rej
+*.tmp
+
+# Design review. The Markdown IS needed at test time — app/tests/fidelity.py
+# checks the frozen instrument against Design/*.md — but the "before" screenshots
+# are 8.9 MB of development history nothing reads.
+Design/previous_ui_screenshots/
+
+# A local convenience and the file it generates, for pasting the tree into a
+# chat. Neither is project source. Delete these two lines if concat.sh should
+# travel with the repository.
+concat.sh
+project_concatenation.txt

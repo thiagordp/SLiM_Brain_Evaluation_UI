@@ -1,0 +1,240 @@
+{
+  "source:HE-08.1": {
+    "criterion_id": "HE-08.1",
+    "level": "source",
+    "field": "contribution_type",
+    "check": "Every value in contribution_type applies to the publication, they are listed in order of dominance, and no applicable value is missing. Closed list: doctrinal | normative | theoretical | empirical_quantitative | empirical_qualitative | technical | survey.",
+    "definition": "Schema definition (schema/source.md) — contribution_type: one or more of the closed list, assigned in order of dominance. doctrinal: describes, systematises or interprets existing law (lex lata). normative: argues what the law or policy should be (lex ferenda), including reform proposals and ethical arguments. theoretical: builds or criticises concepts, taxonomies or frameworks without primarily describing law or reporting data. empirical_quantitative: reports measurements, experiments, benchmarks, statistics or surveys with numerical results. empirical_qualitative: reports interviews, case studies, content analysis or observation. technical: proposes or evaluates a system, model, dataset or method. survey: reviews other literature as its main contribution."
+  },
+  "source:HE-08.2": {
+    "criterion_id": "HE-08.2",
+    "level": "source",
+    "field": "source_jurisdiction",
+    "check": "source_jurisdiction names the legal system(s) the work is actually situated in, in order of dominance; \"general\" is used when the work is not situated in any particular legal system.",
+    "definition": "Schema definition (schema/source.md; extract-claims, Jurisdiction) — source_jurisdiction: the legal system(s) the work is situated in, inferred from the law it treats as its own, the authors' affiliations as printed, and the venue; \"general\" for work that does not situate itself in any legal system (most technical papers). Codes: ISO 3166-1 alpha-2 for states, EU for the European Union, CoE for the Council of Europe system, INT for public international law; a sub-unit (US-CA) only when the source adds it. It is a different field from claim_jurisdiction, which is never inferred from it."
+  },
+  "source:HE-08.3": {
+    "criterion_id": "HE-08.3",
+    "level": "source",
+    "field": "other_versions",
+    "check": "other_versions records the preprint / offprint twins that exist for this publication, and nothing that is not a version of it. Empty is correct when no twin is known.",
+    "definition": "Schema definition (schema/source.md) — other_versions: source ids or external identifiers of the preprint / offprint twins of this publication, if any."
+  },
+  "source:HE-18.1": {
+    "criterion_id": "HE-18.1",
+    "level": "source",
+    "field": "CITES accuracy",
+    "check": "Every CITES edge written from this source corresponds to a citation the source actually makes to that other corpus source, and points in the right direction (citing source -> cited source).",
+    "definition": "Schema definition (schema/edges.md) — CITES: an edge from Source to Source, created only when both are in the corpus, running from the citing source to the cited source. It is written to edges.jsonl as {type, from, to, run_id} and carries no grounding, plausibility or note."
+  },
+  "source:HE-18.2": {
+    "criterion_id": "HE-18.2",
+    "level": "source",
+    "field": "CITES completeness",
+    "check": "No citation from this source to another source already in the corpus is missing a CITES edge.",
+    "definition": "Schema definition (schema/edges.md; CLAUDE.md, Corpus boundary) — a CITES edge exists for every citation this source makes to another source in the corpus, and only for those: a citation to a work outside the corpus never becomes an edge, and primary legal sources (legislation, case law, regulatory guidance) are never nodes."
+  },
+  "source:HE-18.3": {
+    "criterion_id": "HE-18.3",
+    "level": "source",
+    "field": "Missing / spurious edges",
+    "check": "If either answer above is No: list here the CITES edges that are missing (cited SRC id) or spurious (edge id).",
+    "definition": ""
+  },
+  "source:HE-19.1": {
+    "criterion_id": "HE-19.1",
+    "level": "source",
+    "field": "Recall",
+    "check": "All central theses or hypotheses the source advances as part of its contribution were extracted as claims — assessed against the full source, not only its abstract and conclusion.",
+    "definition": "Schema definition (schema/claim.md; extract-claims) — a claim is \"a central thesis or hypothesis that a paper advances as part of its contribution, especially when supported through arguments or empirical data\"; every source claims something, so there is at least one claim per source. Not extracted, and therefore not counted as missing: restatements of an already-extracted claim, headings and signposting, mandatory ethics boilerplate, facts about the paper itself, uncommented quotations of primary legal sources, and graph metadata rendered as assertion. The same effort is owed to essay-style and doctrinal papers as to empirical and technical ones, and a long paper is read in full — the thesis advertised in the abstract and the thesis actually argued can differ."
+  },
+  "source:HE-19.3": {
+    "criterion_id": "HE-19.3",
+    "level": "source",
+    "field": "Claims NOT retrieved",
+    "check": "If HE-19.1 is No, list each central thesis of the source that was NOT extracted: a one-line statement plus the page / section where it is argued. Write \"none\" if recall is complete.",
+    "definition": ""
+  },
+  "claim:HE-03": {
+    "criterion_id": "HE-03",
+    "level": "claim",
+    "field": "Claim definition",
+    "check": "The extracted item complies with the definition of a claim: a central thesis or hypothesis that the source advances as part of its contribution, and one contention under the semantic one-proposition test (the parts stand or fall together; a reader could not accept one and reject another).",
+    "definition": "Schema definition (schema/claim.md) — Claim: \"a central thesis or hypothesis that a paper advances as part of its contribution, especially when supported through arguments or empirical data. It is one proposition — one contention that stands or falls together.\" The one-proposition test is semantic, never syntactic: split two candidate parts into separate claims when a reader could accept one and reject the other, when they need different claim types or jurisdictions, or when an edge could attack one without touching the other; keep them in one claim when they stand or fall together as a single contention. Sentence shape decides nothing — a multi-pronged thesis the paper argues as one position is one claim, stated across sentences, with an anchor per prong."
+  },
+  "claim:HE-25": {
+    "criterion_id": "HE-25",
+    "level": "claim",
+    "field": "Not a restatement",
+    "check": "The claim is NOT a within-source restatement of an already-extracted claim of the same source. (Yes = it is a distinct contention; No = it duplicates another CLM of this source — give that id in the comment.)",
+    "definition": "Schema definition (extract-claims, What to extract) — \"restatements of a claim already extracted (a restatement adds nothing)\" are not extracted. Distinctness is decided by the semantic one-proposition test of schema/claim.md, not by a difference in wording: two records of the same source that state the same contention are one claim."
+  },
+  "claim:HE-04": {
+    "criterion_id": "HE-04",
+    "level": "claim",
+    "field": "Independent intelligibility",
+    "check": "The statement is intelligible on its own, without the source's context, and is stated in as many sentences as the single proposition requires — no more.",
+    "definition": "Schema definition (extract-claims, Formulation) — \"State it so it can be understood without the source, in as many sentences as the proposition needs — the limit is semantic, never syntactic.\" All anaphoric and document-dependent references are resolved; elements like \"this work\" or \"the authors\" must be avoided. The extra room is never used to smuggle in a second proposition."
+  },
+  "claim:HE-05": {
+    "criterion_id": "HE-05",
+    "level": "claim",
+    "field": "Modality preserved",
+    "check": "The modality of the source is preserved in the statement: an is stays an is, a should stays a should, a may stays a may, a finding stays a finding. Nothing is hardened or softened.",
+    "definition": "Schema definition (schema/claim.md, statement; extract-claims, Formulation) — the statement is written \"in the source's own modality (is / should / may / found that)\". \"If the source says 'may', the statement says 'may'. Do not upgrade 'suggests' to 'shows', or 'should' to 'must'.\""
+  },
+  "claim:HE-06": {
+    "criterion_id": "HE-06",
+    "level": "claim",
+    "field": "Anchors warrant the claim",
+    "check": "The 1-3 anchor quotes, taken together, warrant the precise proposition stated — without stitching independent ideas from different parts of the source into a contention the source does not argue.",
+    "definition": "Schema definition (schema/claim.md, quotes) — 1 to 3 anchors, each {quote, location, quote_translation?}. The quote is a verbatim passage from the source's own markdown conversion, in the original language, at most 50 words, \"each anchor supporting a component of the one proposition — two anchors may corroborate the same component, but the anchor set must never stitch independent ideas into a proposition the source does not argue\". location is a page number or, without pagination, section heading plus paragraph ordinal (e.g. \"3.2, para 4\"); quote_translation only when the original is not in English. If no passage warrants a proposition, the claim is not recorded (extract-claims)."
+  },
+  "claim:HE-07": {
+    "criterion_id": "HE-07",
+    "level": "claim",
+    "field": "Premise",
+    "check": "The premise states the specific ground the source actually gives, in one sentence, and does not commit the legal-basis-as-outcome failure (naming the instrument or case as if it were the reasoning). N/A when basis is none_stated and premise is correctly empty.",
+    "definition": "Schema definition (schema/claim.md, premise and division of labour) — premise: \"the ground the source gives for the claim, in one sentence\". basis is the closed-list category of ground (what kind of support the source offers); premise is the free-text content of that ground (which case, which provision, which result, which argument). It is filled whenever the source states a ground and is empty exactly when basis is none_stated; when the source offers several kinds of ground, basis records the dominant one and premise may carry the others. The legal-basis-as-outcome failure (extract-claims) is a legal basis read as a substantive finding — a provision cited for procedure treated as an outcome."
+  },
+  "claim:HE-08.1": {
+    "criterion_id": "HE-08.1",
+    "level": "claim",
+    "field": "claim_type",
+    "check": "claim_type is the right value for what the statement does. Closed list: descriptive | interpretive | normative | empirical | conceptual | predictive | methodological.",
+    "definition": "Schema definition (schema/claim.md) — descriptive: states what the law is, what courts or regulators do, or what a practice is (lex lata). interpretive: offers a reading of a legal text, judgment or concept that goes beyond restating it. normative: states what the law, policy, design or practice should be (lex ferenda); markers: should, ought, must (where not quoting a legal text), we propose, we recommend, it is desirable. empirical: reports a finding from data, an experiment, a benchmark, interviews or observation. conceptual: defines, distinguishes or classifies a notion. predictive: states what will or is likely to happen. methodological: states how something should be studied, measured or built."
+  },
+  "claim:HE-08.2": {
+    "criterion_id": "HE-08.2",
+    "level": "claim",
+    "field": "positive_form",
+    "check": "positive_form is assigned according to its definition in schema/claim.md.",
+    "definition": "Schema definition (schema/claim.md, after Baude, Chilton and Malani 2017) — positive_form is set on every descriptive claim and omitted on every non-descriptive one: choose one of the five forms when the claim describes what courts, legislators or regulators do, and write not_applicable on every other descriptive claim. general_rule: courts generally decide X in way Y. trend: increasingly, over time. split: disagreement between courts or jurisdictions. frequency: courts have often confronted X. existence: at least one court has decided X."
+  },
+  "claim:HE-08.3": {
+    "criterion_id": "HE-08.3",
+    "level": "claim",
+    "field": "basis  (+ basis_qualifier)",
+    "check": "basis records the dominant kind of ground the source offers: case_law | legislation | dataset_or_experiment | argument | literature | none_stated. When basis is case_law, basis_qualifier (holding | dictum | unclear) records what the source claims the case stands on.",
+    "definition": "Schema definition (schema/claim.md) — basis is always filled and records what the source offers for the claim: case_law | legislation | dataset_or_experiment | argument | literature | none_stated (the source offers no ground). Where the source offers several kinds of ground, basis records the dominant one. basis_qualifier is set only when basis is case_law — holding | dictum | unclear — and \"records what the source claims the case stands on, not what is true\"."
+  },
+  "claim:HE-08.4": {
+    "criterion_id": "HE-08.4",
+    "level": "claim",
+    "field": "claim_jurisdiction  (+ relation, inferred)",
+    "check": "claim_jurisdiction names the legal system(s) the CLAIM is about, in order of dominance — never carried over from the source's jurisdiction. jurisdiction_relation is set when there is more than one entry; jurisdiction_inferred is true exactly when the jurisdiction came from context rather than from the source's words.",
+    "definition": "Schema definition (schema/claim.md; extract-claims, Jurisdiction) — claim_jurisdiction: the legal system(s) the claim is about, in order of dominance. Codes: ISO 3166-1 alpha-2 for states, EU, CoE, INT; a sub-unit (US-CA) only when the source adds it. Three special values: general (the source presents the claim as tied to no legal system); undetermined (the source does not say and context does not settle it — never resolved by falling back on the source jurisdiction); geographical_proxy:<code> (the claim itself is general but its evidence comes entirely from one jurisdiction's materials — the code marks the origin of the evidence, not the legal scope). jurisdiction_relation, only when there is more than one entry: eu_law_in_member_state (EU law as applied in a member state), comparative (the claim explicitly compares the listed orders), cumulative (it concerns each listed order independently). jurisdiction_inferred: true when the jurisdiction was assigned from the claim's surrounding text or the materials the source cites on the point — never from the source's own jurisdiction, affiliations or venue."
+  },
+  "claim:HE-08.5": {
+    "criterion_id": "HE-08.5",
+    "level": "claim",
+    "field": "temporal_reference",
+    "check": "temporal_reference gives the date or period of the legal or factual state the claim describes when the source states one, and \"as_of_publication\" otherwise.",
+    "definition": "Schema definition (schema/claim.md; extract-claims, Time) — temporal_reference: the date or period of the legal or factual state the claim describes, when the source specifies one (for example \"before the AI Act entered into force\", \"as of 2023\"); otherwise \"as_of_publication\". Claims are never updated to reflect later legal developments: the claim records what the source said when it said it."
+  },
+  "claim:HE-12": {
+    "criterion_id": "HE-12",
+    "level": "claim",
+    "field": "Concept correctness",
+    "check": "Every concept mapped to this claim is one the claim substantively concerns, and an existing anchor concept was used wherever it captures the claim without distortion.",
+    "definition": "Schema definition (schema/concept.md; map-concepts) — a concept is \"a notion that claims are about\", in three families (concept_type): legal_task, technique_class, normative_concern, plus other for a candidate none of them fits. Anchor concepts are given in advance and define the field; candidate concepts are created during extraction. \"Prefer anchors\" means only this: never coin or use a candidate where an anchor alone captures the claim; when an anchor and a non-anchor both fit without distortion, map both, within the cap. No concept is ever created for a jurisdiction, an instrument, a court, a person, an institution or a paper — these are attributes or sources."
+  },
+  "claim:HE-21": {
+    "criterion_id": "HE-21",
+    "level": "claim",
+    "field": "Candidate concept necessary",
+    "check": "If a candidate concept was created for this claim, it was necessary: no existing anchor concept captured the claim without distortion. N/A when no candidate was created for this claim.",
+    "definition": "Schema definition (map-concepts, Rules for concepts) — \"Create a candidate concept only when at least one claim cannot be placed under any anchor of any family without distortion.\" Before creating one, the registry is checked for an existing concept with the same meaning under another name; where one is found, an alias is added to it instead of creating. The candidate takes the family it extends (legal_task | technique_class | normative_concern), or other when none fits, and a label that is a noun phrase of at most five words in the source's own terms, labelling the notion and never a source."
+  },
+  "claim:HE-20": {
+    "criterion_id": "HE-20",
+    "level": "claim",
+    "field": "Concept recall",
+    "check": "The concepts this claim engages are all represented in its mapping — none of the three families (legal_task, technique_class, normative_concern) is silently left out where the claim engages it.",
+    "definition": "Schema definition (schema/concept.md) — \"Map every claim to at least one concept, and to at most 3 concepts per concept_type value, other included. Leave any concept_type the claim does not engage absent.\" The families are legal_task, technique_class and normative_concern (plus other); the concept is never imputed to a claim that does not concern it."
+  },
+  "claim:HE-20.b": {
+    "criterion_id": "HE-20.b",
+    "level": "claim",
+    "field": "Concepts NOT mapped",
+    "check": "If recall is incomplete: list the concept(s) that should have been mapped (existing CPT id, or the label a candidate should have carried). Write \"none\" if the mapping is complete.",
+    "definition": ""
+  },
+  "claim:HE-16": {
+    "criterion_id": "HE-16",
+    "level": "claim",
+    "field": "Edge labels",
+    "check": "Every cross-source edge on this claim carries a label that respects that edge type's definition in schema/edges.md — the relation the label asserts is the relation that actually holds between the two claims. Record each edge in the block below; the Answer cell fills itself from that block.",
+    "definition": "Schema definition (schema/edges.md) — the cross-source claim edges and the grounding each requires (a hard pairing, so the strength of the label never exceeds the strength of the evidence). SUPPORTS (extracted only): one source explicitly gives reasons or evidence for a claim in another source, naming or citing it on that point. ATTACKS (extracted only): one source explicitly denies or gives reasons against a claim in another source, naming or citing it on that point. COMPATIBLE_WITH (inferred only): judged from content alone that two claims from different sources reinforce each other, with no citation link on the point. IN_TENSION_WITH (inferred only): the same judgment, where the two claims are in tension. SAME_AS (extracted or inferred): two claims from different sources assert the same proposition for the same jurisdiction and claim type — strict on all three, so a descriptive claim about the EU and the same sentence about the United States are not SAME_AS, and a normative claim and its descriptive counterpart are not SAME_AS."
+  },
+  "dataset:HE-14.1": {
+    "criterion_id": "HE-14.1",
+    "level": "dataset",
+    "field": "Warranted node",
+    "check": "The node corresponds to a dataset, benchmark or corpus the source actually USES or INTRODUCES — not to a passing mention, a cited related work, or a dataset merely discussed.",
+    "definition": "Schema definition (schema/dataset.md; schema/edges.md) — \"One node per dataset, benchmark, or corpus that a source uses or introduces. Create a Dataset node only when a USES edge is warranted; never from a passing mention.\" USES runs from Source to Dataset and holds when the source uses or introduces the dataset."
+  },
+  "dataset:HE-14.2": {
+    "criterion_id": "HE-14.2",
+    "level": "dataset",
+    "field": "introduced_by / used_by",
+    "check": "introduced_by correctly says whether this source introduces the dataset (source id) or takes it from outside (\"external\"), and used_by lists the sources that use it.",
+    "definition": "Schema definition (schema/dataset.md) — introduced_by: the source id, when the dataset is introduced in the corpus; otherwise \"external\". used_by: the source ids that use it. At claim level, Claim.dataset records that a claim rests on a dataset node while the USES edge records the source-level relation; the write gate checks the consistency of the two (schema/claim.md)."
+  },
+  "dataset:HE-14.3": {
+    "criterion_id": "HE-14.3",
+    "level": "dataset",
+    "field": "No missing dataset",
+    "check": "No dataset that this source uses or introduces is missing a Dataset node. (Answer on the source as a whole; list any missing dataset in the comment.)",
+    "definition": "Schema definition (schema/dataset.md; schema/edges.md) — every dataset, benchmark or corpus this source uses or introduces warrants a USES edge and therefore a node; a dataset only mentioned in passing, cited as related work or merely discussed does not."
+  },
+  "dataset:HE-15.1": {
+    "criterion_id": "HE-15.1",
+    "level": "dataset",
+    "field": "language",
+    "check": "language lists the ISO 639-1 codes of the texts in the dataset, as the source states them.",
+    "definition": "Schema definition (schema/dataset.md) — language: the ISO 639-1 codes of the texts in the dataset."
+  },
+  "dataset:HE-15.2": {
+    "criterion_id": "HE-15.2",
+    "level": "dataset",
+    "field": "jurisdiction",
+    "check": "jurisdiction names the legal system(s) the dataset's texts come from.",
+    "definition": "Schema definition (schema/dataset.md; extract-claims, Jurisdiction) — jurisdiction: the legal system(s) the texts come from, in the same codes as the claim jurisdictions (ISO 3166-1 alpha-2, EU, CoE, INT)."
+  },
+  "dataset:HE-15.3": {
+    "criterion_id": "HE-15.3",
+    "level": "dataset",
+    "field": "document_types",
+    "check": "document_types describes what the texts are (e.g. judgments, statutes, contracts, exam questions, synthetic).",
+    "definition": "Schema definition (schema/dataset.md) — document_types: what the texts are, e.g. judgments, statutes, contracts, exam questions, synthetic."
+  },
+  "dataset:HE-15.4": {
+    "criterion_id": "HE-15.4",
+    "level": "dataset",
+    "field": "size",
+    "check": "size is recorded as the source states it, with its unit (documents, tokens, pairs, items...).",
+    "definition": "Schema definition (schema/dataset.md) — size: as stated in the source, with its unit."
+  },
+  "dataset:HE-15.5": {
+    "criterion_id": "HE-15.5",
+    "level": "dataset",
+    "field": "annotation",
+    "check": "annotation is the right value: none | automatic | human_single | human_multiple.",
+    "definition": "Schema definition (schema/dataset.md) — annotation: none | automatic | human_single | human_multiple."
+  },
+  "dataset:HE-15.6": {
+    "criterion_id": "HE-15.6",
+    "level": "dataset",
+    "field": "agreement_reported",
+    "check": "agreement_reported correctly states whether the source gives an inter-annotator agreement figure: yes | no | not_applicable.",
+    "definition": "Schema definition (schema/dataset.md) — agreement_reported: yes | no | not_applicable — whether an inter-annotator agreement figure is given."
+  },
+  "dataset:HE-15.7": {
+    "criterion_id": "HE-15.7",
+    "level": "dataset",
+    "field": "availability",
+    "check": "availability is the right value: public | on_request | proprietary | not_stated.",
+    "definition": "Schema definition (schema/dataset.md) — availability: public | on_request | proprietary | not_stated."
+  }
+}

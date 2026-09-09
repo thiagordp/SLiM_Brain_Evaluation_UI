@@ -1,0 +1,7 @@
+evaluator_id,name,is_admin,pair_id,agreement_split,individual_split
+alessandro,Alessandro,False,C,AGR-C,IND-3
+francesca,Francesca,False,A,AGR-A,
+giovanni,Giovanni,False,C,AGR-C,IND-5
+giuseppe,Giuseppe,False,B,AGR-B,IND-2
+thiago,Thiago,True,A,AGR-A,
+vaclav,Vaclav,False,B,AGR-B,IND-4

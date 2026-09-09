@@ -1,0 +1,188 @@
+{
+  "normative_concern": [
+    {
+      "id": "CPT-access-to-justice",
+      "label": "Access to justice",
+      "definition": "Whether AI widens or narrows access to legal help, courts, and legal information."
+    },
+    {
+      "id": "CPT-accountability-and-liability",
+      "label": "Accountability and liability",
+      "definition": "Who answers, and who is legally liable, for AI-produced legal work or decisions."
+    },
+    {
+      "id": "CPT-accuracy-and-reliability",
+      "label": "Accuracy and reliability",
+      "definition": "Correctness, stability, hallucination, and dependability of AI outputs in legal use."
+    },
+    {
+      "id": "CPT-autonomy-and-human-oversight",
+      "label": "Autonomy and human oversight",
+      "definition": "The degree of human control, review, and decision authority over AI in legal tasks."
+    },
+    {
+      "id": "CPT-cost-efficiency-labour",
+      "label": "Cost, efficiency and labour",
+      "definition": "Cost savings, efficiency gains, and effects on legal labour and the legal profession."
+    },
+    {
+      "id": "CPT-due-process-and-fair-trial",
+      "label": "Due process and fair trial",
+      "definition": "Procedural rights, the right to be heard, and fair-trial guarantees when AI is used in proceedings."
+    },
+    {
+      "id": "CPT-environmental-cost",
+      "label": "Environmental cost",
+      "definition": "Energy and environmental footprint of legal AI systems."
+    },
+    {
+      "id": "CPT-explainability-and-transparency",
+      "label": "Explainability and transparency",
+      "definition": "Whether AI outputs and processes can be explained, inspected, or understood."
+    },
+    {
+      "id": "CPT-fairness-and-non-discrimination",
+      "label": "Fairness and non-discrimination",
+      "definition": "Bias, disparate impact, and equal treatment in AI-supported legal processes."
+    },
+    {
+      "id": "CPT-privacy-and-data-protection",
+      "label": "Privacy and data protection",
+      "definition": "Personal data, confidentiality, and data-protection law in legal AI."
+    },
+    {
+      "id": "CPT-professional-responsibility",
+      "label": "Professional responsibility",
+      "definition": "Duties of lawyers, judges, and legal professionals when using AI (competence, verification, candour)."
+    },
+    {
+      "id": "CPT-rule-of-law-and-legitimacy",
+      "label": "Rule of law and legitimacy",
+      "definition": "Legitimacy, authority, and rule-of-law implications of AI in legal interpretation and adjudication."
+    },
+    {
+      "id": "CPT-security-and-misuse",
+      "label": "Security and misuse",
+      "definition": "Adversarial use, manipulation, security risks, and misuse of AI in legal settings."
+    }
+  ],
+  "legal_task": [
+    {
+      "id": "CPT-access-to-justice-tools",
+      "label": "Access-to-justice tools",
+      "definition": "Tools that help laypeople or under-resourced parties navigate legal processes or documents."
+    },
+    {
+      "id": "CPT-adjudicative-decision-support",
+      "label": "Adjudicative decision support",
+      "definition": "Supporting judges, tribunals, or adjudicators in deciding cases."
+    },
+    {
+      "id": "CPT-argument-mining",
+      "label": "Argument mining",
+      "definition": "Identifying and structuring argumentative units and rhetorical roles in legal text."
+    },
+    {
+      "id": "CPT-compliance-and-monitoring",
+      "label": "Compliance and monitoring",
+      "definition": "Checking conduct, systems, or documents against legal or regulatory requirements."
+    },
+    {
+      "id": "CPT-drafting-and-generation",
+      "label": "Drafting and generation",
+      "definition": "Generating legal text such as contracts, briefs, opinions, or answers."
+    },
+    {
+      "id": "CPT-ediscovery",
+      "label": "E-discovery",
+      "definition": "Identifying responsive or relevant documents in litigation document review."
+    },
+    {
+      "id": "CPT-entity-and-citation-extraction",
+      "label": "Entity and citation extraction",
+      "definition": "Extracting named entities, citations, and structured elements from legal text."
+    },
+    {
+      "id": "CPT-information-retrieval",
+      "label": "Information retrieval",
+      "definition": "Finding relevant legal documents or passages (cases, statutes, precedents) for a query."
+    },
+    {
+      "id": "CPT-legal-education",
+      "label": "Legal education",
+      "definition": "Use of AI in teaching, training, or examining legal knowledge and skills."
+    },
+    {
+      "id": "CPT-outcome-prediction",
+      "label": "Outcome prediction",
+      "definition": "Predicting the outcome, verdict, or decision of a legal case or proceeding."
+    },
+    {
+      "id": "CPT-question-answering",
+      "label": "Question answering",
+      "definition": "Answering legal questions posed in natural language, including entailment over statutory text."
+    },
+    {
+      "id": "CPT-review-and-due-diligence",
+      "label": "Review and due diligence",
+      "definition": "Reviewing documents (contracts, filings) for risks, clauses, or issues."
+    },
+    {
+      "id": "CPT-rule-formalisation",
+      "label": "Rule formalisation",
+      "definition": "Translating legal rules or statutes into formal, machine-executable representations."
+    },
+    {
+      "id": "CPT-summarisation",
+      "label": "Summarisation",
+      "definition": "Producing condensed versions of legal documents such as judgments or contracts."
+    }
+  ],
+  "technique_class": [
+    {
+      "id": "CPT-agentic-systems",
+      "label": "Agentic systems",
+      "definition": "Autonomous or semi-autonomous AI agents that plan, act, negotiate, or transact on behalf of users."
+    },
+    {
+      "id": "CPT-case-based-reasoning",
+      "label": "Case-based reasoning",
+      "definition": "Reasoning from precedent cases by factor or dimension comparison."
+    },
+    {
+      "id": "CPT-classical-statistical-ml",
+      "label": "Classical statistical machine learning",
+      "definition": "Feature-based learners such as SVMs, logistic regression, random forests, and n-gram models."
+    },
+    {
+      "id": "CPT-computational-argumentation",
+      "label": "Computational argumentation",
+      "definition": "Formal models of argument structure, attack, and defeat applied to legal reasoning."
+    },
+    {
+      "id": "CPT-large-language-models",
+      "label": "Large language models",
+      "definition": "Large pre-trained generative language models such as GPT-3, GPT-4, Claude, Gemini, and Llama used by prompting or fine-tuning."
+    },
+    {
+      "id": "CPT-neuro-symbolic-hybrid",
+      "label": "Neuro-symbolic hybrids",
+      "definition": "Combinations of neural models with symbolic representations, logics, or reasoning engines."
+    },
+    {
+      "id": "CPT-pre-llm-neural",
+      "label": "Pre-LLM neural models",
+      "definition": "Neural models predating large language models: CNNs, RNNs, BiLSTMs, and encoder models such as BERT fine-tuned for a task."
+    },
+    {
+      "id": "CPT-retrieval-augmented-or-tool-using",
+      "label": "Retrieval-augmented or tool-using systems",
+      "definition": "Language models combined with retrieval, external knowledge sources, or tools at inference time."
+    },
+    {
+      "id": "CPT-symbolic-rule-based",
+      "label": "Symbolic and rule-based systems",
+      "definition": "Hand-coded rules, logic programming, expert systems, and formal logics for legal reasoning."
+    }
+  ]
+}
