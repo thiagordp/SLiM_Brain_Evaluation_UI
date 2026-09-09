@@ -3814,6 +3814,129 @@ def test_quota_is_temporary_not_a_fault():
           "without sending anybody to the bootstrap tool over a rate limit")
 
 
+def test_storage_guard_handler_cannot_raise():
+    """The guard must report the failure it caught, never one of its own.
+
+    On the first deployment an older copy of this project sat earlier on
+    `sys.path`, so `import sheets` inside the guard bound a module with neither
+    `check_ready` nor `QuotaExceeded`. `store.init()` raised AttributeError for
+    the first; evaluating `except sheets.QuotaExceeded` raised AttributeError
+    for the second, replacing the original and hiding it.
+    """
+    print("\n== the storage guard reports what it caught ==")
+    import streamlit_app
+
+    check(streamlit_app.QuotaExceeded is sheets.QuotaExceeded,
+          "the guard holds the very class the storage layer raises")
+    check(streamlit_app.QuotaExceeded is store.sheets.QuotaExceeded,
+          "which is the one `store` would raise it from")
+    check(issubclass(sheets.QuotaExceeded, sheets.StorageError),
+          "and it is a StorageError, so nothing falls through to SQLite")
+
+    # No `except` clause on this path may look a name up: that is what turned a
+    # readable failure into an AttributeError about the handler.
+    guard = _ast_function(APP_DIR / "streamlit_app.py", "guard_storage")
+    import ast
+    lookups = [ast.unparse(handler.type) for node in ast.walk(guard)
+               if isinstance(node, ast.Try) for handler in node.handlers
+               if handler.type is not None
+               and isinstance(handler.type, ast.Attribute)]
+    check(not lookups,
+          f"no except clause resolves an attribute at handling time {lookups}")
+
+    # The guard only reaches storage when a workbook is configured, which is the
+    # deployed condition being reproduced.
+    original = store.init
+    was_configured = sheets.configured
+    sheets.configured = lambda: True
+    for error, expected_title, transient in (
+        (sheets.QuotaExceeded("quota is used up, wait a moment and reload"),
+         "Google Sheets is busy", True),
+        (sheets.StorageError("the workbook is missing PHASE_SUBMISSIONS"),
+         "Google Sheets is not reachable", False),
+        # The exact shape of the deployed failure: the storage layer raising
+        # something nobody anticipated.
+        (AttributeError("'GoogleSheetsWorkbook' object has no attribute "
+                        "'check_ready'"),
+         "Google Sheets is not reachable", False),
+    ):
+        def failing(error=error):
+            raise error
+        store.init = failing
+        try:
+            at = app(authenticated=True).run()
+        finally:
+            store.init = original
+        check(not at.exception,
+              f"{type(error).__name__} does not crash the app "
+              f"({at.exception[0].value[:80] if at.exception else ''})")
+        titles = [t.value for t in at.title]
+        check(expected_title in titles,
+              f"and is shown as {expected_title!r} {titles}")
+        shown = rendered_text(at)
+        check(str(error)[:30] in shown,
+              f"with the message it actually carried ({str(error)[:40]!r})")
+        if transient:
+            check(any(b.label == "Try again" for b in at.button),
+                  "a quota rejection offers to try again")
+            check("bootstrap_sheets.py" not in shown,
+                  "and does not send anybody to the bootstrap tool")
+        else:
+            check(not any(b.label == "Try again" for b in at.button),
+                  "a real fault does not pretend it will pass")
+    sheets.configured = was_configured
+
+
+def _ast_function(path, name):
+    import ast
+
+    tree = ast.parse(pathlib.Path(path).read_text(encoding="utf-8"))
+    return next(node for node in ast.walk(tree)
+                if isinstance(node, ast.FunctionDef) and node.name == name)
+
+
+def test_login_rerun_end_to_end():
+    """The deployed path: password typed, accepted, then the identity page."""
+    print("\n== one whole login, as deployed ==")
+    fresh_db()
+
+    at = app(authenticated=False).run()
+    check(not at.exception, "the password page renders")
+    check(any("Enter access password" in m.value for m in at.markdown),
+          "and asks for the password")
+
+    field = next(t for t in at.text_input if t.label == "Password")
+    at = field.set_value("wrong").run()
+    at = next(b for b in at.button if b.label == "Continue").click().run()
+    check(not at.exception, "a wrong password does not crash it")
+    check(not ss(at, "authenticated"), "and does not let anybody in")
+    check(any("Incorrect password" in e.value for e in at.error),
+          "it says so instead")
+
+    field = next(t for t in at.text_input if t.label == "Password")
+    at = field.set_value(os.environ["HE_APP_PASSWORD"]).run()
+    at = next(b for b in at.button if b.label == "Continue").click().run()
+    check(not at.exception, "the right password does not crash it either")
+    check(ss(at, "authenticated"), "it authenticates")
+    check(any("Select evaluator" in t.value for t in at.title),
+          f"and the next rerun lands on the identity page "
+          f"({[t.value for t in at.title]})")
+
+    # Choose a name and confirm — the rerun after that is where the crash was.
+    box = next(s for s in at.selectbox if s.label == "Evaluator")
+    at = box.set_value("Vaclav").run()
+    check(not at.exception, "choosing a name does not crash it")
+    at = next(b for b in at.button if b.label == "Confirm and continue").click().run()
+    check(not at.exception, "nor does confirming it")
+    check(ss(at, "evaluator_id") == "vaclav", "the evaluator is remembered")
+    check(any(manifest.PHASE_LABEL[manifest.TRAINING] in t.value for t in at.title),
+          f"and a phase page is reached ({[t.value for t in at.title]})")
+
+    # And a plain rerun of that page, which is what Streamlit does constantly.
+    at = at.run()
+    check(not at.exception, "a further rerun is uneventful")
+
+
 def test_pending_individual_split():
     """An undivided pool is named as pending, not passed over in silence."""
     print("\n== a phase awaiting division says so ==")
@@ -6267,6 +6390,8 @@ def main() -> None:
     test_startup_reads_are_minimal()
     test_startup_never_reads_the_evaluation_tabs()
     test_quota_is_temporary_not_a_fault()
+    test_storage_guard_handler_cannot_raise()
+    test_login_rerun_end_to_end()
     test_pending_individual_split()
     test_store_isolation()
     test_citation_line()

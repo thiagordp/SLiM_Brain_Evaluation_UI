@@ -27,11 +27,32 @@ import streamlit as st
 
 import manifest
 import progress
+import sheets
 import spec
 import store
 import ui
 import views
 from brain import load_brain
+
+#: Resolved once, here, from the module `store` itself imported — not looked up
+#: on a module name inside an `except` clause. Two things went wrong at once on
+#: the first deployment: an older copy of this project was earlier on
+#: `sys.path`, so `import sheets` inside the guard bound a `sheets` module with
+#: neither `check_ready` nor `QuotaExceeded`. `store.init()` raised
+#: AttributeError for the first, and evaluating `except sheets.QuotaExceeded`
+#: raised AttributeError for the second — which replaced the original and hid
+#: what had actually gone wrong. Binding the class at import time means a
+#: mismatch is reported when the app starts, by the check below, instead of at
+#: the worst possible moment.
+QuotaExceeded = store.sheets.QuotaExceeded
+StorageError = store.sheets.StorageError
+
+if sheets is not store.sheets:                          # pragma: no cover
+    raise ImportError(
+        f"Two different `sheets` modules are loaded: {sheets.__file__} and "
+        f"{store.sheets.__file__}. Another copy of this project is earlier on "
+        f"sys.path; remove it before starting the app."
+    )
 
 st.set_page_config(page_title="HE Evaluation — SLiM Brain",
                    page_icon="📋", layout="wide")
@@ -1063,20 +1084,23 @@ def guard_storage() -> bool:
     work into a store that can disappear between restarts, and they would only
     find out once answers were already lost.
     """
-    import sheets
-
     problem = None
     gap = ""
     transient = False
     if sheets.configured():
         # Configured, so a failure is always shown — never silently swapped for a
         # different store, which would split the run's answers across two places.
+        #
+        # One `except`, and the kind of failure decided afterwards. An `except`
+        # clause that has to look a name up can itself raise, and when it does it
+        # replaces the exception it was meant to report — which is how the first
+        # deployment turned a plain "no attribute check_ready" into an
+        # AttributeError about the handler.
         try:
             store.init()
-        except sheets.QuotaExceeded as error:
-            problem, transient = str(error), True
         except Exception as error:
-            problem = str(error)
+            problem = str(error) or repr(error)
+            transient = isinstance(error, QuotaExceeded)
     else:
         # Half a configuration is a misconfiguration, not a request for SQLite.
         gap = sheets.configuration_gap()
