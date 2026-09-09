@@ -220,8 +220,43 @@ class StorageError(RuntimeError):
     """A storage operation failed in a way the caller must not paper over."""
 
 
+class QuotaExceeded(StorageError):
+    """Google refused the request for now. Nothing is wrong with the workbook.
+
+    Google allows 60 read requests per minute per user. A burst — several
+    evaluators arriving at once, or a page that reads more than it needs —
+    exhausts it, and the right response is to wait, not to change anything.
+    """
+
+
+def _status_of(error) -> int | None:
+    response = getattr(error, "response", None)
+    return getattr(response, "status_code", None)
+
+
+def _is_missing_range(error) -> bool:
+    """Sheets answers a range naming a tab it does not have with a 400."""
+    return _status_of(error) == 400 and "Unable to parse range" in str(error)
+
+
+def _api_error(context: str, error) -> StorageError:
+    """One Google failure, told apart from another.
+
+    A quota rejection is temporary and means wait; anything else may not be, and
+    the two must not read alike to whoever is looking at the screen.
+    """
+    if _status_of(error) == 429:
+        return QuotaExceeded(
+            f"{context}: Google's read quota for this minute is used up "
+            f"(60 requests per minute per user). Nothing is wrong with the "
+            f"workbook and nothing was changed — wait a moment and reload."
+        )
+    return StorageError(f"{context}: {error}. Nothing was created or changed.")
+
+
 class Workbook(Protocol):
     def ensure_tabs(self) -> None: ...
+    def check_ready(self) -> None: ...
     def read_tab(self, tab: str) -> list[dict[str, str]]: ...
     def read_range(self, tab: str, first: int, last: int) -> list[dict[str, str]]: ...
     def append_rows(self, tab: str, rows: list[dict[str, Any]]) -> int: ...
@@ -277,6 +312,9 @@ class GoogleSheetsWorkbook:
     def __init__(self, sheet_id: str) -> None:
         self.sheet_id = sheet_id
         self._sheet = None
+        #: tab -> worksheet handle. Looking one up costs a metadata request, and
+        #: the set of tabs does not change while the app is running.
+        self._tabs: dict[str, Any] = {}
 
     @classmethod
     def from_env(cls) -> "GoogleSheetsWorkbook":
@@ -340,6 +378,11 @@ class GoogleSheetsWorkbook:
     def _worksheet(self, tab: str):
         """The tab, created only if Google says it genuinely is not there.
 
+        The handle is kept. ``sheet.worksheet(tab)`` fetches the whole workbook's
+        metadata every time it is called, so looking a tab up cost a request of
+        its own before every read and every write — seven of them just to check
+        the headers at startup.
+
         This used to catch every exception and respond by creating the tab. A
         read-quota rejection reads as an exception too, so a burst of traffic
         made the app conclude the tab was missing and try to create one that
@@ -350,26 +393,79 @@ class GoogleSheetsWorkbook:
         """
         import gspread                                   # already a dependency
 
+        cached = self._tabs.get(tab)
+        if cached is not None:
+            return cached
         sheet = self._open()
         try:
-            return sheet.worksheet(tab)
+            worksheet = sheet.worksheet(tab)
         except gspread.WorksheetNotFound:
             worksheet = sheet.add_worksheet(title=tab, rows=1000,
                                             cols=len(COLUMNS[tab]))
             worksheet.update("A1", [list(COLUMNS[tab])])
-            return worksheet
         except gspread.exceptions.APIError as error:
-            raise StorageError(
-                f"Could not reach tab {tab}: {error}. The tab was left alone — a "
-                f"failed read is not evidence that it is missing."
-            ) from error
+            raise _api_error(f"Could not reach tab {tab}", error) from error
+        self._tabs[tab] = worksheet
+        return worksheet
 
     def ensure_tabs(self) -> None:
+        """Create the tabs and fix their headers. A bootstrap step, not a startup one.
+
+        Fifteen requests: a metadata fetch per tab and a header read per tab.
+        `bootstrap_sheets.py` calls it once when a workbook is prepared. The
+        running app calls `check_ready` instead.
+        """
         for tab in ALL_TABS:
             worksheet = self._worksheet(tab)
             header = worksheet.row_values(1)
             if header != list(COLUMNS[tab]):
                 worksheet.update("A1", [list(COLUMNS[tab])])
+
+    def check_ready(self) -> None:
+        """Is the workbook reachable and shaped as expected — in two requests.
+
+        Three requests, once per process: one to open it, which proves it exists
+        and is shared with this account; one listing of its tabs, which both
+        answers "are they all there" and yields the handles every later read
+        would otherwise fetch one at a time; and one `values.batchGet` carrying
+        all seven header rows together. It never creates or changes anything,
+        because a running app is not the thing that prepares a workbook.
+        """
+        import gspread                                   # already a dependency
+
+        sheet = self._open()                             # 1 request, then cached
+        try:
+            # One listing gives both the answer to "are the tabs there" and the
+            # handles every later read would otherwise fetch one at a time.
+            present = {w.title: w for w in sheet.worksheets()}
+        except gspread.exceptions.APIError as error:
+            raise _api_error("Could not list the workbook's tabs", error) from error
+        missing = [tab for tab in ALL_TABS if tab not in present]
+        if missing:
+            raise StorageError(
+                f"The workbook is missing {', '.join(missing)}. Run "
+                f"`bootstrap_sheets.py` against it before starting the app. "
+                f"Nothing was created or changed."
+            )
+        self._tabs.update({tab: present[tab] for tab in ALL_TABS})
+
+        ranges = [f"'{tab}'!1:1" for tab in ALL_TABS]
+        try:
+            answer = sheet.values_batch_get(ranges)      # 1 request for all seven
+        except gspread.exceptions.APIError as error:
+            raise _api_error("Could not read the workbook's headers", error) from error
+
+        found = {}
+        for tab, block in zip(ALL_TABS, answer.get("valueRanges", [])):
+            rows = block.get("values") or [[]]
+            found[tab] = [str(cell) for cell in rows[0]]
+        wrong = [tab for tab in ALL_TABS if found.get(tab) != list(COLUMNS[tab])]
+        if wrong:
+            raise StorageError(
+                f"These tabs do not have the headers this version expects: "
+                f"{', '.join(wrong)}. Run `bootstrap_sheets.py` against the "
+                f"workbook. Nothing was changed."
+            )
 
     def read_tab(self, tab: str) -> list[dict[str, str]]:
         records = self._worksheet(tab).get_all_records(expected_headers=list(COLUMNS[tab]))
@@ -444,6 +540,10 @@ class LocalWorkbook:
             if not path.exists():
                 with path.open("w", newline="", encoding="utf-8") as handle:
                     csv.writer(handle).writerow(COLUMNS[tab])
+
+    def check_ready(self) -> None:
+        """Local files cost nothing to create, so readiness is just having them."""
+        self.ensure_tabs()
 
     def read_tab(self, tab: str) -> list[dict[str, str]]:
         self.ensure_tabs()

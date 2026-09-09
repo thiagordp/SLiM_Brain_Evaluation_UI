@@ -165,9 +165,42 @@ def connect():
         conn.close()
 
 
+#: Which workbook has been found reachable and correctly shaped, or None.
+#: Streamlit re-runs the whole script on every interaction, so without this the
+#: readiness check would be repeated on every keystroke of the password field.
+#: It records *which* workbook rather than merely that one was checked: point
+#: the app at a different sheet and the answer for the old one says nothing.
+_READY_FOR: str | None = None
+
+
+def forget_ready() -> None:
+    """Make the next `init()` check the workbook again. For tests and reloads."""
+    global _READY_FOR
+    _READY_FOR = None
+
+
+def _workbook_identity(book) -> str:
+    return str(getattr(book, "sheet_id", None)
+               or getattr(book, "directory", None)
+               or id(book))
+
+
 def init() -> None:
+    """Prepare the store. Cheap, and on Sheets it happens once per process.
+
+    It used to call `ensure_tabs()`, which fetches the workbook's metadata once
+    per tab and then reads each header: fifteen requests, repeated on every
+    Streamlit rerun. Creating tabs and fixing headers is what
+    `bootstrap_sheets.py` is for; a running app only needs to know that the
+    workbook is there and shaped as expected, which costs two.
+    """
+    global _READY_FOR
     if using_sheets():
-        workbook().ensure_tabs()
+        book = workbook()
+        identity = _workbook_identity(book)
+        if _READY_FOR != identity:
+            book.check_ready()
+            _READY_FOR = identity
         return
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     with contextlib.closing(sqlite3.connect(DB_PATH, timeout=30)) as conn:

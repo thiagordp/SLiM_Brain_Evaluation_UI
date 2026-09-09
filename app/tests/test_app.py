@@ -1288,6 +1288,10 @@ class CountingWorkbook:
     def ensure_tabs(self):
         return self.inner.ensure_tabs()
 
+    def check_ready(self):
+        self._record("check_ready", "")
+        return self.inner.check_ready()
+
     def read_tab(self, tab):
         rows = self.inner.read_tab(tab)
         self._record("read_tab", tab, len(rows))
@@ -1321,8 +1325,10 @@ def _with_counting_workbook():
     store.workbook = lambda: book
     store.forget_row_index()
     store.forget_reviews()
+    store.forget_ready()
     store._TOUCHED.clear()
     store.init()
+    book.reset()          # readiness is startup, not the behaviour being counted
     return book
 
 
@@ -3475,7 +3481,9 @@ def test_a_failed_read_never_creates_a_tab():
         raised = error
     check(isinstance(raised, sheets.StorageError),
           f"the failure is reported as a storage error ({type(raised).__name__})")
-    check("left alone" in str(raised),
+    check(isinstance(raised, sheets.QuotaExceeded),
+          "and a 429 in particular is reported as a quota rejection")
+    check("nothing was changed" in str(raised).lower(),
           f"saying the tab was not touched ({raised})")
 
 
@@ -3552,6 +3560,258 @@ def test_deployment_readiness():
           > [i for i, line in enumerate(order) if "guard_spec_version" in line],
           "with the password gate after them, so a misconfigured deployment "
           "says so rather than asking for a password it cannot honour")
+
+
+def _calls_in(path, function_name: str) -> set[str]:
+    """The names of everything one function calls, from the syntax tree.
+
+    Reading the source as text would count a docstring that names a function in
+    order to say it is no longer used.
+    """
+    import ast
+
+    tree = ast.parse(pathlib.Path(path).read_text(encoding="utf-8"))
+    target = next(node for node in ast.walk(tree)
+                  if isinstance(node, ast.FunctionDef) and node.name == function_name)
+    names = set()
+    for node in ast.walk(target):
+        if isinstance(node, ast.Call):
+            func = node.func
+            names.add(func.attr if isinstance(func, ast.Attribute)
+                      else getattr(func, "id", ""))
+    return names
+
+
+class _FakeGoogleSheet:
+    """Just enough of gspread's Spreadsheet to count what startup asks Google for."""
+
+    def __init__(self, headers=None, fail=None, present=None, fail_listing=None):
+        self.requests: list[str] = []
+        self._headers = headers or {tab: list(sheets.COLUMNS[tab])
+                                    for tab in sheets.ALL_TABS}
+        self._fail = fail
+        self._fail_listing = fail_listing
+        self._present = list(present if present is not None else sheets.ALL_TABS)
+
+    def worksheets(self):
+        self.requests.append("worksheets()")
+        if self._fail_listing:
+            raise self._fail_listing
+        return [_FakeWorksheet(tab) for tab in self._present]
+
+    def values_batch_get(self, ranges):
+        self.requests.append(f"values_batch_get({len(ranges)} ranges)")
+        if self._fail:
+            raise self._fail
+        return {"valueRanges": [{"values": [self._headers[tab]]}
+                                if self._headers.get(tab) else {}
+                                for tab in sheets.ALL_TABS]}
+
+    def worksheet(self, tab):
+        self.requests.append(f"worksheet({tab})")
+        return _FakeWorksheet(tab)
+
+    def add_worksheet(self, **kwargs):                    # pragma: no cover
+        raise AssertionError("the running app must never create a tab")
+
+
+class _FakeWorksheet:
+    def __init__(self, tab):
+        self.tab = tab
+        self.title = tab
+
+    def row_values(self, row):                            # pragma: no cover
+        raise AssertionError("startup must not read headers one tab at a time")
+
+
+def test_startup_reads_are_minimal():
+    """The deployment startup path, counted in Google API requests.
+
+    A 429 on the production workbook the moment it was deployed. `store.init()`
+    called `ensure_tabs()`, which fetches the workbook's metadata once per tab
+    and then reads each header — fifteen requests — and `main()` called it
+    twice, on every Streamlit rerun. Six people typing a password exhausts a
+    quota of sixty reads a minute in seconds.
+    """
+    print("\n== startup asks Google for as little as possible ==")
+
+    book = sheets.GoogleSheetsWorkbook("test-id")
+    fake = _FakeGoogleSheet()
+    book._sheet = fake                      # already "opened": that is 1 request
+
+    book.check_ready()
+    check(fake.requests == ["worksheets()", "values_batch_get(7 ranges)"],
+          f"readiness is one tab listing and one batched header read "
+          f"({fake.requests})")
+    check(not any(r.startswith("worksheet(") for r in fake.requests),
+          "and looks no tab up individually")
+
+    # Three requests for a cold start: opening the workbook, listing its tabs,
+    # and reading all seven headers together.
+    check(len(fake.requests) + 1 == 3,
+          "so a cold start costs three requests in total")
+    check(set(book._tabs) == set(sheets.ALL_TABS),
+          "and the listing leaves every tab handle in hand, so the first paper "
+          "opened does not pay to look three of them up again")
+
+    # Once per process, not once per rerun.
+    original_workbook, original_using = store.workbook, store.using_sheets
+    store.workbook, store.using_sheets = (lambda: book), (lambda: True)
+    store.forget_ready()
+    try:
+        fake.requests.clear()
+        store.init()
+        first = len(fake.requests)
+        for _ in range(20):                 # twenty Streamlit reruns
+            store.init()
+        check(first == 2, f"the first init costs the two checking requests ({first})")
+        check(len(fake.requests) == first,
+              f"and twenty reruns after it cost nothing at all "
+              f"({len(fake.requests) - first})")
+    finally:
+        store.workbook, store.using_sheets = original_workbook, original_using
+        store.forget_ready()
+
+    # The tab handle is kept, so ordinary reads stop paying for a lookup.
+    fake.requests.clear()
+    for _ in range(5):
+        book._worksheet(sheets.CONFIG)
+    check(not fake.requests,
+          f"a primed tab costs nothing to reach ({fake.requests})")
+    book._tabs.clear()                      # as if it had never been primed
+    fake.requests.clear()
+    for _ in range(5):
+        book._worksheet(sheets.CONFIG)
+    check(len(fake.requests) == 1,
+          f"and an unprimed one is looked up once and remembered ({fake.requests})")
+
+    # Nothing on the startup path may touch the evaluation data. Read from the
+    # syntax tree, not the text: a docstring that names `ensure_tabs` in order
+    # to say it is no longer called would otherwise fail this.
+    called = _calls_in(APP_DIR / "store.py", "init")
+    for forbidden in ("ensure_tabs", "read_tab", "read_range"):
+        check(forbidden not in called,
+              f"init() does not call {forbidden}() {sorted(called)}")
+    check("check_ready" in called, f"it calls check_ready() instead {sorted(called)}")
+
+    check("init" not in _calls_in(APP_DIR / "streamlit_app.py", "main"),
+          "and main() does not call store.init() a second time after guard_storage")
+
+
+def test_startup_never_reads_the_evaluation_tabs():
+    """Before anyone has logged in, RESPONSES and EDGE_RESPONSES stay untouched."""
+    print("\n== login costs nothing in evaluation data ==")
+
+    seen: list[tuple[str, str]] = []
+
+    class Watched:
+        """A workbook that records what it is asked for and refuses the expensive."""
+
+        def __init__(self, inner):
+            self.inner = inner
+
+        def __getattr__(self, name):
+            attr = getattr(self.inner, name)
+            if not callable(attr):
+                return attr
+
+            def wrapped(*args, **kwargs):
+                seen.append((name, str(args[0]) if args else ""))
+                return attr(*args, **kwargs)
+            return wrapped
+
+    directory = pathlib.Path(tempfile.mkdtemp())
+    original = store.workbook
+    store.workbook = lambda: Watched(sheets.LocalWorkbook(directory))
+    store.forget_ready()
+    try:
+        store.init()
+        manifest.invalidate()
+        at = app(authenticated=False).run()             # the password page
+        check(not at.exception, "the password page renders")
+        at = app(authenticated=True).run()              # the identity page
+        check(not at.exception, "as does the identity page")
+
+        expensive = [(call, tab) for call, tab in seen
+                     if tab in (sheets.RESPONSES, sheets.EDGE_RESPONSES)
+                     and call in ("read_tab", "read_range")]
+        check(not expensive,
+              f"neither page reads a row of evaluation data {expensive[:3]}")
+        check(not any(call == "ensure_tabs" for call, _ in seen[1:]),
+              "and neither tries to create or repair a tab")
+        whole_tabs = [tab for call, tab in seen if call == "read_tab"]
+        check(all(tab in sheets.CONFIG_TABS for tab in whole_tabs),
+              f"only the configuration tabs are read at all {sorted(set(whole_tabs))}")
+    finally:
+        store.workbook = original
+        store.forget_ready()
+
+
+def test_quota_is_temporary_not_a_fault():
+    """A 429 says wait. It must not read as a broken workbook, or change one."""
+    print("\n== a quota rejection is not a fault ==")
+    import gspread
+
+    quota = gspread.exceptions.APIError(_Response(429, "Quota exceeded"))
+    book = sheets.GoogleSheetsWorkbook("test-id")
+    book._sheet = _FakeGoogleSheet(fail_listing=quota)
+    raised = None
+    try:
+        book.check_ready()
+    except Exception as error:                            # noqa: BLE001
+        raised = error
+    check(isinstance(raised, sheets.QuotaExceeded),
+          f"it is raised as a quota error ({type(raised).__name__})")
+    check(isinstance(raised, sheets.StorageError),
+          "which is still a storage error, so nothing falls through to SQLite")
+    check("wait a moment" in str(raised) and "nothing was changed" in str(raised),
+          f"telling the reader to wait, and that nothing changed ({raised})")
+
+    # A missing tab is a different thing, and says so without creating anything.
+    book = sheets.GoogleSheetsWorkbook("test-id")
+    book._sheet = _FakeGoogleSheet(
+        present=[t for t in sheets.ALL_TABS if t != sheets.PHASE_SUBMISSIONS])
+    raised = None
+    try:
+        book.check_ready()
+    except Exception as error:                            # noqa: BLE001
+        raised = error
+    check(isinstance(raised, sheets.StorageError)
+          and not isinstance(raised, sheets.QuotaExceeded),
+          "a missing tab is reported as a real problem, not a busy signal")
+    check(sheets.PHASE_SUBMISSIONS in str(raised),
+          f"naming the tab that is absent ({raised})")
+    check("bootstrap_sheets.py" in str(raised),
+          "and the tool that fixes it")
+    check("Nothing was created or changed" in str(raised),
+          "and confirming the app did not try to fix it itself")
+
+    # A wrong header is caught without writing over it.
+    wrong = {tab: list(sheets.COLUMNS[tab]) for tab in sheets.ALL_TABS}
+    wrong[sheets.RESPONSES] = ["not", "the", "right", "header"]
+    book = sheets.GoogleSheetsWorkbook("test-id")
+    book._sheet = _FakeGoogleSheet(headers=wrong)
+    raised = None
+    try:
+        book.check_ready()
+    except Exception as error:                            # noqa: BLE001
+        raised = error
+    check(isinstance(raised, sheets.StorageError) and sheets.RESPONSES in str(raised),
+          f"a wrong header names the tab ({raised})")
+    check("Nothing was changed" in str(raised), "and is not silently rewritten")
+
+    # The guard shows it as temporary, and offers to try again.
+    entry = (APP_DIR / "streamlit_app.py").read_text(encoding="utf-8")
+    guard = entry.split("def guard_storage() -> bool:")[1].split("\ndef ")[0]
+    check("QuotaExceeded" in guard, "the startup guard tells the two apart")
+    check("Google Sheets is busy" in guard,
+          "and titles a quota rejection as busy rather than unreachable")
+    check("Try again" in guard, "offering to retry")
+    check("bootstrap_sheets.py" in guard.split("Try again")[0].split(
+              "Google Sheets is busy")[1] is False
+          or "bootstrap" not in guard.split("Google Sheets is busy")[1].split(
+              "return False")[0],
+          "without sending anybody to the bootstrap tool over a rate limit")
 
 
 def test_pending_individual_split():
@@ -6004,6 +6264,9 @@ def main() -> None:
     test_completion_round_trip()
     test_a_failed_read_never_creates_a_tab()
     test_deployment_readiness()
+    test_startup_reads_are_minimal()
+    test_startup_never_reads_the_evaluation_tabs()
+    test_quota_is_temporary_not_a_fault()
     test_pending_individual_split()
     test_store_isolation()
     test_citation_line()

@@ -1067,11 +1067,14 @@ def guard_storage() -> bool:
 
     problem = None
     gap = ""
+    transient = False
     if sheets.configured():
         # Configured, so a failure is always shown — never silently swapped for a
         # different store, which would split the run's answers across two places.
         try:
             store.init()
+        except sheets.QuotaExceeded as error:
+            problem, transient = str(error), True
         except Exception as error:
             problem = str(error)
     else:
@@ -1088,6 +1091,21 @@ def guard_storage() -> bool:
 
     if problem is None:
         return True
+
+    if transient:
+        # Nothing is wrong with the workbook and nothing needs fixing, so the
+        # page must not send anybody to the bootstrap tool. It says wait.
+        st.title("Google Sheets is busy")
+        st.warning(problem)
+        st.caption(
+            "This is a rate limit, not a fault: Google allows 60 read requests "
+            "per minute per user across everybody using this workbook. No answer "
+            "has been lost and nothing in the workbook was changed."
+        )
+        if st.button("Try again", type="primary"):
+            store.forget_ready()
+            st.rerun()
+        return False
 
     st.title("Google Sheets is not configured" if gap
              else "Google Sheets is not reachable")
@@ -1119,9 +1137,10 @@ def guard_storage() -> bool:
 
 
 def main() -> None:
+    # `guard_storage` calls `store.init()` and reports what it finds, so calling
+    # it again here only repeated the work on every rerun.
     if not guard_storage():
         return
-    store.init()
     if not guard_snapshot():
         return
     if not guard_spec_version():
