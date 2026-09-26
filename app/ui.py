@@ -374,31 +374,26 @@ def display_value(field: str, value) -> str:
     return ", ".join(shown)
 
 
-def _box(inner: str) -> None:
-    """A quiet framed block, theme-neutral (rgba, no fixed colours)."""
-    st.markdown(
-        '<div style="border-left:3px solid rgba(128,128,128,0.45);'
-        'background:rgba(128,128,128,0.07);border-radius:0 4px 4px 0;'
-        'padding:0.45rem 0.8rem;margin:0.2rem 0 0.7rem;line-height:1.45;'
-        f'font-size:0.93rem">{inner}</div>',
-        unsafe_allow_html=True)
-
-
 def _esc(text: str) -> str:
     return html.escape(spec.plain(text))
 
 
-def definition_html(key: str, assigned=()) -> str:
-    """One frozen definition, verbatim, with every category and its meaning.
+SCHEMA_DEFINITION = "Schema definition"
+CONCEPT_DEFINITION = "Concept definition"
+#: A UI message, never part of any definition: shown where the Concept wiki
+#: records no definition. No definition is generated in its place.
+NO_CONCEPT_DEFINITION = "Definition not available in the current Concept wiki."
 
-    ``assigned`` names the value(s) the Brain chose, marked in words — never by
-    colour alone.
+
+def definition_html(key: str) -> str:
+    """One frozen passage, verbatim apart from the dropped code markup.
+
+    Nothing is added to it: no heading, no marker for the assigned value (that
+    value is shown outside, next to the question). For a categorical field each
+    value's frozen text follows the value's name as a separate bold label.
     """
     entry = spec.definition(key)
-    assigned = {str(a) for a in (assigned if isinstance(assigned, (list, tuple, set))
-                                 else [assigned]) if a not in (None, "")}
-    parts = [f'<div style="font-weight:600;margin-bottom:0.15rem">'
-             f'{html.escape(entry["label"])}</div>']
+    parts = []
     if entry.get("text"):
         parts.append(f"<div>{_esc(entry['text'])}</div>")
     items = entry.get("items") or []
@@ -408,9 +403,8 @@ def definition_html(key: str, assigned=()) -> str:
             value = item.get("value", "")
             text = _esc(item.get("text", ""))
             if value:
-                mark = " <em>(assigned)</em>" if value in assigned else ""
                 name = html.escape(spec.value_label(value))
-                line = f"<strong>{name}</strong>{mark}" + (f" — {text}" if text else "")
+                line = f"<strong>{name}</strong>" + (f" — {text}" if text else "")
             else:
                 line = text
             subs = item.get("sub") or []
@@ -423,12 +417,29 @@ def definition_html(key: str, assigned=()) -> str:
     return "".join(parts)
 
 
-def definitions(keys, assigned=()) -> None:
-    """The schema definitions for a question, placed directly under it."""
+def definitions(keys, headings: dict | None = None) -> None:
+    """The frozen definitions for a question, in a closed "Schema definition" expander.
+
+    Each passage is preceded by a heading that is interface structure — the
+    entry's label, or ``headings[key]`` — rendered as its own element and never
+    joined into the passage.
+    """
     if not keys:
         return
-    _box("<div style='height:0.35rem'></div>".join(
-        definition_html(k, assigned) for k in keys))
+    with st.expander(SCHEMA_DEFINITION, expanded=False):
+        for key in keys:
+            heading = (headings or {}).get(key) or spec.definition(key)["label"]
+            st.markdown(f"**{html.escape(heading)}**")
+            st.markdown(definition_html(key), unsafe_allow_html=True)
+
+
+def concept_definition(definition: str) -> None:
+    """A Concept's current definition, closed by default; a caption when none."""
+    if (definition or "").strip():
+        with st.expander(CONCEPT_DEFINITION, expanded=False):
+            st.markdown(html.escape(definition))
+    else:
+        st.caption(NO_CONCEPT_DEFINITION)
 
 
 def value_line(label: str, value: str) -> None:

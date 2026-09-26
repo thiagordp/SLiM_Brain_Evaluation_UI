@@ -13,6 +13,7 @@ streamlit run app/streamlit_app.py            # needs a bootstrapped round workb
 ```
 
 Deployment, workbook bootstrap and secrets: [`../DEPLOYMENT.md`](../DEPLOYMENT.md).
+What was requested, how it was built, and an assessment: [`../docs/EVALUATION_V4_REPORT.md`](../docs/EVALUATION_V4_REPORT.md).
 
 ## Flow
 

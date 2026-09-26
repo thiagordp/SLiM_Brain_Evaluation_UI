@@ -24,6 +24,16 @@ MARK = {progress.COMPLETE: "✓", progress.INCOMPLETE: "●", progress.AVAILABLE
         progress.INFO: "·"}
 MARK_LEGEND = "○ not started · ● in progress · ✓ complete"
 
+#: Interface headings for a question's definition passages, where the frozen
+#: entry's own label would not say which passage is which. Rendered apart from
+#: the passages, never joined into them.
+DEFINITION_HEADINGS = {
+    "DATASET_JURISDICTION": {
+        "dataset.jurisdiction": "Dataset jurisdiction",
+        "claim.claim_jurisdiction": "Referenced jurisdiction definition",
+    },
+}
+
 
 # -------------------------------------------------------------- navigation
 def _section_key(ctx: Ctx) -> str:
@@ -135,7 +145,7 @@ def field_question(ctx: Ctx, question: spec.Question, object_id: str,
     with st.container(border=True):
         st.markdown(f"##### {question.title}")
         ui.value_line("Assigned value", shown_value)
-        ui.definitions(question.definitions, assigned=value)
+        ui.definitions(question.definitions, headings=DEFINITION_HEADINGS.get(question.key))
         scalar_question(ctx, question, object_id)
 
 
@@ -296,7 +306,10 @@ def concepts_part(ctx: Ctx, claim: dict) -> None:
         for family, ids in brain.group_by_family(assigned).items():
             if not ids:
                 continue
-            st.markdown(f"###### {family_label(family)}")
+            st.markdown(
+                f"<div style='border-top:1px solid rgba(128,128,128,0.3);"
+                f"margin:0.6rem 0 0.2rem;padding-top:0.4rem;font-weight:700'>"
+                f"{html.escape(family_label(family))}</div>", unsafe_allow_html=True)
             for concept_id in ids:
                 _concept_judgment(ctx, spec.Q12, cid, concept_id)
 
@@ -315,12 +328,9 @@ def concepts_part(ctx: Ctx, claim: dict) -> None:
 def _concept_judgment(ctx: Ctx, question: spec.Question, cid: str, concept_id: str) -> None:
     concept = ctx.brain.concept(concept_id)
     record = ctx.data.concept(question.key, cid, concept_id)
-    name, definition = st.columns([2, 3])
-    with name:
-        st.markdown(f"**{concept_label(concept_id)}**")
-        st.caption(f"{spec.value_label(concept.get('status', ''))} · {concept_id}")
-    with definition:
-        st.markdown(html.escape(concept.get("definition", "")))
+    st.markdown(f"**{concept_label(concept_id)}**")
+    st.caption(f"{spec.value_label(concept.get('status', ''))} · {concept_id}")
+    ui.concept_definition(concept.get("definition", ""))
     key = ui.wkey(ctx, question.key, cid, concept_id)
     answer = _radio(ctx, question.options, record.get("answer", ""), key + "|a",
                     _concept_changed,
@@ -414,17 +424,21 @@ def missing_concepts(ctx: Ctx, claim: dict) -> None:
                        "You recorded that no additional Concepts are missing.")
         for row in existing:
             entry = by_id.get(row["concept_id"], {"label": concept_label(row["concept_id"])})
-            st.button(f"{entry['label']}  ×", key=ui.wkey(ctx, "q14rm", cid, row["concept_id"]),
-                      disabled=ctx.locked, help="Remove from the selection",
-                      on_click=_select_concept,
-                      args=(ctx, cid, {"id": row["concept_id"],
-                                       "family": row.get("concept_family", ""),
-                                       "status": row.get("concept_status", "")}, False))
+            name, remove = st.columns([8, 1], vertical_alignment="center")
+            name.markdown(html.escape(entry["label"]))
+            remove.button("×", key=ui.wkey(ctx, "q14rm", cid, row["concept_id"]),
+                          disabled=ctx.locked, help=f"Remove {entry['label']}",
+                          on_click=_select_concept,
+                          args=(ctx, cid, {"id": row["concept_id"],
+                                           "family": row.get("concept_family", ""),
+                                           "status": row.get("concept_status", "")}, False))
         for row in proposed:
-            st.button(f"Proposed · {row['name']} ({family_label(row['family'])})  ×",
-                      key=ui.wkey(ctx, "q14rmp", cid, row["proposal_id"]),
-                      disabled=ctx.locked, help="Remove this proposal",
-                      on_click=_remove_proposal, args=(ctx, cid, row))
+            name, remove = st.columns([8, 1], vertical_alignment="center")
+            name.markdown(f"Proposed · {html.escape(row['name'])} "
+                          f"({html.escape(family_label(row['family']))})")
+            remove.button("×", key=ui.wkey(ctx, "q14rmp", cid, row["proposal_id"]),
+                          disabled=ctx.locked, help=f"Remove the proposal {row['name']}",
+                          on_click=_remove_proposal, args=(ctx, cid, row))
         none_key = ui.wkey(ctx, "q14none", cid)
         st.session_state[none_key] = state == spec.Q14_NONE_MISSING
         st.checkbox("No additional Concepts are missing", key=none_key,
@@ -449,12 +463,17 @@ def missing_concepts(ctx: Ctx, claim: dict) -> None:
             if not entries:
                 st.caption("No further Concept in this family.")
             for entry in entries:
-                text, action = st.columns([6, 1])
+                text, definition, action = st.columns([6, 2, 1],
+                                                      vertical_alignment="center")
                 with text:
-                    st.markdown(f"**{entry['label']}**  \n"
-                                + (html.escape(entry["definition"]) if entry["definition"]
-                                   else "_Definition not available in the current "
-                                        "Concept wiki._"))
+                    st.markdown(f"**{html.escape(entry['label'])}**")
+                    st.caption(spec.value_label(entry["status"]))
+                with definition:
+                    if entry["definition"]:
+                        with st.popover("Definition"):
+                            st.markdown(html.escape(entry["definition"]))
+                    else:
+                        st.caption(ui.NO_CONCEPT_DEFINITION)
                 with action:
                     st.button("Add", key=ui.wkey(ctx, "q14add", cid, entry["id"]),
                               disabled=ctx.locked, on_click=_select_concept,
@@ -494,7 +513,7 @@ def relations_part(ctx: Ctx, claim: dict) -> None:
             record = ctx.data.relation(relation["key"])
             for question in spec.relation_questions():
                 st.markdown(f"**{question.text}**")
-                ui.definitions(question.definitions, assigned=relation.get(question.field))
+                ui.definitions(question.definitions)
                 key = ui.wkey(ctx, question.key, relation["key"])
                 answer_field = f"{question.column}_answer"
                 comment_field = f"{question.column}_comment"
@@ -570,7 +589,7 @@ def datasets_section(ctx: Ctx) -> None:
     ui.statement_card("Dataset", dataset.get("name", did))
     ui.wiki_button("Open Dataset wiki", ui.DATASET, did, key=f"ds_wiki|{did}")
     resting = brain.claims_using_dataset(ctx.source_id, did)
-    with st.expander(f"Claims of this Source resting on it ({len(resting)})"):
+    with st.expander(f"Claims resting on this Dataset ({len(resting)})", expanded=False):
         for claim in resting:
             st.markdown(f"**{claim['id']}** — {html.escape(claim.get('statement', ''))}")
 
@@ -686,14 +705,7 @@ def review_section(ctx: Ctx) -> None:
 
     if missing:
         st.markdown("#### Items requiring an answer")
-        for n, item in enumerate(missing[:30]):
-            row, action = st.columns([5, 1], vertical_alignment="center")
-            row.markdown(f"{html.escape(item.where)} · **{html.escape(item.what)}** — "
-                         f"{html.escape(item.reason)}")
-            action.button("Go", key=f"goto|{n}", on_click=go_to_section,
-                          args=(ctx, item.section, item.claim_index, item.dataset_index))
-        if len(missing) > 30:
-            st.caption(f"{len(missing) - 30} more not listed.")
+        _missing_groups(ctx, missing)
 
     st.markdown("#### Answers")
     st.caption("Answers that record a problem in the Brain output are marked "
@@ -702,6 +714,60 @@ def review_section(ctx: Ctx) -> None:
     _review_datasets(ctx)
     _review_recall(ctx)
     _completion(ctx, missing)
+
+
+def _missing_groups(ctx: Ctx, missing) -> None:
+    """Missing items grouped by Claim and by Dataset, Claim recall apart.
+
+    A paper can have hundreds of unanswered items; one row per Claim or Dataset
+    keeps the page readable, and each group opens to its individual items.
+    """
+    claims = ctx.brain.claims_of(ctx.source_id)
+    datasets = ctx.brain.dataset_ids_of(ctx.source_id)
+    by_claim: dict[int, list] = {}
+    by_dataset: dict[int, list] = {}
+    recall = []
+    for item in missing:
+        if item.section == "claims" and item.claim_index is not None:
+            by_claim.setdefault(item.claim_index, []).append(item)
+        elif item.section == "datasets" and item.dataset_index is not None:
+            by_dataset.setdefault(item.dataset_index, []).append(item)
+        else:
+            recall.append(item)
+
+    def group(kind, label, index, items, open_args):
+        row, action = st.columns([6, 1], vertical_alignment="top")
+        with row:
+            with st.expander(f"{label} — {len(items)} missing", expanded=False):
+                for n, item in enumerate(items):
+                    detail = item.where.split(" · ", 1)[1] if " · " in item.where else ""
+                    line, go = st.columns([6, 1], vertical_alignment="center")
+                    line.markdown(f"**{html.escape(item.what)}**"
+                                  + (f" · {html.escape(detail)}" if detail else "")
+                                  + f" — {html.escape(item.reason)}")
+                    go.button("Go", key=f"goto|{kind}|{index}|{n}",
+                              on_click=go_to_section, args=(ctx, *open_args))
+        action.button("Open", key=f"open_missing|{kind}|{index}",
+                      on_click=go_to_section, args=(ctx, *open_args))
+
+    if by_claim:
+        st.markdown("**Claims**")
+        for index, items in sorted(by_claim.items()):
+            group("claim", f"Claim {claims[index]['id']}", index, items,
+                  ("claims", index, None))
+    if by_dataset:
+        st.markdown("**Datasets**")
+        for index, items in sorted(by_dataset.items()):
+            did = datasets[index]
+            group("dataset", f"Dataset {did} · {ctx.brain.dataset(did).get('name', did)}",
+                  index, items, ("datasets", None, index))
+    if recall:
+        st.markdown("**Claim recall**")
+        for n, item in enumerate(recall):
+            line, go = st.columns([6, 1], vertical_alignment="center")
+            line.markdown(f"**{html.escape(item.what)}** — {html.escape(item.reason)}")
+            go.button("Go", key=f"goto|recall|{n}", on_click=go_to_section,
+                      args=(ctx, "recall"))
 
 
 def _shown(question: spec.Question, answer: str) -> str:

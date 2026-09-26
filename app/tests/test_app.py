@@ -10,6 +10,7 @@ with `streamlit.testing.v1.AppTest`.
 from __future__ import annotations
 
 import contextlib
+import html
 import io
 import json
 import os
@@ -656,22 +657,34 @@ def test_ui_claim_flow():
     at.run()
     at.text_input(key=search_key).input("")
     at.run()
-    labels = [b.label for b in at.button]
-    check("Machine learning  ×" in labels and "Privacy and data protection  ×" in labels,
-          "ui: selections persist when the search changes")
+    remove_keys = {b.key for b in at.button if b.label == "×"}
+    page = _markdown(at)
+    check({f"{base}|q14rm|{first}|CPT-machine-learning",
+           f"{base}|q14rm|{first}|CPT-privacy-and-data-protection"} <= remove_keys
+          and "Machine learning" in page and "Privacy and data protection" in page,
+          "ui: selections persist when the search changes, each with its own ×")
+    claim_concepts = set(BRAIN.concepts_of_claim(first))
+    eligible = [e for e in BRAIN.vocabulary(spec.concept_grid())
+                if e["id"] not in claim_concepts
+                and e["id"] not in ("CPT-machine-learning", "CPT-privacy-and-data-protection")]
+    offered = [b.key for b in at.button if b.key and f"|q14add|{first}|" in b.key]
+    check(len(offered) == len(eligible),
+          "ui: a cleared search offers the complete eligible vocabulary again")
     check(f"{base}|q14add|{first}|CPT-machine-learning" not in [b.key for b in at.button],
           "ui: a selected Concept is no longer offered")
     at.button(key=f"{base}|q14rm|{first}|CPT-machine-learning").click()
     at.run()
-    check("Machine learning  ×" not in [b.label for b in at.button],
-          "ui: × removes a selected Concept")
+    check(f"{base}|q14rm|{first}|CPT-machine-learning" not in [b.key for b in at.button]
+          and f"{base}|q14add|{first}|CPT-machine-learning" in [b.key for b in at.button],
+          "ui: × removes a selected Concept and returns it to the browser")
     at.text_input(key=f"{base}|q14name|{first}").input("Legal chatbots")
     at.selectbox(key=f"{base}|q14family|{first}").select("technical_task")
     at.run()
     at.button(key=f"{base}|q14propose|{first}").click()
     at.run()
-    check(any(label.startswith("Proposed · Legal chatbots") for label in
-              [b.label for b in at.button]), "ui: a proposed Concept appears as selected")
+    check("Proposed · Legal chatbots" in _markdown(at)
+          and any(b.key and "|q14rmp|" in b.key for b in at.button),
+          "ui: a proposed Concept appears as selected, with its ×")
     _flush(at)
     stored = store.load_review(rid("agreement", "thiago", "SRC-0001"))
     check(stored.response(spec.Q14.key, first)["answer"] == spec.Q14_MISSING
@@ -811,6 +824,99 @@ def test_ui_submission_locks():
     at.button(key="nav|claims").click()
     at.run()
     check(all(r.disabled for r in _questions(at)), "ui: a submitted paper is read-only")
+
+
+def _expanders(at, label):
+    return [e for e in at.expander if e.label == label]
+
+
+def _inside(expander) -> str:
+    return "\n".join(m.value for m in expander.markdown)
+
+
+def test_ui_definitions_collapsed_but_complete():
+    fresh_round()
+    source = "SRC-0001"
+    review = rid("agreement", "thiago", source)
+    start(review)
+    at = _app()
+    _login(at)
+    _open(at, "agreement", source)
+    at.button(key="nav|claims").click()
+    at.run()
+    schema = _expanders(at, "Schema definition")
+    concept = _expanders(at, "Concept definition")
+    check(schema and concept and all(not e.proto.expanded for e in schema + concept),
+          "ui: every schema and Concept definition starts closed")
+    everything = [_inside(e) for e in schema]
+
+    def plain(key, field="text"):
+        return html.escape(spec.plain(spec.definition(key)[field]))
+
+    q2 = next((t for t in everything if plain("claim.node") in t), "")
+    check(plain("claim.statement") in q2 and "**Claim**" in q2 and "**Statement**" in q2,
+          "ui: Question 2's closed expander holds the Claim and Statement passages")
+    claim_object = next((t for t in everything if plain("claim.claim_object") in t), "")
+    check(all(html.escape(spec.plain(i["text"])) in claim_object
+              for i in spec.definition("claim.claim_object")["items"])
+          and all(v in claim_object for v in ("Law", "Technology", "Other")),
+          "ui: Claim object's closed expander holds all three values and meanings")
+    check("(assigned)" not in "\n".join(everything),
+          "ui: nothing is added inside a frozen definition")
+    grounding = spec.definition("edge.grounding")
+    check(any(all(html.escape(spec.plain(i["text"])) in t for i in grounding["items"])
+              and all(html.escape(spec.plain(sub)) in t for sub in grounding["items"][0]["sub"])
+              for t in everything),
+          "ui: Relation Grounding keeps the complete create-edges passage")
+    claim = BRAIN.claims_of(source)[0]["id"]
+    first_concept = BRAIN.concepts_of_claim(claim)[0]
+    check(any(html.escape(BRAIN.concept(first_concept)["definition"]) in _inside(e)
+              for e in concept), "ui: a Concept definition is complete when opened")
+    page = _markdown(at)
+    check(html.escape(BRAIN.claim(claim)["anchors"][0]["quote"]) in page
+          and "Assigned value" in page,
+          "ui: anchors and assigned values stay outside the expanders")
+
+    at.button(key="nav|datasets").click()
+    at.run()
+    schema = _expanders(at, "Schema definition")
+    check(schema and all(not e.proto.expanded for e in schema),
+          "ui: Dataset definitions start closed")
+    jurisdiction = next((_inside(e) for e in schema
+                         if plain("dataset.jurisdiction") in _inside(e)), "")
+    check("**Dataset jurisdiction**" in jurisdiction
+          and "**Referenced jurisdiction definition**" in jurisdiction
+          and plain("claim.claim_jurisdiction") in jurisdiction,
+          "ui: Dataset Jurisdiction shows two separately headed passages")
+    check(spec.definition("dataset.jurisdiction")["text"]
+          == "legal system(s) the texts come from; jurisdiction codes in `schema/claim.md`.",
+          "ui: the stored passage carries no interface heading")
+    check(len(_questions(at)) == 6, "ui: the Dataset page keeps all six questions")
+
+
+def test_ui_review_groups_missing_items():
+    fresh_round()
+    source = "SRC-0001"
+    review = rid("agreement", "thiago", source)
+    start(review)
+    at = _app()
+    _login(at)
+    _open(at, "agreement", source)
+    at.button(key="nav|review").click()
+    at.run()
+    labels = [e.label for e in at.expander]
+    claim_groups = [l for l in labels if l.startswith("Claim CLM-") and "missing" in l]
+    dataset_groups = [l for l in labels if l.startswith("Dataset DST-") and "missing" in l]
+    check(len(claim_groups) == len(BRAIN.claims_of(source)),
+          "ui: missing items are grouped by Claim")
+    check(len(dataset_groups) == len(BRAIN.dataset_ids_of(source)),
+          "ui: missing Dataset items are grouped by Dataset")
+    check(any(b.key == "goto|recall|0" for b in at.button),
+          "ui: Claim recall is listed separately")
+    check(not any(b.key and re.fullmatch(r"goto\|\d+", b.key) for b in at.button),
+          "ui: no flat source-wide list of individual missing items")
+    check(all(not e.proto.expanded for e in at.expander if "missing" in e.label),
+          "ui: each group starts closed")
 
 
 # ====================================================================== main
