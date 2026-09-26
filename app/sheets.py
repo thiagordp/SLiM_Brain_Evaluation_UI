@@ -1,54 +1,48 @@
-"""The shared Google Sheets workbook — the live store for a deployed run.
+"""The round workbook: the one persistent store of an evaluation round.
 
-Streamlit Community Cloud does not guarantee that runtime-generated local files
-survive, so a SQLite file there is not a safe database. One shared Sheets
-workbook is, and it is also inspectable and trivially exportable.
+One evaluation round is one fresh Google Sheets workbook, created empty and
+initialised by `tools/bootstrap_round.py`. There is no other store and no
+fallback: if the workbook is missing, unreachable or wrongly shaped, the app
+refuses to start rather than keep answers anywhere else.
 
-Two rules from the design shape this module:
+Two rules shape this module:
 
-* **Narrow writes only.** Never download a tab, edit a frame and write it back:
-  a concurrent evaluator's newer answer would be silently overwritten. Rows are
-  preallocated, each evaluator owns their own rows, and a save updates exactly
-  one row range.
+* **Narrow writes only.** A tab is never downloaded, edited and written back — a
+  concurrent evaluator's newer answer would be silently overwritten. Every save
+  names the rows it owns.
 * **Deterministic keys.** Every row carries the key its caller computes, so a
   save is always "find my row, update its cells".
 
-``LocalWorkbook`` writes the same tabs as CSV. It exists for dry runs and tests
-— it is not a live store for a running evaluation.
+Tabs, in three groups:
 
-Seven tabs, in two groups. CONFIG / EVALUATORS / ASSIGNMENTS say what the
-experiment *is*: who evaluates what, and which switches are on. REVIEWS /
-RESPONSES / EDGE_RESPONSES hold what the evaluators *decided*. The first group
-changes rarely and is read on almost every page; the second changes constantly
-and is read one review at a time. They are cached accordingly.
+    round metadata   ROUND, DEFINITIONS            written once by bootstrap
+    configuration    CONFIG, EVALUATORS, ASSIGNMENTS
+    evaluation       REVIEWS, RESPONSES, CONCEPT_RESPONSES, RELATION_RESPONSES,
+                     MISSING_CONCEPTS, PROPOSED_CONCEPTS, SUBMISSIONS
+
+REVIEWS, RESPONSES, CONCEPT_RESPONSES and RELATION_RESPONSES are preallocated
+by bootstrap, one contiguous block per review. MISSING_CONCEPTS and
+PROPOSED_CONCEPTS hold a variable number of rows per Claim and grow by
+idempotent upserts.
 """
 from __future__ import annotations
 
-import csv
 import json
 import os
 import pathlib
 from typing import Any, Protocol
 
-# The Splitter writes this workbook before the evaluation app reads it, so the
-# canonical names are the ones that project already uses. The HE_-prefixed
-# aliases are accepted too, so a single export serves both applications.
 ENV_SHEET_ID = "GOOGLE_SHEET_ID"
 ENV_CREDENTIALS = "GOOGLE_SERVICE_ACCOUNT_JSON"
 ENV_SHEET_ID_ALIASES = (ENV_SHEET_ID, "HE_GOOGLE_SHEET_ID")
 ENV_CREDENTIALS_ALIASES = (ENV_CREDENTIALS, "HE_GOOGLE_CREDENTIALS", "GOOGLE_CREDENTIALS")
-
 
 #: Streamlit's idiomatic place for a service-account key, as a TOML table.
 SECRETS_SERVICE_ACCOUNT = "gcp_service_account"
 
 
 def _secrets():
-    """Streamlit secrets when running under Streamlit, otherwise nothing.
-
-    Streamlit Community Cloud provides no environment variables — secrets arrive
-    only through st.secrets — so every lookup has to consult both.
-    """
+    """Streamlit secrets when running under Streamlit, otherwise nothing."""
     try:
         import streamlit as st
 
@@ -98,44 +92,36 @@ def service_account_info() -> dict | None:
 
 
 def configured() -> bool:
-    return bool(sheet_id()) and service_account_info() is not None
+    try:
+        return bool(sheet_id()) and service_account_info() is not None
+    except Exception:
+        return bool(sheet_id())
 
 
 def configuration_gap() -> str:
-    """Name the missing half of a partial configuration, or "" when there is none.
-
-    The live store needs both the workbook id and the key. Supplying one without
-    the other is never a deliberate request for the local store: it is a
-    deployment that runs on SQLite while everyone assumes the workbook is being
-    filled, and the answers are only found missing after the fact. The caller
-    stops on this rather than falling back.
-    """
+    """What is missing from the workbook configuration, or "" when nothing is."""
     has_id = bool(sheet_id())
     try:
         has_account = service_account_info() is not None
     except Exception:
-        has_account = True      # present but unreadable — a different problem
-    if has_id == has_account:
+        has_account = True      # present but unreadable — reported when opened
+    if has_id and has_account:
         return ""
     if has_id:
-        return (
-            f"`{ENV_SHEET_ID}` is set but no service account is. Add the key as a "
-            f"`[{SECRETS_SERVICE_ACCOUNT}]` table in Streamlit secrets, or as "
-            f"`{ENV_CREDENTIALS}`."
-        )
-    return (
-        f"A service account is set but `{ENV_SHEET_ID}` is not, so the app has no "
-        f"workbook to write to. Add `{ENV_SHEET_ID}` — the segment of the sheet's URL "
-        f"between `/d/` and `/edit` — to the same secrets."
-    )
+        return (f"`{ENV_SHEET_ID}` is set but no service account is. Add the key as a "
+                f"`[{SECRETS_SERVICE_ACCOUNT}]` table in Streamlit secrets, or as "
+                f"`{ENV_CREDENTIALS}`.")
+    if has_account:
+        return (f"A service account is set but `{ENV_SHEET_ID}` is not, so there is "
+                f"no round workbook. Add `{ENV_SHEET_ID}` — the segment of the "
+                f"sheet's URL between `/d/` and `/edit`.")
+    return (f"Neither `{ENV_SHEET_ID}` nor a service account is set. Google Sheets "
+            f"is the only evaluation store, so the application cannot start without "
+            f"a round workbook.")
 
 
 def describe_account() -> str:
-    """Identify the service account without ever revealing the key.
-
-    `service_account_info()` returns the private key. Never print or log it;
-    print this instead.
-    """
+    """Identify the service account without ever revealing the key."""
     try:
         info = service_account_info()
     except Exception:
@@ -144,73 +130,84 @@ def describe_account() -> str:
         return "no service account"
     return f"{info.get('client_email', '?')} (project {info.get('project_id', '?')})"
 
-# --- configuration: what the experiment is
-CONFIG, EVALUATORS, ASSIGNMENTS = "CONFIG", "EVALUATORS", "ASSIGNMENTS"
-# --- evaluation: what the evaluators decided
-REVIEWS, RESPONSES, EDGE_RESPONSES = "REVIEWS", "RESPONSES", "EDGE_RESPONSES"
-#: A phase is finally submitted for an evaluator only when a row exists here.
-#: Sheets has no transaction across the many review-row updates a submission
-#: makes, so the marker is written last: a submission interrupted halfway leaves
-#: reviews submitted and no marker, and retrying is safe because submitting an
-#: already-submitted review changes nothing.
-PHASE_SUBMISSIONS = "PHASE_SUBMISSIONS"
 
+# ------------------------------------------------------------------- tabs
+ROUND, DEFINITIONS = "ROUND", "DEFINITIONS"
+CONFIG, EVALUATORS, ASSIGNMENTS = "CONFIG", "EVALUATORS", "ASSIGNMENTS"
+REVIEWS = "REVIEWS"
+RESPONSES = "RESPONSES"
+CONCEPT_RESPONSES = "CONCEPT_RESPONSES"
+RELATION_RESPONSES = "RELATION_RESPONSES"
+MISSING_CONCEPTS = "MISSING_CONCEPTS"
+PROPOSED_CONCEPTS = "PROPOSED_CONCEPTS"
+#: A phase is finally submitted for an evaluator only when a row exists here.
+#: Sheets has no transaction across the review rows a submission touches, so the
+#: marker is written last and retrying a half-finished submission is safe.
+SUBMISSIONS = "SUBMISSIONS"
+
+METADATA_TABS = (ROUND, DEFINITIONS)
 CONFIG_TABS = (CONFIG, EVALUATORS, ASSIGNMENTS)
-EVALUATION_TABS = (REVIEWS, RESPONSES, EDGE_RESPONSES, PHASE_SUBMISSIONS)
-ALL_TABS = CONFIG_TABS + EVALUATION_TABS
+BLOCK_TABS = (RESPONSES, CONCEPT_RESPONSES, RELATION_RESPONSES)
+SELECTION_TABS = (MISSING_CONCEPTS, PROPOSED_CONCEPTS)
+EVALUATION_TABS = (REVIEWS, *BLOCK_TABS, *SELECTION_TABS, SUBMISSIONS)
+ALL_TABS = METADATA_TABS + CONFIG_TABS + EVALUATION_TABS
+
+#: The REVIEWS columns that record where each block tab's rows for a review sit.
+BLOCK_PREFIX = {RESPONSES: "responses", CONCEPT_RESPONSES: "concepts",
+                RELATION_RESPONSES: "relations"}
 
 COLUMNS: dict[str, tuple[str, ...]] = {
-    # A key/value tab rather than one row of many columns: the settings are read
-    # and written one at a time, and a new setting must not mean a new column.
+    ROUND: ("key", "value"),
+    DEFINITIONS: ("key", "label", "source_file", "text", "items_json"),
     CONFIG: ("key", "value"),
-    EVALUATORS: (
-        "evaluator_id", "name", "is_admin", "pair_id",
-        "agreement_split", "individual_split",
-    ),
-    ASSIGNMENTS: (
-        "assignment_key", "evaluator_id", "phase_id", "split_id",
-        "source_id", "work_id", "assignment_order", "assignment_state",
-    ),
+    EVALUATORS: ("evaluator_id", "name", "is_admin", "pair_id",
+                 "agreement_split", "individual_split"),
+    ASSIGNMENTS: ("assignment_key", "evaluator_id", "phase_id", "split_id",
+                  "source_id", "pdf_file", "assignment_order", "assignment_state"),
     REVIEWS: (
-        "review_id", "phase_id", "evaluator_id", "evaluator_name", "pair_id",
-        "source_id", "work_id", "assignment_key", "split_id",
-        # Provenance, stamped when work begins rather than when the row is made:
-        # a preallocated row may sit for weeks under a configuration that is not
-        # the one its evaluation is eventually performed under.
-        "brain_snapshot_id", "eval_spec_version", "config_version",
-        "assignment_state",
-        # Where this review's preallocated rows sit, so opening one paper is a
-        # narrow range read rather than a whole-tab download.
+        "review_id", "round_id", "phase_id", "evaluator_id", "evaluator_name",
+        "pair_id", "source_id", "assignment_key", "split_id",
+        # Provenance, stamped when work begins rather than when the row is made.
+        "brain_snapshot_id", "eval_spec_version", "definitions_id",
+        "config_version", "assignment_state",
         "responses_first_row", "responses_last_row",
-        "edges_first_row", "edges_last_row",
+        "concepts_first_row", "concepts_last_row",
+        "relations_first_row", "relations_last_row",
         "pdf_read_confirmed", "status", "started_at", "last_saved_at",
         "submitted_at",
     ),
     RESPONSES: (
         "response_key", "review_id", "source_id", "object_type", "object_id",
-        "question_key", "criterion_id", "field_subitem", "answer",
-        "comment_evidence", "unclear", "applicability", "updated_at",
+        "claim_id", "question_key", "answer", "related_claim_id", "comment",
+        "updated_at",
     ),
-    EDGE_RESPONSES: (
-        "edge_response_key", "review_id", "source_id", "host_claim_id", "edge_key",
-        "edge_from", "edge_to", "other_claim_id", "edge_type", "label_correct",
-        "comment_correct_label", "updated_at",
+    CONCEPT_RESPONSES: (
+        "response_key", "review_id", "source_id", "claim_id", "concept_id",
+        "concept_status", "concept_family", "question_key", "answer", "comment",
+        "updated_at",
     ),
-    PHASE_SUBMISSIONS: (
-        "submission_key", "evaluator_id", "phase_id", "config_version",
-        "status", "submitted_at",
+    RELATION_RESPONSES: (
+        "response_key", "review_id", "source_id", "relation_key",
+        "relation_type", "from_claim", "to_claim", "from_source", "to_source",
+        "grounding", "note",
+        "grounding_answer", "grounding_comment", "type_answer", "type_comment",
+        "updated_at",
+    ),
+    MISSING_CONCEPTS: (
+        "selection_key", "review_id", "source_id", "claim_id", "concept_id",
+        "concept_family", "concept_status", "active", "updated_at",
+    ),
+    PROPOSED_CONCEPTS: (
+        "proposal_key", "review_id", "source_id", "claim_id", "proposal_id",
+        "name", "family", "explanation", "active", "updated_at",
+    ),
+    SUBMISSIONS: (
+        "submission_key", "round_id", "evaluator_id", "phase_id",
+        "config_version", "status", "submitted_at",
     ),
 }
 
-KEY_COLUMN = {
-    CONFIG: "key",
-    EVALUATORS: "evaluator_id",
-    ASSIGNMENTS: "assignment_key",
-    REVIEWS: "review_id",
-    RESPONSES: "response_key",
-    EDGE_RESPONSES: "edge_response_key",
-    PHASE_SUBMISSIONS: "submission_key",
-}
+KEY_COLUMN = {tab: columns[0] for tab, columns in COLUMNS.items()}
 
 #: Rows per write request, so a large preallocation stays inside payload limits.
 WRITE_CHUNK = 2000
@@ -220,13 +217,12 @@ class StorageError(RuntimeError):
     """A storage operation failed in a way the caller must not paper over."""
 
 
-class QuotaExceeded(StorageError):
-    """Google refused the request for now. Nothing is wrong with the workbook.
+class StorageNotConfigured(StorageError):
+    """No round workbook is configured. There is no other store to use."""
 
-    Google allows 60 read requests per minute per user. A burst — several
-    evaluators arriving at once, or a page that reads more than it needs —
-    exhausts it, and the right response is to wait, not to change anything.
-    """
+
+class QuotaExceeded(StorageError):
+    """Google refused the request for now. Nothing is wrong with the workbook."""
 
 
 def _status_of(error) -> int | None:
@@ -234,20 +230,10 @@ def _status_of(error) -> int | None:
     return getattr(response, "status_code", None)
 
 
-def _is_missing_range(error) -> bool:
-    """Sheets answers a range naming a tab it does not have with a 400."""
-    return _status_of(error) == 400 and "Unable to parse range" in str(error)
-
-
 def _api_error(context: str, error) -> StorageError:
-    """One Google failure, told apart from another.
-
-    A quota rejection is temporary and means wait; anything else may not be, and
-    the two must not read alike to whoever is looking at the screen.
-    """
     if _status_of(error) == 429:
         return QuotaExceeded(
-            f"{context}: Google's read quota for this minute is used up "
+            f"{context}: Google's request quota for this minute is used up "
             f"(60 requests per minute per user). Nothing is wrong with the "
             f"workbook and nothing was changed — wait a moment and reload."
         )
@@ -255,17 +241,20 @@ def _api_error(context: str, error) -> StorageError:
 
 
 class Workbook(Protocol):
-    def ensure_tabs(self) -> None: ...
-    def check_ready(self) -> None: ...
+    def tab_titles(self) -> list[str]: ...
+    def is_blank(self, title: str) -> bool: ...
+    def create_tab(self, tab: str) -> None: ...
+    def delete_tab(self, title: str) -> None: ...
+    def write_header(self, tab: str) -> None: ...
+    def headers(self, tabs) -> dict[str, list[str]]: ...
     def read_tab(self, tab: str) -> list[dict[str, str]]: ...
     def read_range(self, tab: str, first: int, last: int) -> list[dict[str, str]]: ...
+    def read_ranges(self, requests) -> list[list[dict[str, str]]]: ...
     def append_rows(self, tab: str, rows: list[dict[str, Any]]) -> int: ...
-    def update_row(self, tab: str, row_number: int, values: dict[str, Any]) -> None: ...
-    def update_rows(self, tab: str, updates: list[tuple[int, dict[str, Any]]]) -> None: ...
-    def row_count(self, tab: str) -> int: ...
+    def update_rows(self, tab: str, updates) -> None: ...
 
 
-def _column_letter(index: int) -> str:
+def column_letter(index: int) -> str:
     """1-based column index to an A1 column letter."""
     letters = ""
     while index > 0:
@@ -275,21 +264,37 @@ def _column_letter(index: int) -> str:
 
 
 def row_index(rows: list[dict[str, str]], tab: str) -> dict[str, int]:
-    """key -> sheet row number (header is row 1, so data starts at row 2)."""
+    """key -> sheet row number (header is row 1, so data starts at row 2).
+
+    Where a key occurs more than once — possible only in the selection tabs,
+    after two sessions appended the same key at the same moment — the first row
+    wins, so every later write lands on one row.
+    """
     key_column = KEY_COLUMN[tab]
-    return {row[key_column]: number
-            for number, row in enumerate(rows, start=2) if row.get(key_column)}
+    index: dict[str, int] = {}
+    for number, row in enumerate(rows, start=2):
+        key = row.get(key_column)
+        if key and key not in index:
+            index[key] = number
+    return index
 
 
-def _ordered(tab: str, values: dict[str, Any]) -> list[Any]:
+def ordered(tab: str, values: dict[str, Any]) -> list[Any]:
     return ["" if values.get(name) is None else values.get(name)
             for name in COLUMNS[tab]]
 
 
-def _as_row(tab: str, raw: list) -> dict[str, str]:
+def as_row(tab: str, raw: list) -> dict[str, str]:
     """A row of raw cell values as a record. Trailing empty cells are omitted."""
     padded = list(raw) + [""] * (len(COLUMNS[tab]) - len(raw))
     return {name: str(value) for name, value in zip(COLUMNS[tab], padded)}
+
+
+def a1(tab: str, first: int | None = None, last: int | None = None) -> str:
+    end = column_letter(len(COLUMNS[tab]))
+    if first is None:
+        return f"'{tab}'!A2:{end}"
+    return f"'{tab}'!A{first}:{end}{last}"
 
 
 # --------------------------------------------------------------- Google Sheets
@@ -301,27 +306,17 @@ def _credentials() -> dict:
             f"{ENV_CREDENTIALS} is neither a readable JSON file path nor inline JSON"
         ) from error
     if info is None:
-        raise StorageError(
-            f"no service account: set {ENV_CREDENTIALS}, or a [{SECRETS_SERVICE_ACCOUNT}] "
-            f"table in Streamlit secrets"
-        )
+        raise StorageNotConfigured(configuration_gap())
     return info
 
 
 class GoogleSheetsWorkbook:
-    def __init__(self, sheet_id: str) -> None:
-        self.sheet_id = sheet_id
+    def __init__(self, identifier: str) -> None:
+        self.sheet_id = identifier
         self._sheet = None
-        #: tab -> worksheet handle. Looking one up costs a metadata request, and
-        #: the set of tabs does not change while the app is running.
+        #: tab -> worksheet handle. A lookup costs a metadata request, and the
+        #: set of tabs does not change while the app is running.
         self._tabs: dict[str, Any] = {}
-
-    @classmethod
-    def from_env(cls) -> "GoogleSheetsWorkbook":
-        identifier = sheet_id()
-        if not identifier:
-            raise StorageError(f"{ENV_SHEET_ID} is not set")
-        return cls(identifier)
 
     def _open(self):
         if self._sheet is not None:
@@ -331,273 +326,152 @@ class GoogleSheetsWorkbook:
             from google.oauth2.service_account import Credentials
         except ImportError as error:                      # pragma: no cover
             raise StorageError(
-                "google sheets support needs `gspread` and `google-auth`"
+                "Google Sheets support needs `gspread` and `google-auth`"
             ) from error
-        scopes = ["https://www.googleapis.com/auth/spreadsheets"]
-        creds = Credentials.from_service_account_info(_credentials(), scopes=scopes)
-        account = _credentials().get("client_email", "the service account")
+        info = _credentials()
+        creds = Credentials.from_service_account_info(
+            info, scopes=["https://www.googleapis.com/auth/spreadsheets"])
         try:
             self._sheet = gspread.authorize(creds).open_by_key(self.sheet_id)
         except Exception as error:                        # pragma: no cover
-            raise StorageError(self.explain(error, account)) from error
+            raise StorageError(self.explain(error, info.get("client_email", "the "
+                                                             "service account"))) from error
         return self._sheet
 
     def explain(self, error: Exception, account: str) -> str:
-        """Turn Google's error into the specific thing to go and fix.
-
-        403 and 404 mean different things and have different fixes, so they must
-        not collapse into one "check your configuration" message.
-        """
+        """403 and 404 have different fixes, so they get different messages."""
         text = str(error)
-        status = getattr(getattr(error, "response", None), "status_code", None)
-        forbidden = status == 403 or "PermissionError" in type(error).__name__ or \
-            "does not have permission" in text
-        missing = status == 404 or "SpreadsheetNotFound" in type(error).__name__
+        status = _status_of(error)
+        if status == 403 or "PermissionError" in type(error).__name__:
+            return (f"The workbook exists, but {account} cannot open it. Share the "
+                    f"sheet with that address as an Editor.")
+        if status == 404 or "SpreadsheetNotFound" in type(error).__name__:
+            return (f"No workbook with id `{self.sheet_id}` exists. {ENV_SHEET_ID} is "
+                    f"only the segment between `/d/` and `/edit` in the sheet's URL.")
+        return f"Could not open sheet `{self.sheet_id}` as {account}: {text}"
 
-        if forbidden:
-            return (
-                f"The workbook exists, but {account} cannot open it.\n\n"
-                f"Share the sheet with that address as an **Editor**:\n"
-                f"open https://docs.google.com/spreadsheets/d/{self.sheet_id}/edit "
-                f"→ Share → paste the address → set the role to Editor → Share.\n\n"
-                f"Your own access to the sheet does not grant the service account "
-                f"anything; it has to be shared explicitly."
-            )
-        if missing:
-            return (
-                f"No workbook with id `{self.sheet_id}` exists.\n\n"
-                f"{ENV_SHEET_ID} should be only the segment between `/d/` and `/edit` "
-                f"in the sheet's URL — not the whole URL, and not the `#gid=` part."
-            )
-        return (
-            f"Could not open sheet `{self.sheet_id}` as {account}: {text}\n\n"
-            f"Check {ENV_SHEET_ID}, that the Google Sheets API is enabled for the "
-            f"project, and that the sheet is shared with that address as an Editor."
-        )
+    def _worksheets(self) -> dict[str, Any]:
+        import gspread
+
+        try:
+            present = {w.title: w for w in self._open().worksheets()}
+        except gspread.exceptions.APIError as error:
+            raise _api_error("Could not list the workbook's tabs", error) from error
+        self._tabs.update(present)
+        return present
 
     def _worksheet(self, tab: str):
-        """The tab, created only if Google says it genuinely is not there.
-
-        The handle is kept. ``sheet.worksheet(tab)`` fetches the whole workbook's
-        metadata every time it is called, so looking a tab up cost a request of
-        its own before every read and every write — seven of them just to check
-        the headers at startup.
-
-        This used to catch every exception and respond by creating the tab. A
-        read-quota rejection reads as an exception too, so a burst of traffic
-        made the app conclude the tab was missing and try to create one that
-        already existed — recovering from a transient failure by attempting a
-        structural change to the workbook. Only ``WorksheetNotFound`` means
-        absent; anything else is raised, because a failure to read must never
-        become a decision to write.
-        """
-        import gspread                                   # already a dependency
-
+        """The tab's handle. Never creates one: that is bootstrap's job."""
         cached = self._tabs.get(tab)
         if cached is not None:
             return cached
-        sheet = self._open()
-        try:
-            worksheet = sheet.worksheet(tab)
-        except gspread.WorksheetNotFound:
-            worksheet = sheet.add_worksheet(title=tab, rows=1000,
-                                            cols=len(COLUMNS[tab]))
-            worksheet.update("A1", [list(COLUMNS[tab])])
-        except gspread.exceptions.APIError as error:
-            raise _api_error(f"Could not reach tab {tab}", error) from error
+        present = self._worksheets()
+        if tab not in present:
+            raise StorageError(f"The workbook has no {tab} tab. Run "
+                               f"`tools/bootstrap_round.py` against it.")
+        return present[tab]
+
+    def tab_titles(self) -> list[str]:
+        return list(self._worksheets())
+
+    def create_tab(self, tab: str) -> None:
+        worksheet = self._open().add_worksheet(
+            title=tab, rows=100, cols=len(COLUMNS.get(tab, ())) or 26)
         self._tabs[tab] = worksheet
-        return worksheet
 
-    def ensure_tabs(self) -> None:
-        """Create the tabs and fix their headers. A bootstrap step, not a startup one.
+    def delete_tab(self, title: str) -> None:
+        present = self._worksheets()
+        if title in present:
+            self._open().del_worksheet(present[title])
+            self._tabs.pop(title, None)
 
-        Fifteen requests: a metadata fetch per tab and a header read per tab.
-        `bootstrap_sheets.py` calls it once when a workbook is prepared. The
-        running app calls `check_ready` instead.
-        """
-        for tab in ALL_TABS:
-            worksheet = self._worksheet(tab)
-            header = worksheet.row_values(1)
-            if header != list(COLUMNS[tab]):
-                worksheet.update("A1", [list(COLUMNS[tab])])
+    def is_blank(self, title: str) -> bool:
+        """Whether a tab holds nothing at all (a new workbook's default sheet)."""
+        import gspread
 
-    def check_ready(self) -> None:
-        """Is the workbook reachable and shaped as expected — in two requests.
-
-        Three requests, once per process: one to open it, which proves it exists
-        and is shared with this account; one listing of its tabs, which both
-        answers "are they all there" and yields the handles every later read
-        would otherwise fetch one at a time; and one `values.batchGet` carrying
-        all seven header rows together. It never creates or changes anything,
-        because a running app is not the thing that prepares a workbook.
-        """
-        import gspread                                   # already a dependency
-
-        sheet = self._open()                             # 1 request, then cached
         try:
-            # One listing gives both the answer to "are the tabs there" and the
-            # handles every later read would otherwise fetch one at a time.
-            present = {w.title: w for w in sheet.worksheets()}
+            values = self._open().values_get(f"'{title}'!A1:Z50").get("values") or []
         except gspread.exceptions.APIError as error:
-            raise _api_error("Could not list the workbook's tabs", error) from error
-        missing = [tab for tab in ALL_TABS if tab not in present]
-        if missing:
-            raise StorageError(
-                f"The workbook is missing {', '.join(missing)}. Run "
-                f"`bootstrap_sheets.py` against it before starting the app. "
-                f"Nothing was created or changed."
-            )
-        self._tabs.update({tab: present[tab] for tab in ALL_TABS})
+            raise _api_error(f"Could not read tab {title}", error) from error
+        return not any(str(cell).strip() for row in values for cell in row)
 
-        ranges = [f"'{tab}'!1:1" for tab in ALL_TABS]
+    def write_header(self, tab: str) -> None:
+        self._worksheet(tab).update("A1", [list(COLUMNS[tab])])
+
+    def headers(self, tabs) -> dict[str, list[str]]:
+        """Row 1 of each tab, in one request."""
+        import gspread
+
+        tabs = list(tabs)
         try:
-            answer = sheet.values_batch_get(ranges)      # 1 request for all seven
+            answer = self._open().values_batch_get([f"'{t}'!1:1" for t in tabs])
         except gspread.exceptions.APIError as error:
             raise _api_error("Could not read the workbook's headers", error) from error
-
         found = {}
-        for tab, block in zip(ALL_TABS, answer.get("valueRanges", [])):
+        for tab, block in zip(tabs, answer.get("valueRanges", [])):
             rows = block.get("values") or [[]]
             found[tab] = [str(cell) for cell in rows[0]]
-        wrong = [tab for tab in ALL_TABS if found.get(tab) != list(COLUMNS[tab])]
-        if wrong:
-            raise StorageError(
-                f"These tabs do not have the headers this version expects: "
-                f"{', '.join(wrong)}. Run `bootstrap_sheets.py` against the "
-                f"workbook. Nothing was changed."
-            )
+        return found
 
     def read_tab(self, tab: str) -> list[dict[str, str]]:
-        records = self._worksheet(tab).get_all_records(expected_headers=list(COLUMNS[tab]))
-        return [{name: str(row.get(name, "")) for name in COLUMNS[tab]} for row in records]
+        return self.read_ranges([(tab, None, None)])[0]
 
     def read_range(self, tab: str, first: int, last: int) -> list[dict[str, str]]:
-        """One contiguous block of rows, by sheet row number.
-
-        The whole point of preallocating a review's rows together: reading one
-        paper costs a few hundred cells instead of the whole tab.
-        """
         if last < first:
             return []
-        columns = COLUMNS[tab]
-        end = _column_letter(len(columns))
-        values = self._worksheet(tab).get(f"A{first}:{end}{last}")
-        return [_as_row(tab, raw) for raw in values]
+        return self.read_ranges([(tab, first, last)])[0]
 
-    def row_count(self, tab: str) -> int:
-        """Data rows present, excluding the header."""
-        return max(len(self._worksheet(tab).col_values(1)) - 1, 0)
+    def read_ranges(self, requests) -> list[list[dict[str, str]]]:
+        """Several tabs or row blocks in ONE request (`values.batchGet`).
+
+        Opening a paper reads its three preallocated blocks and the two small
+        selection tabs together; the Sheets quota counts requests, not cells.
+        """
+        import gspread
+
+        requests = list(requests)
+        if not requests:
+            return []
+        ranges = [a1(tab, first, last) for tab, first, last in requests]
+        try:
+            answer = self._open().values_batch_get(ranges)
+        except gspread.exceptions.APIError as error:
+            raise _api_error("Could not read the workbook", error) from error
+        out = []
+        for (tab, _, _), block in zip(requests, answer.get("valueRanges", [])):
+            out.append([as_row(tab, raw) for raw in (block.get("values") or [])])
+        return out
 
     def append_rows(self, tab: str, rows: list[dict[str, Any]]) -> int:
         if not rows:
             return 0
         worksheet = self._worksheet(tab)
-        payload = [_ordered(tab, row) for row in rows]
+        payload = [ordered(tab, row) for row in rows]
         for start in range(0, len(payload), WRITE_CHUNK):
             worksheet.append_rows(payload[start:start + WRITE_CHUNK],
-                                  value_input_option="RAW")
+                                  value_input_option="RAW",
+                                  insert_data_option="INSERT_ROWS",
+                                  table_range="A1")
         return len(payload)
 
-    def update_row(self, tab: str, row_number: int, values: dict[str, Any]) -> None:
-        """One row, one request — never a whole-tab rewrite."""
-        self.update_rows(tab, [(row_number, values)])
-
     def update_rows(self, tab: str, updates) -> None:
-        """Several rows in one request, each still a targeted range.
-
-        A whole-tab rewrite would silently overwrite a concurrent evaluator's
-        newer answer; this only ever names the rows it owns.
-        """
+        """Several rows in one request, each still a targeted range."""
         updates = list(updates)
         if not updates:
             return
         worksheet = self._worksheet(tab)
-        last = _column_letter(len(COLUMNS[tab]))
+        last = column_letter(len(COLUMNS[tab]))
         payload = [{"range": f"A{number}:{last}{number}",
-                    "values": [_ordered(tab, values)]}
+                    "values": [ordered(tab, values)]}
                    for number, values in updates]
-        if len(payload) == 1:
-            worksheet.update(payload[0]["range"], payload[0]["values"],
-                             value_input_option="RAW")
-            return
-        worksheet.batch_update(payload, value_input_option="RAW")
+        for start in range(0, len(payload), WRITE_CHUNK):
+            worksheet.batch_update(payload[start:start + WRITE_CHUNK],
+                                   value_input_option="RAW")
 
 
-# ------------------------------------------------------------- local dry runs
-class LocalWorkbook:
-    """The same tabs as CSV files. For dry runs and tests, not for live use."""
-
-    def __init__(self, directory: pathlib.Path) -> None:
-        self.directory = pathlib.Path(directory)
-        self.directory.mkdir(parents=True, exist_ok=True)
-
-    def _path(self, tab: str) -> pathlib.Path:
-        return self.directory / f"{tab}.csv"
-
-    def ensure_tabs(self) -> None:
-        for tab in ALL_TABS:
-            path = self._path(tab)
-            if not path.exists():
-                with path.open("w", newline="", encoding="utf-8") as handle:
-                    csv.writer(handle).writerow(COLUMNS[tab])
-
-    def check_ready(self) -> None:
-        """Local files cost nothing to create, so readiness is just having them."""
-        self.ensure_tabs()
-
-    def read_tab(self, tab: str) -> list[dict[str, str]]:
-        self.ensure_tabs()
-        with self._path(tab).open(encoding="utf-8") as handle:
-            return [{name: row.get(name, "") or "" for name in COLUMNS[tab]}
-                    for row in csv.DictReader(handle)]
-
-    def read_range(self, tab: str, first: int, last: int) -> list[dict[str, str]]:
-        if last < first:
-            return []
-        rows = self.read_tab(tab)
-        return rows[first - 2:last - 1]        # sheet row 2 is the first record
-
-    def row_count(self, tab: str) -> int:
-        return len(self.read_tab(tab))
-
-    def append_rows(self, tab: str, rows: list[dict[str, Any]]) -> int:
-        if not rows:
-            return 0
-        self.ensure_tabs()
-        with self._path(tab).open("a", newline="", encoding="utf-8") as handle:
-            writer = csv.writer(handle)
-            for row in rows:
-                writer.writerow(_ordered(tab, row))
-        return len(rows)
-
-    def update_row(self, tab: str, row_number: int, values: dict[str, Any]) -> None:
-        self.update_rows(tab, [(row_number, values)])
-
-    def update_rows(self, tab: str, updates) -> None:
-        updates = list(updates)
-        if not updates:
-            return
-        self.ensure_tabs()
-        path = self._path(tab)
-        with path.open(encoding="utf-8") as handle:
-            lines = list(csv.reader(handle))
-        for row_number, values in updates:
-            index = row_number - 1
-            if not 0 < index < len(lines):
-                raise StorageError(f"{tab} has no row {row_number}")
-            lines[index] = [str(v) for v in _ordered(tab, values)]
-        with path.open("w", newline="", encoding="utf-8") as handle:
-            csv.writer(handle).writerows(lines)
-
-
-def workbook_from_env(dry_run_dir: pathlib.Path | None = None) -> Workbook | None:
-    """The live workbook when configured, a local one when a directory is given.
-
-    Returns None when neither is configured, so the caller can fall back to the
-    local SQLite store used for development.
-    """
-    if configured():
-        return GoogleSheetsWorkbook.from_env()
-    if dry_run_dir is not None:
-        return LocalWorkbook(dry_run_dir)
-    return None
+def workbook_from_env() -> GoogleSheetsWorkbook:
+    """The configured round workbook. Raises when there is none — never falls back."""
+    gap = configuration_gap()
+    if gap:
+        raise StorageNotConfigured(gap)
+    return GoogleSheetsWorkbook(sheet_id())

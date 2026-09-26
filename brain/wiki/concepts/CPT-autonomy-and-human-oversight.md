@@ -1,206 +1,130 @@
 ---
-id: "CPT-autonomy-and-human-oversight"
-label: "Autonomy and human oversight"
-status: "anchor"
-concept_type: "normative_concern"
-definition: "The degree of human control, review, and decision authority over AI in legal tasks."
-aliases: []
-broader: []
-sources: ["SRC-0007", "SRC-0009", "SRC-0014", "SRC-0019", "SRC-0020", "SRC-0021", "SRC-0022", "SRC-0023", "SRC-0024", "SRC-0025", "SRC-0028", "SRC-0029", "SRC-0030", "SRC-0031", "SRC-0037", "SRC-0038", "SRC-0040", "SRC-0044", "SRC-0045", "SRC-0047", "SRC-0049"]
-deprecated: false
-replaced_by:
-created: "2026-09-02"
+id: CPT-autonomy-and-human-oversight
+status: anchor
+concept_type: normative_concern
+definition: The concern with how much decision authority stays with humans — supervision, review, the human in the loop — when automated systems take part in legal work.
+run_ids: [RUN-2026-09-25-01]
 ---
 
-# Autonomy and human oversight
+# CPT-autonomy-and-human-oversight
 
-_Status: anchor; family: normative_concern._
+## What it means
 
-## Definition
+The concern with how much decision authority stays with humans — supervision, review, the human in the loop — when automated systems take part in legal work. An anchor concept, given in advance in the grid of `schema/concept.md`; the corpus uses it as the claims below show [CLM-0002-009] [CLM-0003-001] [CLM-0003-007].
 
-The degree of human control, review, and decision authority over AI in legal tasks.
-
-## Claims about the concept
+## Claims
 
 ### Descriptive
 
-**GB**
+**CN**
 
-- Briggs of Westbourne (2026) state that The average taxpayer may be happy for a robot to decide small disputes, usually on grounds of speed and proportionality, but would at present prefer a human judge to decide disputes that put at risk their liberty, home, access to their children, or financial survival; there is probably a hard-to-define threshold or spectrum between the two kinds of case. [CLM-0047-013]. — jurisdiction: GB [jurisdiction inferred]; basis: argument
-
-**general**
-
-- Waldon et al. (2025) state that With respect to conscious or unconscious human bias, LLMs may pose greater risks than traditional interpretive tools: automation bias and users' tendency to anthropomorphise LLM platforms encourage over-trust in outputs, judges are less equipped to recognise manipulation of LLM responses than selective dictionary use, and automated prompt-optimisation tools could let judges, lawyers or scholars generate neutral-sounding prompts designed to elicit particular interpretive outcomes. [CLM-0022-010]. — jurisdiction: general [jurisdiction inferred]; basis: literature
-- Mandal and Sinha (2026) state that As matters stand today, human judgment and direction are still required to guide AI agents in complex, open-ended projects: humans must define what problems to address, what to research and where to narrow down, and large performance gaps remain when a model must itself choose goals for research focus and engineering. [CLM-0040-018]. — jurisdiction: general [jurisdiction inferred]; basis: literature
-- Briggs of Westbourne (2026) state that It may be said, at a theoretical level, that humans are at least better than robots at dispensing equity and mercy, and at present, though this may change, better at reasoning. [CLM-0047-014]. — jurisdiction: general [jurisdiction inferred]; basis: none_stated
-
-### Interpretive
-
-**EU**
-
-- Gridin (2026) read AI Act, Art. 14 as follows: The Human-in-the-Loop paradigm, as mandated by Article 14 of the EU AI Act and widely adopted as the default safeguard in corporate AI governance, is a structural placebo: mandating human oversight in the absence of architectural guardrails does not prevent catastrophic errors but merely redistributes liability onto operators who are cognitively and technically unequipped to intercept them. [CLM-0049-007]. — jurisdiction: EU; basis: literature
-- Gridin (2026) read AI Act, Art. 14(1) as follows: Article 14 of the EU AI Act (human oversight, including the capacity to override or reverse a high-risk system's output and awareness of automation bias) can be translated directly into executable code by demoting the AI to a decision-support tool: no LLM or Linear AI agent may execute a final legal action without a human cryptographic signature, a formalised and logged Algorithmic Appeal provides the right to override, and a 'Red Zone' executive dashboard with kill-switch authority counters automation bias as required by Article 14(4)(b). [CLM-0049-025]. — jurisdiction: EU; basis: legislation
-
-**US, CoE, EU**
-
-- Gridin (2026) read U.S. Const. amends. V and XIV as follows: When a deterministic Linear AI wrapper issues a final rejection of a legal document, the affected attorney is subject to an adverse algorithmic determination; absent a mechanism to challenge it, the architecture risks operating as an unchecked algorithmic tribunal in violation of the right to a meaningful opportunity to be heard under due process (Fifth and Fourteenth Amendments, ECHR Article 6), a risk contemplated by Article 14 of the EU AI Act and Article 14 of the Council of Europe AI Convention. [CLM-0049-035]. — jurisdiction: US, CoE, EU (cumulative); basis: legislation
-
-### Normative
-
-**EU**
-
-- Gridin (2026) argue that Automation bias cannot be remedied by legislation: statutory mandates such as Article 14 of the EU AI Act cannot debias human psychology when users face authoritative, anthropomorphic AI interfaces, so the error must be intercepted computationally by multi-layered neuro-symbolic defences before it ever reaches the human interface. [CLM-0049-008]. — jurisdiction: EU; basis: literature
-- Gridin (2026) argue that Transparency and explainability mandates are necessary but insufficient: Article 14 of the EU AI Act identifies human oversight as a requirement but provides no architectural specification for achieving it, so future regulatory instruments, including the AI Act's implementing acts and harmonised standards, should incorporate minimum architectural requirements for AI in high-risk legal contexts - mandatory deterministic validation layers, immutable audit logging, and formalised access-authorisation protocols for biometric evidentiary data. [CLM-0049-038]. — jurisdiction: EU; basis: argument
-
-**EU, CoE**
-
-- Gridin (2026) argue that Human oversight of high-risk AI requires a formalised 'Right to Override' operationalised as a digitally recorded three-tier Escalation Matrix - technical remediation, cognitive re-evaluation by a higher-capacity LLM, and an executive human consortium - which converts the deterministic system from an unchecked algorithmic tribunal into a reviewable decision-support system and turns the abstract contestability mandated by Article 14 of the EU AI Act and Article 14 of the Council of Europe AI Convention into an enforceable procedural mechanism. [CLM-0049-036]. — jurisdiction: EU, CoE (cumulative); basis: argument
-
-**GB**
-
-- Briggs of Westbourne (2026) argue that Whether AI can or should replace human lawyers and judges in the resolution of some or all types of civil litigation, and what precisely the courts should use AI for, is a democratic question: it is not appropriate for lawyers and judges to decide, but is a matter for the people, and for taxpayers in particular, who must decide what they want as the arbiter of their disputes and what they are prepared to pay for the human elements in the process. [CLM-0047-012]. — jurisdiction: GB [jurisdiction inferred]; basis: argument
-- Briggs of Westbourne (2026) argue that Before it is too late, it is necessary to identify what contribution the human elements of the civil justice process make to the rule of law, which human qualities will never be supplanted by robots, and what red lines are needed to preserve that human contribution from erosion by AI; judges should not stay silent on this even though whether they are replaced is a democratic question. [CLM-0047-017]. — jurisdiction: GB [jurisdiction inferred]; basis: argument
+- Software IP lawyers perceive LicenseGPT as a valuable supplementary tool that enhances efficiency and express willingness to incorporate it into their workflows as an auxiliary resource for initial assessments, while recognizing the need for human oversight and careful validation in complex cases due to limitations in handling complex legal nuances. — rests on factual basis (SRC-0012). [CLM-0012-010]
+- Allowing users to interactively select the legal articles a legal large language model uses improves the accuracy and completeness of its responses: in a user study the top three retrieved legal articles were not entirely correct for an average of 83% of queries, but users successfully received correct responses in 80% of cases by selecting relevant legal articles for the model to regenerate its response. — rests on factual basis (SRC-0014). [CLM-0014-005]
 
 **US**
 
-- Lee and Egbert (2025) argue that Asking an AI to analyze the quantitative results of corpus coding and report whether the ordinary meaning of a term includes a given element would be a step too far, too close to robo-judging, because it would outsource the judicial decisions about what ordinary meaning is, how much evidence suffices, and how the data should be weighted; judges do not need to be told the ordinary meaning of a word or phrase by a human or a computer but need transparent empirical evidence of how words and phrases are commonly used. [CLM-0021-027]. — jurisdiction: US [jurisdiction inferred]; basis: argument
-- Waldon et al. (2025) argue that Judges could use LLM chatbots as dialectical partners, prompting them to generate and critique competing arguments about meaning (brainstorming), and treating the outputs not as evidence of ordinary meaning but as potential considerations for the judge's own linguistic analysis. This retains judicial sovereignty over interpretive reasoning; used in this way, variability across LLM responses is an asset rather than a liability, and even closed-source platforms can constructively inform decision-making. [CLM-0022-002]. — jurisdiction: US [jurisdiction inferred]; basis: argument
+- A semi-automated approach in which a large language model induces legal factors from raw opinions with a human in the loop produces factor representations that can predict case outcomes with moderate success, if not yet as well as expert-defined factors can. — rests on factual basis (SRC-0018). [CLM-0018-002]
+- Validating generated logical programs and deferring uncertain cases to human experts can substantially reduce tax penalties, underscoring the value of explicit reasoning even when full automation is not feasible. — rests on literature (SRC-0021). [CLM-0021-013]
+- Over the past five years several U.S. states, including Ohio, South Carolina and Virginia, have turned to generative AI to identify outdated, duplicative or confusing rules that could be repealed or revised; each initiative was narrowly focused on such rules and each involved human review of the rules identified for potential repeal or amendment. — rests on factual basis (SRC-0024). [CLM-0024-010]
 
 **general**
 
-- T.Y.S.S. et al. (2024) argue that Because legal systems are human-centric and human accountability is paramount for trust in a democratically governed society, the vision of AI & Law is one of AI supporting human decision makers rather than replacing or unduly influencing them, and predictive systems should not be directly applied within courts. [CLM-0014-016]. — jurisdiction: general; basis: argument
-- Zhu et al. (2025) argue that Users should be careful when delegating business decisions to LLM agents, because although automating negotiations and transactions can enhance transactional efficiency, it also poses nontrivial risks to consumer markets. [CLM-0020-003]. — jurisdiction: general [jurisdiction inferred]; basis: dataset_or_experiment
-- Li et al. (2024) argue that To address LLMs' unsatisfactory performance on ethics-related legal tasks, more advanced and precise alignment strategies should be devised, and the supervision and evaluation of LLMs should be strengthened to ensure they conform to ethical standards and moral requirements in practical applications. [CLM-0030-022]. — jurisdiction: general; basis: argument
-- Li et al. (2024) argue that LLMs should not completely replace legal professionals in legal practice, because legal judgment is unique and complex, requiring rich professional knowledge, experience, and humanistic insight; the goal of benchmarking is to help legal professionals make more informed decisions on when, where, and how to use these technologies. [CLM-0030-028]. — jurisdiction: general; basis: argument
-- Li et al. (2024) argue that Benchmark evaluation results for legal LLMs are only for reference and not the sole basis for decision-making; when applying large models in real-world legal scenarios, more in-depth or specific evaluations are still needed to ensure the legitimacy and rationality of decisions. [CLM-0030-029]. — jurisdiction: general; basis: argument
-- Wang et al. (2026) argue that Legal ambiguity should be treated not as a failure of the system but as an inherent property of legal text that AI alone cannot resolve. A proposed lawyer-centred approach has SMT solvers surface Minimal Correction Subsets, the minimal set of axioms whose acceptance would shift a classification from Neutral to Entailment or Contradiction, and presents them to legal practitioners as structured entry points for resolving ambiguity, positioning the lawyer as the decision-maker for well-scoped interpretive questions and constraining human review to precisely the assumptions that matter rather than requiring exhaustive document-level verification. [CLM-0037-016]. — jurisdiction: general [jurisdiction inferred]; basis: argument
-- Medvedeva et al. (2021) argue that Machine learning models that forecast or classify court judgements cannot and should not be used for making decisions in courts, especially where human rights are at stake, nor in other high-stakes situations, because such models cannot deal with new legal developments and interpretations or previously unobserved issues, lack transparency, and raise cybersecurity concerns. [CLM-0045-010]. — jurisdiction: general; basis: argument
-- Gridin (2026) argue that Because manual verification of black-box outputs now often takes human operators longer than performing the original task, raw LLMs are economically and operationally meaningless in law; the regulatory trajectory must pivot from forcing operators into verification loops toward architectures that preemptively eliminate the error at its root. [CLM-0049-017]. — jurisdiction: general; basis: literature
-
-**geographical_proxy:IN**
-
-- Deroy et al. (2023) argue that Pre-trained abstractive summarization models and general-domain large language models are not yet ready for fully automatic deployment for legal case judgement summarization; a human-in-the-loop approach, in which a legal expert monitors the generated summaries and manually checks for inconsistencies, is more suitable at present. [CLM-0044-001]. — jurisdiction: geographical_proxy:IN; basis: dataset_or_experiment
-
-**geographical_proxy:IN, geographical_proxy:GB, geographical_proxy:US**
-
-- Deroy et al. (2024) argue that For complex domains like law, LLMs and pre-trained abstractive summarization models are not yet ready for fully automatic deployment; a human-in-the-loop approach in which a legal expert monitors the generated summaries may be more appropriate, and better methods are needed to detect complex errors in abstractive summaries. [CLM-0028-015]. — jurisdiction: geographical_proxy:IN, geographical_proxy:GB, geographical_proxy:US (cumulative); basis: dataset_or_experiment
-
-**geographical_proxy:US**
-
-- Zhang et al. (2026) argue that Because the ability to identify significant distinctions is important to legal practice, the current inability of LLMs to perform this task reliably raises concerns about their readiness for real-world legal applications: effective legal AI must be capable of multi-step, multi-level abstraction and synthesis, and the current generation of LLMs, despite impressive surface-level capabilities, lacks the sophisticated reasoning mechanisms necessary for the nuanced analysis required in legal practice. [CLM-0038-010]. — jurisdiction: geographical_proxy:US; basis: dataset_or_experiment
-
-### Empirical
-
-**geographical_proxy:IN**
-
-- Khadloya et al. (2025) report that Under fixed time budgets, a navigation-first design increases the breadth of the record a judge actually consults while preserving the judge's control and transparency. [CLM-0019-011]. — jurisdiction: geographical_proxy:IN [jurisdiction inferred]; basis: argument
-
-### Predictive
-
-**GB**
-
-- Briggs of Westbourne (2026) argue that It is inevitable that AI will have to be used by the civil courts to increase the productivity of court staff and judges: the robotisation of the courts' response to incoming AI-prepared claims will have to proceed apace if the civil courts are not to sink under the tsunami of claims, and this has already started to happen. [CLM-0047-009]. — jurisdiction: GB [jurisdiction inferred]; basis: argument
-- Briggs of Westbourne (2026) argue that Using AI only as a labour-saving device for tasks at the edges of the process for determining civil claims, such as summarising documents, initial legal research, checking draft judgments and streamlining case management, will speed up what remains a human-run process but will not increase productivity by anything approaching the amount needed to cope with the tsunami of AI-generated claims. [CLM-0047-010]. — jurisdiction: GB [jurisdiction inferred]; basis: argument
-- Briggs of Westbourne (2026) argue that The arrival of agentic AI makes it by no means implausible that an AI platform could soon be tasked with the whole process of reaching a decision on a case and producing at least the first draft of the judgment; if the judge's only role were to approve the AI's plan of action and review the draft judgment, it is doubtful whether the public expectation that a human judge decides the case would really be fulfilled, and a judicial role reduced to reviewer rather than initiator would be poor at developing or maintaining judicial skills. [CLM-0047-015]. — jurisdiction: GB [jurisdiction inferred]; basis: argument
-
-**IN**
-
-- Malik et al. (2022) argue that NLP-based technology that helps legal practitioners extract relevant information from legal documents could make the legal process more streamlined and efficient and help deal with the backlog of pending cases in India; such technology could not fully automate judgment prediction but could augment the work of a judge or legal practitioner to expedite the legal process in highly populated countries. [CLM-0007-018]. — jurisdiction: IN; basis: argument
-
-**general**
-
-- Nay et al. (2023) argue that Even without replacing trained lawyers, LLMs can assist a lawyer or produce a first draft for the lawyer to check, which could significantly increase lawyers' productivity, decrease the cost of legal services and improve access to legal counsel for people who currently cannot afford it; LLMs could also provide useful legal information to consumers not engaging a traditional lawyer. [CLM-0024-014]. — jurisdiction: general [jurisdiction inferred]; basis: argument
-- Westermann and Savelka (2024) argue that Multi-modal LLMs have considerable potential to support laypeople and self-represented litigants in access to justice by extracting and analysing data contained in images of printed forms, legal documents or letters, especially in collaboration with a human who verifies and corrects the captured data, for applications such as filling out new forms or providing relevant legal information. [CLM-0031-010]. — jurisdiction: general [jurisdiction inferred]; basis: dataset_or_experiment
-- Gridin (2026) argue that Deterministic AI architectures do not replace the legal professional's functions of research, drafting, and strategic judgment but reallocate cognitive resources from the first two to the third; the lawyer of the coming decade is a 'Legal Architect' who translates human objectives into machine-executable legal specifications and interprets algorithmic outputs in terms of rights and legitimacy, and the trajectory of ABA Model Rule 1.1 Comment 8 is toward mandatory AI literacy as a licensing prerequisite. [CLM-0049-040]. — jurisdiction: general [jurisdiction inferred]; basis: argument
-
-**geographical_proxy:CA-QC**
-
-- Janatian et al. (2023) argue that An LLM pathway generator used in conjunction with a human expert (augmented intelligence) has the potential to support annotators with a strong draft, making annotation more efficient and even yielding more logically correct pathways; LLMs can thus potentially support humans in creating predictable and safe legal expert systems more efficiently, with possible beneficial impacts on access to justice. [CLM-0009-012]. — jurisdiction: geographical_proxy:CA-QC; basis: dataset_or_experiment
+- A retrieval-augmented fatwa system's source-based response places substantial weight on the inquirer, leaving source verification and relevance to the user's judgment, and inherits biases created by online visibility: websites with more traffic and content, such as Islamweb, are more likely to appear in retrieved results not because they are more authoritative but because they are more visible. — rests on abstract considerations (SRC-0003). [CLM-0003-007]
+- Explainable AI techniques for large language models, such as chain-of-thought explanation, cannot supply the passive contextual information a mufti relies on — intention, social conditions, or local custom — but can show which sources shaped a model's answer and how the model weighed them, supporting scholarly oversight of whether the reasoning aligns with accepted interpretive methods. — rests on abstract considerations (SRC-0003). [CLM-0003-014]
+- Full 'transmission principles' in the sense of Contextual Integrity - the complex social norms governing when data sharing is appropriate - are not extracted automatically from privacy policies because they require human judgment about social context and significant human interpretation. — rests on literature (SRC-0013). [CLM-0013-010]
+- Most users are not familiar with the existence or extent of the limitations of large language models and have a tendency to put much more faith in their output than it deserves; the ease of use of the models contributes to automation bias, a phenomenon where persons place too much trust in automated systems and do not adequately verify or validate the output. — rests on literature (SRC-0024). [CLM-0024-009]
 
 **undetermined**
 
-- Gridin (2026) argue that Logging every human override in an immutable micro-ledger restructures liability allocation: where the AI correctly flagged an error and the human overrode it, the log shifts the entire burden of liability to the human operator, eliminating the Moral Crumple Zone because the operator can no longer claim ignorance of the warning; where the AI failed to flag a genuine error and no override occurred, the liability trajectory moves toward the system's developer or deployer under applicable product liability doctrine. [CLM-0049-037]. — jurisdiction: undetermined; basis: argument
+- A neuro-symbolic system supporting medical coverage policy review does not make coverage determinations: human reviewers maintain full adjudication authority, and the system serves as a support tool that finds support from coverage documents and makes the underlying policy logic interpretable, helping humans make informed judgments while the final decision remains in the hands of the human reviewer. — rests on abstract considerations (SRC-0007). [CLM-0007-013]
 
-### Methodological
+### Interpretative
+
+**US**
+
+- Substituting a polling proxy — a panel drawn from the public or a large language model prediction of aggregated public opinion — for a judge's individual reasoning is not the process mandated for legal decisions by the text of the US Constitution and by US legal culture; a judge who handed over her ultimate decision to such a proxy would be violating her duty to decide the case. — rests on legal sources (SRC-0019). [CLM-0019-003]
+- Having a human in the loop to review the conclusions reached by a large language model does not make an agency's action reasonable, since the human cannot recreate or verify the reasoning of the model before the agency adopts its conclusions. — rests on abstract considerations (SRC-0024). [CLM-0024-022]
 
 **general**
 
-- Hartung et al. (2026) argue that A hybrid, human-in-the-loop approach to information management, combining state-of-the-art natural language processing tools to find and curate publications for review with subject-matter-expert human control, and realised as a living, interactive survey with web infrastructure accepting community contributions, is suggested as the way to survey the fast-growing and linguistically and methodologically diverse Legal NLP literature. [CLM-0023-018]. — jurisdiction: general [jurisdiction inferred]; basis: argument
-- Getir Yaman et al. (2023) argue that When a system design is found to violate a SLEEC rule, the SLEEC and requirements stakeholders have to be consulted to decide the outcome; possible resolutions include a domain expert relaxing an over-strict design deadline, or distinguishing capabilities so that different types of call to support are represented by distinct events. [CLM-0025-015]. — jurisdiction: general; basis: argument
-- Hu et al. (2024) argue that Allowing users to participate in legal article retrieval by interactively selecting, from the top retrieved articles, those that fit their situation increases the consistency between the user's situation and the legal articles the LLM refers to, enabling the LLM to generate more complete and accurate responses while avoiding noise from irrelevant articles. [CLM-0029-006]. — jurisdiction: general [jurisdiction inferred]; basis: argument
+- Large language models occupy an intermediate position in Islamic legal reasoning: they assist juristic research through retrieval, organization, and structured reasoning, yet they cannot assume the epistemic or ethical responsibilities that shape Islamic legal judgment, and therefore cannot take the role of a mufti or a mujtahid. — rests on literature (SRC-0003). [CLM-0003-001]
+- Mapped onto the principal tiers of Islamic juristic competence, large language models neither fit a single juristic rank nor fully replicate any human role: they occupy an intermediate space, partially simulating analytical tasks while lacking the deeper judgment, context-sensitivity, and ethical responsibility that underpin genuine ijtihād and fatwa issuance, and while far exceeding the lay interpreter (muqallid) in information retrieval and recall, their outputs remain dependent and non-independent. — rests on abstract considerations (SRC-0003). [CLM-0003-013]
+- Understanding where and why current legal AI systems break is not a limitation but the foundation of an agenda for trustworthy AI legal reasoning: only by honestly characterizing failure modes can it be identified where AI assistance can be responsibly applied, and systems be built that proactively surface interpretive uncertainty rather than asking lawyers to verify conclusions after the fact. — rests on abstract considerations (SRC-0022). [CLM-0022-019]
 
-## Disagreements
+### Prescriptive
 
-No extracted ATTACKS edge touches a claim on this page.
+**US**
+
+- Large language models should be thought of as no more definitive than other sources of 'evidence' of ordinary meaning, such as dictionaries, must only be used with an understanding of their limits, their tendencies to hallucinate and their sensitivity to context and priming, and must never be used to decide the core interpretive questions at issue in a case. — rests on abstract considerations (SRC-0019). [CLM-0019-008]
+
+**general**
+
+- Because different large language models produce varying responses, there is a need to create and use standardized evaluation benchmarks across model families, and human oversight and domain-specific fine-tuning remain crucial in applications where consistency is essential, such as the legal domain. — rests on factual basis (SRC-0002). [CLM-0002-009]
+- Large language models should be deployed in Islamic legal settings as supervised accelerators and synthesizers — assisting retrieval, classification, and preliminary analysis — with domain experts setting the frame, checking the steps, and making the rulings, leaving authoritative judgments to qualified jurists. — rests on abstract considerations (SRC-0003). [CLM-0003-008]
+- Privacy policy formalization should embrace rather than abstract away the limitations of legal language: a large language model can identify six key elements of each policy statement - the data sender, receiver, data subject, data type, action performed, and any conditions - and the extracted elements can be encoded as first-order logic, while vague terms are preserved as uninterpreted predicates rather than defined, making the ambiguity explicit for human review. — rests on abstract considerations (SRC-0013). [CLM-0013-009]
+- Formalizing legal privacy policy text shows both promise and fundamental limits; rather than attempting full automation, privacy policy analysis should be structured so that formal methods identify clear-cut issues while human expertise resolves genuine ambiguities. — rests on abstract considerations (SRC-0013). [CLM-0013-014]
+- Large language models should not be used for inherently normative tasks such as judging: normative values are always present in the legal process, and it is better to be explicit and choose socially desirable values than to accept without question the hidden and often harmful normative values forced on us by technology companies. — rests on abstract considerations (SRC-0019). [CLM-0019-009]
+- LLM systems in legal settings should support, not replace, human legal judgment, and automated evaluation of legal reasoning should be validated against, not substituted for, expert assessment. — rests on factual basis (SRC-0020). [CLM-0020-020]
+- A neutral entailment classification need not be a dead end: a system can compute the minimal set of additional axioms sufficient to shift the classification to ENTAILMENT or CONTRADICTION and present them to a legal reviewer with a targeted question, so that whether the lawyer validates the implicit norm or confirms the case is genuinely underspecified, legal expertise is applied precisely where formal methods reach their limit. — rests on abstract considerations (SRC-0022). [CLM-0022-011]
+- Rather than using LLM judges or human preferences as feedback, a formal verification tool can be used as a reward signal in training, teaching a model to distinguish formally supportable inferences from assumption-laden ones; when the solver flags an insufficiently grounded claim it also computes the minimal axioms required to ground it, feeding directly into targeted human review at the points where legal interpretation and formal grounding diverge. — rests on abstract considerations (SRC-0022). [CLM-0022-018]
+
+### Predictive
+
+**general**
+
+- The trust placed in large language models by users — especially models developed by authoritative entities — has the potential to redefine what and how people consider international law; if users rely on these models as definitive interpretative machines, the influence of their design choices will ripple across legal systems and international decision-making processes. — rests on abstract considerations (SRC-0005). [CLM-0005-017]
+
+## Where papers disagree
+
+No extracted disagreement is recorded: every ATTACKS edge touching these claims is inferred.
 
 ### Inferred
 
-Tensions judged from content alone, with no citation link (hypotheses about the literature, not facts about it; schema/edges.md).
-- The claim that Using AI only as a labour-saving device for tasks at the edges of the process for determining civil claims, such as summarising documents, initial legal research, checking draft judgments and streamlining case management, will speed up what remains a human-run process but will not increase productivity by anything approaching the amount needed to cope with the tsunami of AI-generated claims. [CLM-0047-010] is in tension with the claim that Because legal systems are human-centric and human accountability is paramount for trust in a democratically governed society, the vision of AI & Law is one of AI supporting human decision makers rather than replacing or unduly influencing them, and predictive systems should not be directly applied within courts. [CLM-0014-016] (inferred, low). Note: One predicts that confining AI to labour-saving edge tasks around a human-run process will not cope with AI-driven claim volumes; the other's vision keeps AI in exactly that supporting role — a tension of expectation rather than of principle.
-- The claim that The Human-in-the-Loop paradigm, as mandated by Article 14 of the EU AI Act and widely adopted as the default safeguard in corporate AI governance, is a structural placebo: mandating human oversight in the absence of architectural guardrails does not prevent catastrophic errors but merely redistributes liability onto operators who are cognitively and technically unequipped to intercept them. [CLM-0049-007] is in tension with the claim that Because legal systems are human-centric and human accountability is paramount for trust in a democratically governed society, the vision of AI & Law is one of AI supporting human decision makers rather than replacing or unduly influencing them, and predictive systems should not be directly applied within courts. [CLM-0014-016] (inferred, medium). Note: One treats human oversight of AI as the appropriate vision for legal AI; the other holds that the human-in-the-loop paradigm as a default safeguard is structurally flawed.
-- The claim that The Human-in-the-Loop paradigm, as mandated by Article 14 of the EU AI Act and widely adopted as the default safeguard in corporate AI governance, is a structural placebo: mandating human oversight in the absence of architectural guardrails does not prevent catastrophic errors but merely redistributes liability onto operators who are cognitively and technically unequipped to intercept them. [CLM-0049-007] is in tension with the claim that For complex domains like law, LLMs and pre-trained abstractive summarization models are not yet ready for fully automatic deployment; a human-in-the-loop approach in which a legal expert monitors the generated summaries may be more appropriate, and better methods are needed to detect complex errors in abstractive summaries. [CLM-0028-015] (inferred, medium). Note: One prescribes a human in the loop as the remedy for unreliable legal AI; the other holds that this paradigm fails under automation bias.
+- SRC-0002 holds “Because different large language models produce varying responses, there is a need to create and use standardized evaluation benchmarks …” [CLM-0002-009]; SRC-0001 holds “Because large language models can incorporate broader textual segments such as full paragraphs into their reasoning and can follow …” [CLM-0001-006]. Note: The assertion that human oversight and domain-specific fine-tuning remain crucial in the legal domain because different LLMs produce varying responses gives reasons against the contention that zero-shot operation without domain-specific fine-tuning highlights LLMs' potential for scalable legal compliance checking.
+- SRC-0003 holds “A retrieval-augmented fatwa system's source-based response places substantial weight on the inquirer, leaving source verification and …” [CLM-0003-007]; SRC-0014 holds “Allowing users to interactively select the legal articles a legal large language model uses improves the accuracy and completeness of its …” [CLM-0014-005]. Note: That leaving source relevance and verification to the inquirer's judgment is a weight and a bias risk gives a reason against expecting lay article selection to yield accurate advice.
+- SRC-0019 holds “Substituting a polling proxy — a panel drawn from the public or a large language model prediction of aggregated public opinion — for a …” [CLM-0019-003]; SRC-0025 holds “The third party who observes and understands the objective manifestations of contractual agreement can be a large language model, even …” [CLM-0025-008]. Note: The contention that substituting an LLM proxy for a judge's individual reasoning violates the duty to decide gives reasons against the claim that the third-party interpreter of contractual agreement can be a large language model.
+- SRC-0019 holds “Large language models should not be used for inherently normative tasks such as judging: normative values are always present in the legal …” [CLM-0019-009]; SRC-0025 holds “The third party who observes and understands the objective manifestations of contractual agreement can be a large language model, even …” [CLM-0025-008]. Note: The contention that LLMs should not be used for inherently normative tasks such as judging gives reasons against the claim that an LLM can serve as the third party deciding contract interpretation disputes with a more satisfying result than a coin flip.
+- SRC-0019 holds “Large language models should be thought of as no more definitive than other sources of 'evidence' of ordinary meaning, such as …” [CLM-0019-008]; SRC-0025 holds “Large language models may be the adjudicatory technology that resolves the text-versus-context issue at the practical lawyering scale where …” [CLM-0025-010]. Note: The contention that LLMs are no more definitive than dictionaries and must never decide core interpretive questions gives reasons against the claim that LLMs may be the adjudicatory technology that resolves the text-versus-context issue.
 
-## Distribution
+## The spread
 
-Sources with claims on this concept: 21; claims: 38.
+| paper | year | claims | by type | by basis | jurisdictions |
+|---|---|---|---|---|---|
+| SRC-0002 | unknown | 1 | 1 prescriptive | 1 factual | general |
+| SRC-0003 | 2026 | 5 | 2 interpretative, 2 descriptive, 1 prescriptive | 1 literature, 4 abstract | general |
+| SRC-0005 | 2026 | 1 | 1 predictive | 1 abstract | general |
+| SRC-0007 | 2026 | 1 | 1 descriptive | 1 abstract | undetermined |
+| SRC-0012 | 2025 | 1 | 1 descriptive | 1 factual | CN |
+| SRC-0013 | 2025 | 3 | 2 prescriptive, 1 descriptive | 2 abstract, 1 literature | general |
+| SRC-0014 | unknown | 1 | 1 descriptive | 1 factual | CN |
+| SRC-0018 | 2024 | 1 | 1 descriptive | 1 factual | US |
+| SRC-0019 | 2025 | 3 | 1 interpretative, 2 prescriptive | 1 legal, 2 abstract | US, general |
+| SRC-0020 | 2025 | 1 | 1 prescriptive | 1 factual | general |
+| SRC-0021 | unknown | 1 | 1 descriptive | 1 literature | US |
+| SRC-0022 | unknown | 3 | 2 prescriptive, 1 interpretative | 3 abstract | general |
+| SRC-0024 | unknown | 3 | 2 descriptive, 1 interpretative | 1 literature, 1 factual, 1 abstract | US, general |
 
-**By contribution type**
+## What is missing
 
-| value | sources |
-|---|---|
-| technical | 16 |
-| empirical_quantitative | 15 |
-| theoretical | 9 |
-| normative | 7 |
-| empirical_qualitative | 4 |
-| doctrinal | 3 |
-| survey | 2 |
+Absence records whose key names this concept (12, computed by `tools/absences.py`). Each is `unresolved` between its three readings — `gap_in_literature` (nobody in the field has written it), `extraction_shadow` (somebody has, and this corpus or extraction missed it), `tacit_link` (so obvious to the field that nobody states it) — which only a person may resolve.
 
-**By source jurisdiction**
+- ABS-0070 — `concept_jurisdiction:CPT-autonomy-and-human-oversight|AU` — No claim about CPT-autonomy-and-human-oversight concerns AU. (reading: unresolved — gap_in_literature | extraction_shadow | tacit_link)
+- ABS-0071 — `concept_jurisdiction:CPT-autonomy-and-human-oversight|BR` — No claim about CPT-autonomy-and-human-oversight concerns BR. (reading: unresolved — gap_in_literature | extraction_shadow | tacit_link)
+- ABS-0072 — `concept_jurisdiction:CPT-autonomy-and-human-oversight|CA` — No claim about CPT-autonomy-and-human-oversight concerns CA. (reading: unresolved — gap_in_literature | extraction_shadow | tacit_link)
+- ABS-0073 — `concept_jurisdiction:CPT-autonomy-and-human-oversight|DE` — No claim about CPT-autonomy-and-human-oversight concerns DE. (reading: unresolved — gap_in_literature | extraction_shadow | tacit_link)
+- ABS-0074 — `concept_jurisdiction:CPT-autonomy-and-human-oversight|EU` — No claim about CPT-autonomy-and-human-oversight concerns EU. (reading: unresolved — gap_in_literature | extraction_shadow | tacit_link)
+- ABS-0075 — `concept_jurisdiction:CPT-autonomy-and-human-oversight|GB` — No claim about CPT-autonomy-and-human-oversight concerns GB. (reading: unresolved — gap_in_literature | extraction_shadow | tacit_link)
+- ABS-0076 — `concept_jurisdiction:CPT-autonomy-and-human-oversight|KR` — No claim about CPT-autonomy-and-human-oversight concerns KR. (reading: unresolved — gap_in_literature | extraction_shadow | tacit_link)
+- ABS-0077 — `concept_jurisdiction:CPT-autonomy-and-human-oversight|MY` — No claim about CPT-autonomy-and-human-oversight concerns MY. (reading: unresolved — gap_in_literature | extraction_shadow | tacit_link)
+- ABS-0078 — `concept_jurisdiction:CPT-autonomy-and-human-oversight|NL` — No claim about CPT-autonomy-and-human-oversight concerns NL. (reading: unresolved — gap_in_literature | extraction_shadow | tacit_link)
+- ABS-0079 — `concept_jurisdiction:CPT-autonomy-and-human-oversight|NZ` — No claim about CPT-autonomy-and-human-oversight concerns NZ. (reading: unresolved — gap_in_literature | extraction_shadow | tacit_link)
+- ABS-0080 — `concept_jurisdiction:CPT-autonomy-and-human-oversight|RU` — No claim about CPT-autonomy-and-human-oversight concerns RU. (reading: unresolved — gap_in_literature | extraction_shadow | tacit_link)
+- ABS-0081 — `concept_jurisdiction:CPT-autonomy-and-human-oversight|TR` — No claim about CPT-autonomy-and-human-oversight concerns TR. (reading: unresolved — gap_in_literature | extraction_shadow | tacit_link)
 
-| value | sources |
-|---|---|
-| general | 8 |
-| US | 5 |
-| IN | 3 |
-| CN | 2 |
-| CoE | 2 |
-| CA-QC | 1 |
-| EU | 1 |
-| GB | 1 |
-| RU | 1 |
+## Open questions
 
-**By claim jurisdiction**
-
-| value | sources |
-|---|---|
-| general | 14 |
-| US | 3 |
-| geographical_proxy:IN | 3 |
-| geographical_proxy:US | 2 |
-| CoE | 1 |
-| EU | 1 |
-| GB | 1 |
-| IN | 1 |
-| geographical_proxy:CA-QC | 1 |
-| geographical_proxy:GB | 1 |
-| undetermined | 1 |
-
-**By year**
-
-| value | sources |
-|---|---|
-| 2026 | 6 |
-| 2024 | 5 |
-| 2023 | 4 |
-| 2025 | 4 |
-| 2021 | 1 |
-| 2022 | 1 |
-
-## What the sources do not address
-
-- No conceptual claim on CPT-autonomy-and-human-oversight. [ABS-1377] candidate readings: gap_in_literature | extraction_shadow | tacit_link
-
-## Open questions for the hypothesis register
-
-Entries are made at query time (query-graph skill); none recorded for this concept yet.
+- Can zero-shot LLM deployment be reconciled with the demand for human oversight and domain-specific fine-tuning where consistency is essential?
+- Can lay users be relied on to select the sources a legal assistant reasons from?
+- May an adjudicator delegate the observer's role in interpretation to a model without violating the duty to decide?
+- Are interpretive determinations inherently normative tasks that models should not perform?
+- Should model outputs ever outrank other evidence of meaning, such as dictionaries, in interpretation?

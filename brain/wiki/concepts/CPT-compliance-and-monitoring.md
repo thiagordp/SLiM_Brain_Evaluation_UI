@@ -1,168 +1,132 @@
 ---
-id: "CPT-compliance-and-monitoring"
-label: "Compliance and monitoring"
-status: "anchor"
-concept_type: "legal_task"
-definition: "Checking conduct, systems, or documents against legal or regulatory requirements."
-aliases: []
-broader: []
-sources: ["SRC-0012", "SRC-0024", "SRC-0025", "SRC-0040", "SRC-0049", "SRC-0050"]
-deprecated: false
-replaced_by:
-created: "2026-09-02"
+id: CPT-compliance-and-monitoring
+status: anchor
+concept_type: legal_task
+definition: The legal task of checking conduct, documents or systems against applicable rules and keeping that assessment current.
+run_ids: [RUN-2026-09-25-01]
 ---
 
-# Compliance and monitoring
+# CPT-compliance-and-monitoring
 
-_Status: anchor; family: legal_task._
+## What it means
 
-## Definition
+The legal task of checking conduct, documents or systems against applicable rules and keeping that assessment current. An anchor concept, given in advance in the grid of `schema/concept.md`; the corpus uses it as the claims below show [CLM-0001-001] [CLM-0001-002] [CLM-0001-003].
 
-Checking conduct, systems, or documents against legal or regulatory requirements.
-
-Conceptual claims on this concept, each with its source:
-- Hagag et al. (2024): Identifying legal violations on the open web presents two primary challenges: determining where to search among massive amounts of online content of varying credibility and relevance, and accurately interpreting whether the information found indicates a legal violation, which requires applying legal knowledge to determine the legal grounds and to identify victims who may be entitled to compensation. [CLM-0012-007]
-- Hagag et al. (2024): Information sparsity is a challenge for identifying cases of legal violation on the open web: the salient details of a case are often spread across multiple online sources and individually offer little insight, so that a holistic understanding and evaluation of the case is possible only when the individual details are stitched together. [CLM-0012-014]
-- Nay et al. (2023): Methods that improve LLMs' legal analysis skills are relevant to aligning AI with humans and governing AI: an LLM that grasps the law could 'self-police' to act in accordance with law, or separate models could apply legal and ethical standards to confirm whether another AI is properly aligned with the law (the 'Law Informs Code' approach). [CLM-0024-016]
-- Mandal and Sinha (2026): Built-in compliance is a medium-to-high, sticky moat for a vertical application: beyond the table-stakes base layer, meeting complex regulatory and policy compliance requirements with ongoing conformance guarantees means supplying the determinism, explainability and auditability that foundation models lack; horizontal players rarely absorb this burden, and once a firm wires compliance into its supervision and recordkeeping stack, switching means re-validating from scratch. [CLM-0040-012]
-- Mandal and Sinha (2026): Compliance requirements facing a vertical application fall on a spectrum of three tiers — a strict liability tier of rules requiring absolute adherence on pain of criminal liability or catastrophic fines (such as GDPR, HIPAA or the EU AI Act's prohibited and high-risk categories), a tolerable penalty tier where non-compliance is a manageable business cost, and a cautionary or advisory tier with opportunities to correct and minimal penalties — and verticals and workflows in the more stringent tiers can create much deeper moats through specialised solutions. [CLM-0040-013]
-
-## Claims about the concept
+## Claims
 
 ### Descriptive
 
-**US**
+**EU**
 
-- Mandal and Sinha (2026) state that In wealth management, which is governed by overlapping regimes of SEC recordkeeping and fiduciary rules, FINRA supervision and communications rules for broker-dealers, and state-level RIA rules, compliance rather than note-taking is the moat of the advisor productivity tool Jump, and compliance is what allows Jump to command a price premium over horizontal recording tools. [CLM-0040-014]. — jurisdiction: US [jurisdiction inferred]; basis: argument
-- Mandal and Sinha (2026) state that FINRA's 2026 regulatory oversight report explicitly pivots from AI guidance to accountability, demanding that firms document how their AI systems are supervised. [CLM-0040-015]. — jurisdiction: US [jurisdiction inferred]; basis: literature; positive form: trend
+- A prompt-driven framework that places structured prompt engineering at the center of automated GDPR compliance assessment — dividing Data Processing Agreements into paragraph-level semantic units and evaluating them against optimized representations of GDPR obligations using tailored prompts — yields notable improvements in accuracy, precision, and F1-score. — rests on factual basis (SRC-0001). [CLM-0001-002]
+- The GDPR's dense legal language frequently links provisions across multiple articles — breach notifications, security safeguards, and data subject rights often depend on definitions or clauses found elsewhere in the text — and this cross-referential structure challenges NLP pipelines that treat sentences as independent units. — rests on literature (SRC-0001). [CLM-0001-004]
+- Data Processing Agreements — legally binding contracts formalizing the controller-processor relationship under GDPR Article 28 — vary considerably in structure and terminology in practice; relevant details such as role definitions or security measures are often distributed across paragraphs or depend on contextual interpretation, causing sentence-level analysis to frequently fall short. — rests on literature (SRC-0001). [CLM-0001-005]
+- In zero-shot GDPR compliance checking of Data Processing Agreements using paragraph-level semantic context units and a structured prompt template, GPT-5.1-thinking consistently outperforms GPT-4o across all metrics, achieving a 6.3% absolute improvement in accuracy and a 6.0% improvement in F1-score; the additional gains suggest that explicit reasoning provides measurable benefits in legal compliance tasks. — rests on factual basis (SRC-0001). [CLM-0001-010]
+- The performance gains of GPT-5.1-thinking over GPT-4o in GDPR compliance checking are particularly pronounced for multi-part GDPR rules, such as those concerning breach notification content, security measures, and data subject rights: GPT-4o frequently classified paragraphs as compliant when only a subset of required elements was present, while GPT-5.1-thinking identified partial compliance cases more accurately, lowering the incidence of over-generalized acceptance. — rests on factual basis (SRC-0001). [CLM-0001-011]
+
+**EU+US**
+
+- New regulations such as the GDPR and the CCPA compound the difficulty of translating vague privacy policy terms into concrete access control rules by adding jurisdiction-specific requirements that change how data can be processed. — rests on legal sources (SRC-0013). [CLM-0013-004]
 
 **general**
 
-- Hagag et al. (2024) state that Prior work on automated detection of legal violations focused on domain-specific use cases such as privacy protection and lacks the versatility needed to address the broad spectrum of legal violations across contexts; LegalLens (Bernsohn et al., 2024) was the first to introduce legal violation detection as a general natural language inference task across multiple domains and the first to establish a cross-domain approach for detecting legal violations. [CLM-0012-013]. — jurisdiction: general; basis: literature
-- Getir Yaman et al. (2023) state that Existing formal verification approaches for autonomous systems mostly focus on the agents' safety requirements, and prior work on verifying ethical and legal constraints of robots does not address the operationalisation of such requirements and provides no notation dedicated to encoding SLEEC-related concerns as requirements; the SLEEC framework is distinctive in addressing the operationalisation of norms while leaving the identification of rules to complementary work. [CLM-0025-016]. — jurisdiction: general; basis: literature
-- Getir Yaman et al. (2023) state that Many autonomous systems learn, adapt and evolve in operation, for example in response to changes in their environment, and therefore cannot be fully verified at development time; runtime verification of autonomous-agent decisions against SLEEC rules and online synthesis of SLEEC-compliant adaptation plans are needed to cover this evolution. [CLM-0025-018]. — jurisdiction: general; basis: argument
+- Most existing automated compliance methods rely on sentence-level processing, manually crafted rules, or domain-specific features, which often fail to capture cross-references, legal definitions, and deeper semantic relationships across a document; sentence-level analysis is poorly suited to the contextual dependencies and hierarchical structure of regulatory texts. — rests on literature (SRC-0001). [CLM-0001-001]
+- Because large language models can incorporate broader textual segments such as full paragraphs into their reasoning and can follow natural-language instructions, they are uniquely suited for legal tasks where rule interpretation, justification, and flexible reasoning are essential; their ability to operate zero-shot without explicit domain-specific fine-tuning highlights their potential for scalable compliance checking. — rests on literature (SRC-0001). [CLM-0001-006]
+- Segmenting Data Processing Agreements at the paragraph level into Semantic Context Units preserves referential integrity — pronouns, relative clauses and definitional references remain interpretable because their antecedents stay within the same unit — ensuring the LLM receives contextually complete information for each compliance assessment, whereas references break and misinterpretation follows when sentences are analyzed in isolation. — rests on abstract considerations (SRC-0001). [CLM-0001-007]
+- Although previous studies have examined the performance of large language models on legal tasks, prompt engineering itself — the systematic design of instructions, context packaging, and compliance rule representations — has not been thoroughly investigated as a primary analytical mechanism. — rests on literature (SRC-0001). [CLM-0001-012]
+- Four fundamental challenges act as roadblocks to making fully automated privacy compliance checking feasible: vague terms with no computational definition, evolving terminology that does not fit predefined categories, exception patterns that appear contradictory to automated tools, and external legal dependencies not defined in the policy text. — rests on abstract considerations (SRC-0013). [CLM-0013-001]
+- Privacy policies state general rules and then carve out specific exceptions, which appear contradictory to automated tools that treat each statement independently; humans understand that the later statement creates a specific exception to the general rule, but current analyzers struggle to recognize the hierarchical relationship where specific rules override general ones, and manual review shows that most apparent contradictions in policies are actually coherent exception patterns. — rests on literature (SRC-0013). [CLM-0013-006]
+- Privacy policies reference external context that is not defined within the policy text, such as which laws apply in each jurisdiction or how an application actually implements its settings; formalizing these statements requires information beyond the policy text itself, and even entity-sensitive analysis cannot determine which specific laws trigger sharing in which contexts. — rests on abstract considerations (SRC-0013). [CLM-0013-007]
+- The rapid integration of large language models into diverse applications faces significant challenges due to the complexity of global regulatory and ethical frameworks, such as those in the GDPR and the AI Act, and diverse, evolving regulatory landscapes across countries challenge developers, data scientists, researchers, regulators, and policymakers. — rests on abstract considerations (SRC-0016). [CLM-0016-001]
+- Annotating and labeling data for teaching and evaluating a compliance assistant demands the expertise of legal professionals to ensure accuracy, making the process both time-consuming and expensive. — rests on abstract considerations (SRC-0016). [CLM-0016-004]
+- Reasoning on the compliance of AI tools with variable provisions differs from existing legal AI assistants and legal-reasoning benchmarks: given a large language model instructed to reason only on specific retrieved provisions, the user can select which provisions are considered by selecting those that can be retrieved, for example only laws that apply in the EU, plus provisions applying to the financial sector, plus the user's own ethical guidelines. — rests on abstract considerations (SRC-0016). [CLM-0016-009]
+- Explicit traffic rules such as speed limits and right-of-way regulations can be directly programmed into automated driving systems, but implicit traffic rules — which emerge from judicial decisions and may not be formally written in statutes — are crucial for autonomous vehicles to navigate ambiguous or unusual driving scenarios. — rests on abstract considerations (SRC-0017). [CLM-0017-001]
+- LLM-based extraction of implicit traffic rules from court decisions constitutes a scalable and efficient framework that can be integrated into autonomous vehicle development pipelines, enabling continuous updates to the implicit rule corpus as new judicial decisions are issued. — rests on abstract considerations (SRC-0017). [CLM-0017-012]
+- The lack of transparency in influencer marketing is the largest issue consistently identified by advertising self-regulatory bodies; the main challenge for such bodies in measuring compliance with their own rules is the sheer amount of social media posts that can potentially contain commercial content, and the fact that social media platforms do not allow anyone to thoroughly search their databases further complicates the enforcement of transparency standards. — rests on literature (SRC-0023). [CLM-0023-002]
+- Prior research on evaluating LLM outputs has not extended explanation-evaluation frameworks to complex, domain-specific contexts such as legal interpretation in detecting undisclosed advertisements on social media, which is a key gap in compliance detection; a taxonomy of common errors in LLM-generated legal reasoning for this task is a novel addition to regulatory compliance technology. — rests on literature (SRC-0023). [CLM-0023-003]
 
-### Interpretive
+### Interpretative
 
 **EU**
 
-- Gridin (2026) read AI Act, Art. 9(1) as follows: Satisfying Article 9 of the EU AI Act (a continuous, iterative risk management system throughout the lifecycle of a high-risk system) solely through manual human audits is economically and practically impossible given the volume and velocity of legal data processing; passing every LLM output through deterministic Linear AI wrappers before execution performs a systematic risk audit on every transaction and thereby automates compliance with Article 9. [CLM-0049-022]. — jurisdiction: EU; basis: legislation
-
-### Normative
-
-**EU, US**
-
-- Gridin (2026) argue that The transatlantic regulatory chasm is architecturally bridgeable: by establishing a single apex internal 'High Trust' standard (Risk Interoperability) whose Neuro-Symbolic architecture satisfies the EU AI Act's strictest transparency criteria while generating the cryptographic audit trail required by US tort law, a corporation can dissolve the binary compliance trap without legislative harmonisation, and sandboxed 'Shadow AI Governance' deployment lets it achieve US innovation velocity while producing the evidentiary logs European regulators require. [CLM-0049-019]. — jurisdiction: EU, US (comparative); basis: argument
+- In LLM-based legal compliance checking, the true driver of the accuracy gains observed when expanding context from sentences to paragraphs is the design of the prompt itself, not only the size of the context window; prompt quality is the dominant determinant of accuracy. — rests on factual basis (SRC-0001). [CLM-0001-003]
 
 **general**
 
-- Hagag et al. (2024) argue that The broader research community, particularly interdisciplinary researchers, should contribute resources, methodologies and diverse perspectives to legal violation detection, because collaboration across disciplines will be crucial to advancing the state of the art in this area. [CLM-0012-015]. — jurisdiction: general; basis: argument
-- Neumann et al. (2026) argue that Systematic prompt tests with clear thresholds should be set and met before public release to minimise trial-and-error deployment, and any standardisation of system-level instructions should not target specific words or prompt templates unless robustness across implementations has been shown; specialised intermediary roles could translate governance objectives into prompt specifications and validate their behavioural effects. [CLM-0050-017]. — jurisdiction: general; basis: argument
+- Prompt engineering functions as a form of 'soft programming' that can replace complex feature extraction pipelines or rigid rule-based frameworks, placing prompts at the core of any LLM-driven compliance automation system and motivating the need to treat them as first-class artifacts in the design of legal analysis tools. — rests on abstract considerations (SRC-0001). [CLM-0001-009]
+- Carefully designed prompts can serve as the primary mechanism for guiding legal reasoning in LLM-based systems, offering a scalable, explainable, and cost-effective solution for continuous compliance assessment under evolving regulations such as the GDPR. — rests on factual basis (SRC-0001). [CLM-0001-013]
 
-### Empirical
-
-**general**
-
-- Getir Yaman et al. (2023) report that In the robotic assistive dressing (RAD) case study, the SLEEC framework found the four expert-defined rules to be free of conflict and redundancy and the RoboChart design to satisfy three of them, but detected a violation of the fourth rule: an extra design requirement to call support within one minute of a user fall is incompatible with the rule requiring a two-minute delay for a retry agreement before support is called when dressing is abandoned. [CLM-0025-014]. — jurisdiction: general; basis: dataset_or_experiment
-
-**geographical_proxy:US**
-
-- Hagag et al. (2024) report that In the LegalLens Shared Task 2024, the top-performing teams in both the LegalLens-NER and LegalLens-NLI sub-tasks consistently relied on fine-tuning pretrained language models, and these fine-tuned models outperformed legal-specific models and few-shot methods. [CLM-0012-001]. — jurisdiction: geographical_proxy:US [jurisdiction inferred]; basis: dataset_or_experiment
-- Hagag et al. (2024) report that In the LegalLens Shared Task 2024, progress over the baseline was substantial for legal violation entity recognition (the best team improved the NER F1 score by 7.11%) but marginal for legal natural language inference (only one team outperformed the NLI baseline, by 5.7%), so significant room remains for advances in handling the complexities of natural legal language inference. [CLM-0012-002]. — jurisdiction: geographical_proxy:US [jurisdiction inferred]; basis: dataset_or_experiment
-- Hagag et al. (2024) report that Success in one LegalLens sub-task does not necessarily translate into success in the other: the challenges posed by legal violation entity recognition (LegalLens-NER) and legal violation inference (LegalLens-NLI) are distinct and require different approaches and strengths. [CLM-0012-003]. — jurisdiction: geographical_proxy:US [jurisdiction inferred]; basis: dataset_or_experiment
-- Hagag et al. (2024) report that In the LegalLens-NER sub-task there appears to be a performance ceiling: the top four teams achieve scores around 70% F1, which seems to be a plateau. [CLM-0012-004]. — jurisdiction: geographical_proxy:US [jurisdiction inferred]; basis: dataset_or_experiment
-- Hagag et al. (2024) report that Systems in the LegalLens-NER sub-task showed a significant drop in performance when identifying the "Violated By" and "Violated On" entities compared with the Law and Violation entities; this gap indicates room for improvement and suggests the potential of integrating other information extraction techniques, possibly from outside the legal domain. [CLM-0012-005]. — jurisdiction: geographical_proxy:US [jurisdiction inferred]; basis: dataset_or_experiment
-- Hagag et al. (2024) report that In the LegalLens-NLI sub-task, performance varied significantly by legal domain: systems underperformed in the Wage domain, likely because of its smaller dataset size and the implicit nature of its violations, and while models fine-tuned on larger datasets showed better overall performance, models specialising in domain-specific tasks demonstrated only marginal improvements, revealing a gap in domain adaptation. [CLM-0012-006]. — jurisdiction: geographical_proxy:US [jurisdiction inferred]; basis: dataset_or_experiment
-
-### Conceptual
+### Prescriptive
 
 **general**
 
-- Hagag et al. (2024) argue that Identifying legal violations on the open web presents two primary challenges: determining where to search among massive amounts of online content of varying credibility and relevance, and accurately interpreting whether the information found indicates a legal violation, which requires applying legal knowledge to determine the legal grounds and to identify victims who may be entitled to compensation. [CLM-0012-007]. — jurisdiction: general; basis: argument
-- Hagag et al. (2024) argue that Information sparsity is a challenge for identifying cases of legal violation on the open web: the salient details of a case are often spread across multiple online sources and individually offer little insight, so that a holistic understanding and evaluation of the case is possible only when the individual details are stitched together. [CLM-0012-014]. — jurisdiction: general; basis: argument
-- Nay et al. (2023) argue that Methods that improve LLMs' legal analysis skills are relevant to aligning AI with humans and governing AI: an LLM that grasps the law could 'self-police' to act in accordance with law, or separate models could apply legal and ethical standards to confirm whether another AI is properly aligned with the law (the 'Law Informs Code' approach). [CLM-0024-016]. — jurisdiction: general; basis: argument
-- Mandal and Sinha (2026) argue that Built-in compliance is a medium-to-high, sticky moat for a vertical application: beyond the table-stakes base layer, meeting complex regulatory and policy compliance requirements with ongoing conformance guarantees means supplying the determinism, explainability and auditability that foundation models lack; horizontal players rarely absorb this burden, and once a firm wires compliance into its supervision and recordkeeping stack, switching means re-validating from scratch. [CLM-0040-012]. — jurisdiction: general [jurisdiction inferred]; basis: argument
-- Mandal and Sinha (2026) argue that Compliance requirements facing a vertical application fall on a spectrum of three tiers — a strict liability tier of rules requiring absolute adherence on pain of criminal liability or catastrophic fines (such as GDPR, HIPAA or the EU AI Act's prohibited and high-risk categories), a tolerable penalty tier where non-compliance is a manageable business cost, and a cautionary or advisory tier with opportunities to correct and minimal penalties — and verticals and workflows in the more stringent tiers can create much deeper moats through specialised solutions. [CLM-0040-013]. — jurisdiction: general [jurisdiction inferred]; basis: argument
+- Methods developed for open-source software license compliance cannot be directly applied to dataset licenses, because publicly available dataset licenses often contain unclear and ambiguous terms regarding commercial use; automated approaches for identifying rights and obligations for dataset licenses are therefore needed. — rests on literature (SRC-0012). [CLM-0012-005]
+- Legal compliance is a critical non-functional requirement in the AI software engineering lifecycle that directly impacts software quality, yet proposed commercial software engineering lifecycles for AI-powered software do not include it — a critical oversight that can lead to significant legal risks — and ignoring legal issues, like copyright infringement or contract violations, undermines the reliability of AI-powered software. — rests on abstract considerations (SRC-0012). [CLM-0012-013]
+- Seamless integration of dataset license compliance into the AI software engineering lifecycle requires addressing three immediate challenges: developing tools to identify and analyze all licenses associated with datasets that aggregate data from various sources, especially when licenses conflict; adopting standardized license metadata, since current documentation standards lack the necessary details for license compliance; and extending compliance to AI models by evaluating model licenses alongside their training datasets' licenses. — rests on abstract considerations (SRC-0012). [CLM-0012-015]
+- Formalizing legal privacy policy text shows both promise and fundamental limits; rather than attempting full automation, privacy policy analysis should be structured so that formal methods identify clear-cut issues while human expertise resolves genuine ambiguities. — rests on abstract considerations (SRC-0013). [CLM-0013-014]
+- High classification accuracy does not ensure trustworthy enforcement of advertising rules: an LLM that labels a post correctly but cites irrelevant or fabricated legal provisions cannot satisfy procedural fairness standards, so platforms using LLMs for detection must pair performance metrics with legal-reasoning audits to ensure that decisions are not only correct but also defensible. — rests on factual basis (SRC-0023). [CLM-0023-013]
+- Not all errors in LLM-generated explanations are equally harmful for content moderation: vague reasoning may be tolerable, but fabricated citations or misapplied provisions threaten procedural fairness, and integrating severity-sensitive auditing into compliance monitoring would allow regulators to triage high-risk cases while ensuring that enforcement remains both effective and legitimate. — rests on abstract considerations (SRC-0023). [CLM-0023-014]
 
 ### Predictive
 
 **general**
 
-- Nay et al. (2023) argue that If LLMs understand the law well enough, they could be deployed by governments, citizens and researchers to identify inconsistencies in existing laws, flag potentially outdated law or areas where the law is silent although guidance exists in similar circumstances, provide clear explanations of complex laws and regulations, and eventually help predict the likely impacts of new laws or policies. [CLM-0024-017]. — jurisdiction: general; basis: argument
-- Getir Yaman et al. (2023) argue that The relatively low complexity of SLEEC rules is expected to make verification of a system's compliance with each individual rule feasible, provided the system's tock-CSP model is itself of manageable size; this assumption may not always hold because of state explosion, in particular as the FDR model checker is not optimised for timed (tock-CSP) models, but RoboChart's support for theorem proving, simulation and testing offers alternative verification routes. [CLM-0025-012]. — jurisdiction: general; basis: argument
+- Leveraging large language models to explain, review, and assess AI models, datasets, and complete pipelines from the perspective of legislations, regulations, ethical guidelines, and social impact can help address the challenges posed by rapid technological advancement and diverse, evolving regulatory landscapes. — rests on abstract considerations (SRC-0016). [CLM-0016-002]
+- Any general solution for an AI compliance assistant will likely require some form of retrieval-augmented generation in which the large language model can reason over the specific set of retrieved compliance requirements that can apply to a single product, service, or company at a given point in time within a certain jurisdiction. — rests on abstract considerations (SRC-0016). [CLM-0016-003]
+- A tool that automates the generation of compliance reasoning data — selecting real-world examples of AI technologies and explaining how specific legal and ethical guidelines impact them, followed by a refinement process so that only the best candidates are presented to annotators — aims to facilitate the development of AI-driven compliance assistants that can effectively align with global legal and ethical standards. — rests on abstract considerations (SRC-0016). [CLM-0016-007]
+- By integrating a compliance assistant into the AI development process, companies can proactively ensure that their models and data pipelines comply with complex regulations, identify potential legal issues early in the development cycle, and streamline the process by reducing the need for extensive manual reviews by legal experts, thereby reducing compliance risks and accelerating time-to-market. — rests on abstract considerations (SRC-0016). [CLM-0016-008]
 
-### Methodological
+## Where papers disagree
 
-**general**
-
-- Hagag et al. (2024) argue that A system for efficiently detecting legal violations in online digital data must scan large amounts of data, isolate relevant information, contextualise the findings by linking them to specific legal grounds, clearly explain potential violations, and identify the affected individuals or entities who may be entitled to legal recourse. [CLM-0012-008]. — jurisdiction: general; basis: argument
-- Hagag et al. (2024) argue that Existing named entity recognition methods and entity types, including those used in legal-domain NER tasks (such as plaintiff and defendant), are not tailored to detecting legal violations, fail to capture the ambiguity of legal language, and lack the complexity needed for the task. [CLM-0012-009]. — jurisdiction: general; basis: literature
-- Hagag et al. (2024) argue that Beyond mapping detected violations to legal grounds, the LegalLens-NLI task can serve the additional purpose of identifying individuals who may have been harmed by a violation, by using descriptions of violations (such as court-filed complaints or articles) as premises and online content in which people describe personal experiences (such as reviews or posts) as hypotheses. [CLM-0012-010]. — jurisdiction: general; basis: argument
-- Getir Yaman et al. (2023) argue that SLEEC (social, legal, ethical, empathetic and cultural) rules for autonomous agents can be given end-to-end tool-supported formal treatment through a framework comprising a domain-specific language for specifying the rules and their defeaters, a formal semantics for that language in the process algebra tock-CSP, and methods for detecting conflicts and redundancy within a rule set and for verifying an agent's compliance with the rules. [CLM-0025-002]. — jurisdiction: general; basis: argument
-- Getir Yaman et al. (2023) argue that Conflict freedom of two SLEEC rules can be checked automatically with the FDR model checker using two assertions on the parallel conjunction of the rule processes, a standard deadlock-freedom assertion and a timed-deadlock-freedom assertion; deadlock freedom alone is insufficient, because a rule pair can pass the deadlock check while still reaching a state in which only the passage of time is possible. [CLM-0025-008]. — jurisdiction: general; basis: argument
-- Getir Yaman et al. (2023) argue that Compliance of an autonomous agent design with a SLEEC rule can be verified as traces refinement in tock-CSP, with the specification given by the process capturing the semantics of the rule: the events of the system under verification must occur in the order and time the rule specifies, projected onto the rule's alphabet and with matching values of the measures the rule reads, while the conforming system may engage in additional events and read additional measures. [CLM-0025-011]. — jurisdiction: general; basis: argument
-- Getir Yaman et al. (2023) argue that When a system design is found to violate a SLEEC rule, the SLEEC and requirements stakeholders have to be consulted to decide the outcome; possible resolutions include a domain expert relaxing an over-strict design deadline, or distinguishing capabilities so that different types of call to support are represented by distinct events. [CLM-0025-015]. — jurisdiction: general; basis: argument
-- Gridin (2026) argue that AI should be deployed in high-stakes legal environments only through a Neuro-Symbolic 'Sandwich' architecture in which a generative LLM is encapsulated by hundreds of specialised, rule-based Linear AI micro-agents (for example citation, chronological, and arithmetic agents) that verify its output against closed libraries and deterministically halt the workflow on error; delegating creativity to the neural network and factual verification to the linear algorithm is the only computationally sound method to deploy AI in such environments. [CLM-0049-005]. — jurisdiction: general; basis: argument
-
-**geographical_proxy:US**
-
-- Hagag et al. (2024) argue that The enhanced LegalLens dataset built for the shared task is a more comprehensive and challenging benchmark than the original LegalLens dataset: improved prompt practices, better annotator guidelines, human expert validation and feedback on the original paper improve the generation process and the annotations, yielding more realistic content, better data quality and reduced bias. [CLM-0012-012]. — jurisdiction: geographical_proxy:US [jurisdiction inferred]; basis: dataset_or_experiment
-
-## Disagreements
-
-No extracted ATTACKS edge touches a claim on this page.
+No extracted disagreement is recorded: every ATTACKS edge touching these claims is inferred.
 
 ### Inferred
 
-Tensions judged from content alone, with no citation link (hypotheses about the literature, not facts about it; schema/edges.md).
-- The claim that Legal-oriented pre-trained language models (Legal-BERT and CaseLaw-BERT) perform overall better than models pre-trained on generic corpora (BERT, RoBERTa, DeBERTa, Longformer, BigBird) across the seven LexGLUE legal NLU tasks, consistently offering performance improvements across multiple tasks. [CLM-0048-002] is in tension with the claim that In the LegalLens Shared Task 2024, the top-performing teams in both the LegalLens-NER and LegalLens-NLI sub-tasks consistently relied on fine-tuning pretrained language models, and these fine-tuned models outperformed legal-specific models and few-shot methods. [CLM-0012-001] (inferred, medium). Note: One finds legal-oriented pre-trained models overall better than generic ones on legal NLU tasks; the other finds fine-tuned generic models beating legal-specific ones on violation detection.
+- SRC-0002 holds “Because different large language models produce varying responses, there is a need to create and use standardized evaluation benchmarks …” [CLM-0002-009]; SRC-0001 holds “Because large language models can incorporate broader textual segments such as full paragraphs into their reasoning and can follow …” [CLM-0001-006]. Note: The assertion that human oversight and domain-specific fine-tuning remain crucial in the legal domain because different LLMs produce varying responses gives reasons against the contention that zero-shot operation without domain-specific fine-tuning highlights LLMs' potential for scalable legal compliance checking.
+- SRC-0003 holds “Large language models do not perform reasoning in the juristic sense; their outputs are statistical reproductions of reasoning-like …” [CLM-0003-004]; SRC-0001 holds “Because large language models can incorporate broader textual segments such as full paragraphs into their reasoning and can follow …” [CLM-0001-006]. Note: If LLM outputs are statistical reproductions of reasoning-like patterns rather than epistemic deliberation, that gives reasons against LLMs being uniquely suited to legal tasks where rule interpretation, justification and flexible reasoning are essential.
+- SRC-0003 holds “For Islamic legal questions, deductive reasoning by large language models works most consistently where explicit Qurʾānic verses and widely …” [CLM-0003-011]; SRC-0001 holds “Because large language models can incorporate broader textual segments such as full paragraphs into their reasoning and can follow …” [CLM-0001-006]. Note: The unreliability of abductive, causal and analogical reasoning in LLMs counts against the claim that they are uniquely suited to legal tasks demanding flexible legal reasoning.
+- SRC-0006 holds “Large language models make predictions about the most likely next word in a sequence by treating each word as a number …” [CLM-0006-013]; SRC-0001 holds “Because large language models can incorporate broader textual segments such as full paragraphs into their reasoning and can follow …” [CLM-0001-006]. Note: The claim that LLMs make no attempt to understand or externally validate meaning gives reasons against LLMs being uniquely suited to legal tasks where rule interpretation, justification and flexible reasoning are essential.
+- SRC-0007 holds “The traceability of a symbolic rule-based coverage system — showing which rule fired and which attribute conditions matched — allows a …” [CLM-0007-011]; SRC-0001 holds “Carefully designed prompts can serve as the primary mechanism for guiding legal reasoning in LLM-based systems, offering a scalable, …” [CLM-0001-013]. Note: The contention that direct prompting offers no comparable traceability and is more prone to hallucinations gives reasons against treating carefully designed prompts as a scalable, explainable primary mechanism for guiding legal reasoning in LLM-based systems.
+- SRC-0007 holds “LLM-based methods given retrieved policy text achieve slightly higher accuracy and F1 scores (up to 0.94 accuracy and 0.96 F1) than …” [CLM-0007-008]; SRC-0001 holds “Prompt engineering functions as a form of 'soft programming' that can replace complex feature extraction pipelines or rigid rule-based …” [CLM-0001-009]. Note: Evidence that LLM inference costs scale rapidly while a rule-based system delivers competitive performance far more cheaply gives reasons against the contention that prompt engineering can replace rule-based frameworks in LLM-driven compliance systems.
+- SRC-0013 holds “Four fundamental challenges act as roadblocks to making fully automated privacy compliance checking feasible: vague terms with no …” [CLM-0013-001]; SRC-0016 holds “By integrating a compliance assistant into the AI development process, companies can proactively ensure that their models and data …” [CLM-0016-008]. Note: The four roadblocks to fully automated privacy compliance checking — vague terms, evolving terminology, exception patterns, and external legal dependencies — give reasons against the claim that an automated compliance assistant can proactively ensure models and data pipelines comply with complex regulations.
+- SRC-0024 holds “Generative AI can be used effectively in the rulemaking process for tasks such as preparing summaries or plain-English versions of …” [CLM-0024-001]; SRC-0001 holds “Because large language models can incorporate broader textual segments such as full paragraphs into their reasoning and can follow …” [CLM-0001-006]. Note: The contention that LLMs are a poor tool for tasks requiring legal analysis gives reasons against the contention that LLMs are uniquely suited for legal tasks where rule interpretation, justification and flexible reasoning are essential.
+- SRC-0007 holds “For large-scale coverage adjudication, a symbolic rule-based system that performs attribute generation once per procedure code and rule …” [CLM-0007-007]; SRC-0001 holds “Carefully designed prompts can serve as the primary mechanism for guiding legal reasoning in LLM-based systems, offering a scalable, …” [CLM-0001-013]. Note: That a symbolic rule-based coverage system needing no LLM inference at run time is dramatically cheaper at scale ($22 against $4,840-$9,680 for 11,000 codes) gives reasons against carefully designed prompts being a cost-effective solution for continuous compliance assessment.
 
-## Distribution
+## The spread
 
-Sources with claims on this concept: 6; claims: 32.
+| paper | year | claims | by type | by basis | jurisdictions |
+|---|---|---|---|---|---|
+| SRC-0001 | unknown | 12 | 9 descriptive, 3 interpretative | 5 literature, 5 factual, 2 abstract | EU, general |
+| SRC-0012 | 2025 | 3 | 3 prescriptive | 1 literature, 2 abstract | general |
+| SRC-0013 | 2025 | 5 | 4 descriptive, 1 prescriptive | 3 abstract, 1 legal, 1 literature | EU+US, general |
+| SRC-0016 | 2024 | 7 | 3 descriptive, 4 predictive | 7 abstract | general |
+| SRC-0017 | 2024 | 2 | 2 descriptive | 2 abstract | general |
+| SRC-0023 | unknown | 4 | 2 descriptive, 2 prescriptive | 2 literature, 1 factual, 1 abstract | general |
 
-**By contribution type**
+## What is missing
 
-| value | sources |
-|---|---|
-| technical | 4 |
-| theoretical | 4 |
-| empirical_qualitative | 3 |
-| normative | 3 |
-| empirical_quantitative | 2 |
-| doctrinal | 1 |
-| survey | 1 |
+Absence records whose key names this concept (11, computed by `tools/absences.py`). Each is `unresolved` between its three readings — `gap_in_literature` (nobody in the field has written it), `extraction_shadow` (somebody has, and this corpus or extraction missed it), `tacit_link` (so obvious to the field that nobody states it) — which only a person may resolve.
 
-**By source jurisdiction**
+- ABS-0543 — `concept_pair:CPT-compliance-and-monitoring|CPT-agentic-systems` — No claim links CPT-compliance-and-monitoring to CPT-agentic-systems. (reading: unresolved — gap_in_literature | extraction_shadow | tacit_link)
+- ABS-0544 — `concept_pair:CPT-compliance-and-monitoring|CPT-deep-learning` — No claim links CPT-compliance-and-monitoring to CPT-deep-learning. (reading: unresolved — gap_in_literature | extraction_shadow | tacit_link)
+- ABS-0545 — `concept_pair:CPT-compliance-and-monitoring|CPT-defeasible-reasoning` — No claim links CPT-compliance-and-monitoring to CPT-defeasible-reasoning. (reading: unresolved — gap_in_literature | extraction_shadow | tacit_link)
+- ABS-0546 — `concept_pair:CPT-compliance-and-monitoring|CPT-fine-tuning` — No claim links CPT-compliance-and-monitoring to CPT-fine-tuning. (reading: unresolved — gap_in_literature | extraction_shadow | tacit_link)
+- ABS-0547 — `concept_pair:CPT-compliance-and-monitoring|CPT-human-reinforcement-learning` — No claim links CPT-compliance-and-monitoring to CPT-human-reinforcement-learning. (reading: unresolved — gap_in_literature | extraction_shadow | tacit_link)
+- ABS-0548 — `concept_pair:CPT-compliance-and-monitoring|CPT-in-context-learning` — No claim links CPT-compliance-and-monitoring to CPT-in-context-learning. (reading: unresolved — gap_in_literature | extraction_shadow | tacit_link)
+- ABS-0549 — `concept_pair:CPT-compliance-and-monitoring|CPT-llm-as-a-judge` — No claim links CPT-compliance-and-monitoring to CPT-llm-as-a-judge. (reading: unresolved — gap_in_literature | extraction_shadow | tacit_link)
+- ABS-0550 — `concept_pair:CPT-compliance-and-monitoring|CPT-machine-learning` — No claim links CPT-compliance-and-monitoring to CPT-machine-learning. (reading: unresolved — gap_in_literature | extraction_shadow | tacit_link)
+- ABS-0551 — `concept_pair:CPT-compliance-and-monitoring|CPT-neuro-symbolic-hybrid` — No claim links CPT-compliance-and-monitoring to CPT-neuro-symbolic-hybrid. (reading: unresolved — gap_in_literature | extraction_shadow | tacit_link)
+- ABS-0552 — `concept_pair:CPT-compliance-and-monitoring|CPT-question-decomposition` — No claim links CPT-compliance-and-monitoring to CPT-question-decomposition. (reading: unresolved — gap_in_literature | extraction_shadow | tacit_link)
+- ABS-0553 — `concept_pair:CPT-compliance-and-monitoring|CPT-syllogistic-reasoning` — No claim links CPT-compliance-and-monitoring to CPT-syllogistic-reasoning. (reading: unresolved — gap_in_literature | extraction_shadow | tacit_link)
 
-| value | sources |
-|---|---|
-| general | 4 |
-| US | 2 |
-| CoE | 1 |
-| EU | 1 |
-| RU | 1 |
+## Open questions
 
-**By claim jurisdiction**
-
-| value | sources |
-|---|---|
-| general | 6 |
-| US | 2 |
-| EU | 1 |
-| geographical_proxy:US | 1 |
-
-**By year**
-
-| value | sources |
-|---|---|
-| 2026 | 3 |
-| 2023 | 2 |
-| 2024 | 1 |
-
-## What the sources do not address
-
-
-## Open questions for the hypothesis register
-
-Entries are made at query time (query-graph skill); none recorded for this concept yet.
+- Can zero-shot LLM deployment be reconciled with the demand for human oversight and domain-specific fine-tuning where consistency is essential?
+- Does statistical reproduction of reasoning-like patterns suffice for the rule interpretation and flexible reasoning legal tasks demand?
+- Which legal tasks require the abductive and analogical reasoning LLMs perform least reliably?
+- Can systems that make no attempt to validate meaning be entrusted with tasks where interpretation is essential?
+- Can prompt-driven LLM pipelines reach the traceability that symbolic rules offer a human reviewer?
+- At what scale do LLM inference costs outweigh the flexibility that prompt-centred designs buy?
+- How far can compliance checking be automated when vague terms, exceptions and external references resist formalization?
+- Which side of the boundary between clerical assistance and legal analysis do current LLM deployments actually sit on?
+- Is prompt-driven LLM inference cost-effective for continuous compliance at adjudication scale?

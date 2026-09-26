@@ -1,0 +1,100 @@
+# Allocation for ROUND-2026-01 — DEVELOPMENT ALLOCATION.
+#
+# This is NOT the accepted scientific allocation. It exists so the round can be
+# bootstrapped and exercised end to end while one Source (the 26th) is still
+# missing from the Brain. The choice of Agreement and Individual papers is
+# arbitrary but deterministic:
+#
+#   training   the two agreed Training papers, resolved by title in the Brain
+#   agreement  the first six remaining Sources in ascending id order, two per pair
+#   individual the other seventeen in ascending id order, in consecutive blocks
+#              of three per evaluator, in the evaluator order below; the last
+#              evaluator (Alessandro) temporarily has two.
+#
+# When the 26th Source is in the Brain, add it to IND-6 (Alessandro), giving
+# every evaluator three Individual papers, then regenerate:
+#
+#   python app/tools/build_assignments.py
+#
+# Titles are checked against the Brain: a Source renumbered between snapshots is
+# reported instead of silently assigning a different paper.
+allocation_id: DEV-2026-09-26
+status: development
+
+evaluators:
+  - {evaluator_id: thiago, name: Thiago, is_admin: true}
+  - {evaluator_id: francesca, name: Francesca}
+  - {evaluator_id: giuseppe, name: Giuseppe}
+  - {evaluator_id: vaclav, name: Vaclav}
+  - {evaluator_id: giovanni, name: Giovanni}
+  - {evaluator_id: alessandro, name: Alessandro}
+
+pairs:
+  A: [thiago, francesca]
+  B: [giuseppe, vaclav]
+  C: [giovanni, alessandro]
+
+# Optional practice, the same papers for all six evaluators.
+training:
+  - {source: SRC-0006, title: "Pseudolaw and the illusion of legal meaning"}
+  - {source: SRC-0009, title: "Automated Extraction of Judicial Interpretative Formulas in EU Case Law on VAT"}
+
+# Both members of the pair evaluate every paper of their set.
+agreement:
+  AGR-A:
+    pair: A
+    sources:
+      - {source: SRC-0001, title: "Prompt Driven Legal Compliance Automation Using Large Language Models"}
+      - {source: SRC-0002, title: "Evaluating Open and Proprietary Large Language Models in Law Interpretation: The Case of the EU VAT Directive"}
+  AGR-B:
+    pair: B
+    sources:
+      - {source: SRC-0003, title: "Artificial Reasoning and Islamic Law: Mapping LLM Capabilities Across Juristic Ranks and Reasoning Frameworks"}
+      - {source: SRC-0004, title: "Less is Better: A Comparative Analysis of Guidance Methods for Long-Context Window-Based Legal Interpretation"}
+  AGR-C:
+    pair: C
+    sources:
+      - {source: SRC-0005, title: "Encoded Normativity: Designing Large Language Models for International Law"}
+      - {source: SRC-0007, title: "From Policy to Logic for Efficient and Interpretable Coverage Assessment"}
+
+# Exactly one evaluator per paper.
+individual:
+  IND-1:
+    evaluator: thiago
+    sources:
+      - {source: SRC-0008, title: "Legal Markup for Reasoning: discursive analysis of tax law court decision texts"}
+      - {source: SRC-0010, title: "The Death of the Legal Author: Authority, Intention, and Law-Creation in the Advent of GenAI"}
+      - {source: SRC-0011, title: "SyLeR: A Framework for Explicit Syllogistic Legal Reasoning in Large Language Models"}
+  IND-2:
+    evaluator: francesca
+    sources:
+      - {source: SRC-0012, title: "LicenseGPT: A Fine-tuned Foundation Model for Publicly Available Dataset License Compliance"}
+      - {source: SRC-0013, title: "The Privacy Quagmire: Where Computer Scientists and Lawyers May Disagree"}
+      - {source: SRC-0014, title: "ELLA: Empowering LLMs for Interpretable, Accurate and Informative Legal Advice"}
+  IND-3:
+    evaluator: giuseppe
+    sources:
+      - {source: SRC-0015, title: "Can ChatGPT Perform Reasoning Using the IRAC Method in Analyzing Legal Scenarios Like a Lawyer?"}
+      - {source: SRC-0016, title: "Preparing AI for Compliance: Initial Steps of a Framework for Teaching LLMs to Reason About Compliance"}
+      - {source: SRC-0017, title: "Leveraging LLM for Identification and Extraction of Normative Statements"}
+  IND-4:
+    evaluator: vaclav
+    sources:
+      - {source: SRC-0018, title: "Using LLMs to Discover Legal Factors"}
+      - {source: SRC-0019, title: "Against AI Jurisprudence: Large Language Models and the False Promises of Empirical Judging"}
+      - {source: SRC-0020, title: "Can LLMs Reason in a Legally Meaningful Manner? A Small-scale Study on European Court of Human Rights Cases"}
+  IND-5:
+    evaluator: giovanni
+    sources:
+      - {source: SRC-0021, title: "Reasoners or Translators? Contamination-aware Evaluation and Neuro-Symbolic Robustness in Tax Law"}
+      - {source: SRC-0022, title: "Bridging Legal Interpretation and Formal Logic: Faithfulness, Assumption, and the Future of AI Legal Reasoning"}
+      - {source: SRC-0023, title: "Evaluating LLM-Generated Legal Explanations for Regulatory Compliance in Social Media Influencer Marketing"}
+  IND-6:
+    evaluator: alessandro
+    sources:
+      - {source: SRC-0024, title: "Automating the Administrative State? Caution and Humility in the Use of Generative AI in Rulemaking"}
+      - {source: SRC-0025, title: "Contract Law Illusions and Delusions"}
+
+# Generic reservations: preallocated storage for a decision not yet taken.
+# None are needed for this allocation.
+reserved: []

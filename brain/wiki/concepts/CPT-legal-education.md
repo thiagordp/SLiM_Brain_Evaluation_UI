@@ -1,80 +1,69 @@
 ---
-id: "CPT-legal-education"
-label: "Legal education"
-status: "anchor"
-concept_type: "legal_task"
-definition: "Use of AI in teaching, training, or examining legal knowledge and skills."
-aliases: []
-broader: []
-sources: ["SRC-0010"]
-deprecated: false
-replaced_by:
-created: "2026-09-02"
+id: CPT-legal-education
+status: anchor
+concept_type: legal_task
+definition: The legal task of teaching law and building legal understanding, in institutions or for the public.
+run_ids: [RUN-2026-09-25-01]
 ---
 
-# Legal education
+# CPT-legal-education
 
-_Status: anchor; family: legal_task._
+## What it means
 
-## Definition
+The legal task of teaching law and building legal understanding, in institutions or for the public. An anchor concept, given in advance in the grid of `schema/concept.md`; the corpus uses it as the claims below show [CLM-0006-019] [CLM-0015-009] [CLM-0015-011].
 
-Use of AI in teaching, training, or examining legal knowledge and skills.
+## Claims
 
-## Claims about the concept
+### Descriptive
 
-### Empirical
+**MY+AU**
 
-**geographical_proxy:CoE**
+- In human evaluation of ChatGPT's IRAC analyses by law students, the questions evaluating the generated assumptions are subjective — a common problem in law education: the Cohen's Kappa inter-annotator agreement score over all evaluation measures was 0.55, rising to 0.75 when the assumption evaluation was excluded. — rests on factual basis (SRC-0015). [CLM-0015-009]
 
-- Mumford et al. (2023) report that The absence of any effect of legal domain experience on human verdict-classification performance suggests a limited effectiveness of university education for training law students to reconcile legal case descriptions into case outcomes. [CLM-0010-008]. — jurisdiction: geographical_proxy:CoE; basis: dataset_or_experiment
+**general**
 
-## Disagreements
+- IRAC — standing for Issue, Rule, Application and Conclusion — is the most popular legal analysis methodology used by legal professionals and law schools, applied for solving legal problems in a systematic manner. — rests on literature (SRC-0015). [CLM-0015-011]
 
-No extracted ATTACKS edge touches a claim on this page.
+### Interpretative
 
-### Inferred
+**AU**
 
-Tensions judged from content alone, with no citation link (hypotheses about the literature, not facts about it; schema/edges.md).
-- none
+- Pseudolaw is the logical extension of 50 years of diminishing access to justice and a chronic underinvestment in civics and legal literacy education; failures in those domains have given rise to pseudolaw, which is already profoundly disrupting courts. — rests on abstract considerations (SRC-0006). [CLM-0006-019]
 
-## Distribution
+## Where papers disagree
 
-Sources with claims on this concept: 1; claims: 1.
+No ATTACKS edge touches the claims mapped to this concept.
 
-**By contribution type**
+## The spread
 
-| value | sources |
-|---|---|
-| empirical_quantitative | 1 |
-| technical | 1 |
+| paper | year | claims | by type | by basis | jurisdictions |
+|---|---|---|---|---|---|
+| SRC-0006 | 2025 | 1 | 1 interpretative | 1 abstract | AU |
+| SRC-0015 | unknown | 2 | 2 descriptive | 1 factual, 1 literature | MY+AU, general |
 
-**By source jurisdiction**
+## What is missing
 
-| value | sources |
-|---|---|
-| general | 1 |
+Absence records whose key names this concept (18, computed by `tools/absences.py`). Each is `unresolved` between its three readings — `gap_in_literature` (nobody in the field has written it), `extraction_shadow` (somebody has, and this corpus or extraction missed it), `tacit_link` (so obvious to the field that nobody states it) — which only a person may resolve.
 
-**By claim jurisdiction**
+- ABS-0634 — `concept_pair:CPT-legal-education|CPT-agentic-systems` — No claim links CPT-legal-education to CPT-agentic-systems. (reading: unresolved — gap_in_literature | extraction_shadow | tacit_link)
+- ABS-0635 — `concept_pair:CPT-legal-education|CPT-context-granularity` — No claim links CPT-legal-education to CPT-context-granularity. (reading: unresolved — gap_in_literature | extraction_shadow | tacit_link)
+- ABS-0636 — `concept_pair:CPT-legal-education|CPT-deep-learning` — No claim links CPT-legal-education to CPT-deep-learning. (reading: unresolved — gap_in_literature | extraction_shadow | tacit_link)
+- ABS-0637 — `concept_pair:CPT-legal-education|CPT-explicit-reasoning` — No claim links CPT-legal-education to CPT-explicit-reasoning. (reading: unresolved — gap_in_literature | extraction_shadow | tacit_link)
+- ABS-0638 — `concept_pair:CPT-legal-education|CPT-fine-tuning` — No claim links CPT-legal-education to CPT-fine-tuning. (reading: unresolved — gap_in_literature | extraction_shadow | tacit_link)
+- ABS-0639 — `concept_pair:CPT-legal-education|CPT-human-reinforcement-learning` — No claim links CPT-legal-education to CPT-human-reinforcement-learning. (reading: unresolved — gap_in_literature | extraction_shadow | tacit_link)
+- ABS-0640 — `concept_pair:CPT-legal-education|CPT-in-context-learning` — No claim links CPT-legal-education to CPT-in-context-learning. (reading: unresolved — gap_in_literature | extraction_shadow | tacit_link)
+- ABS-0641 — `concept_pair:CPT-legal-education|CPT-large-language-models` — No claim links CPT-legal-education to CPT-large-language-models. (reading: unresolved — gap_in_literature | extraction_shadow | tacit_link)
+- ABS-0642 — `concept_pair:CPT-legal-education|CPT-llm-as-a-judge` — No claim links CPT-legal-education to CPT-llm-as-a-judge. (reading: unresolved — gap_in_literature | extraction_shadow | tacit_link)
+- ABS-0643 — `concept_pair:CPT-legal-education|CPT-llm-based-annotation` — No claim links CPT-legal-education to CPT-llm-based-annotation. (reading: unresolved — gap_in_literature | extraction_shadow | tacit_link)
+- ABS-0644 — `concept_pair:CPT-legal-education|CPT-machine-learning` — No claim links CPT-legal-education to CPT-machine-learning. (reading: unresolved — gap_in_literature | extraction_shadow | tacit_link)
+- ABS-0645 — `concept_pair:CPT-legal-education|CPT-neuro-symbolic-hybrid` — No claim links CPT-legal-education to CPT-neuro-symbolic-hybrid. (reading: unresolved — gap_in_literature | extraction_shadow | tacit_link)
+- ABS-0646 — `concept_pair:CPT-legal-education|CPT-prompt-engineering` — No claim links CPT-legal-education to CPT-prompt-engineering. (reading: unresolved — gap_in_literature | extraction_shadow | tacit_link)
+- ABS-0647 — `concept_pair:CPT-legal-education|CPT-question-decomposition` — No claim links CPT-legal-education to CPT-question-decomposition. (reading: unresolved — gap_in_literature | extraction_shadow | tacit_link)
+- ABS-0648 — `concept_pair:CPT-legal-education|CPT-retrieval-augmented-generation` — No claim links CPT-legal-education to CPT-retrieval-augmented-generation. (reading: unresolved — gap_in_literature | extraction_shadow | tacit_link)
+- ABS-0649 — `concept_pair:CPT-legal-education|CPT-syllogistic-reasoning` — No claim links CPT-legal-education to CPT-syllogistic-reasoning. (reading: unresolved — gap_in_literature | extraction_shadow | tacit_link)
+- ABS-0650 — `concept_pair:CPT-legal-education|CPT-symbolic-rule-based` — No claim links CPT-legal-education to CPT-symbolic-rule-based. (reading: unresolved — gap_in_literature | extraction_shadow | tacit_link)
+- ABS-0651 — `concept_pair:CPT-legal-education|CPT-zero-shot-learning` — No claim links CPT-legal-education to CPT-zero-shot-learning. (reading: unresolved — gap_in_literature | extraction_shadow | tacit_link)
 
-| value | sources |
-|---|---|
-| geographical_proxy:CoE | 1 |
+## Open questions
 
-**By year**
-
-| value | sources |
-|---|---|
-| 2023 | 1 |
-
-## What the sources do not address
-
-- No descriptive claim on CPT-legal-education. [ABS-1416] candidate readings: gap_in_literature | extraction_shadow | tacit_link
-- No interpretive claim on CPT-legal-education. [ABS-1417] candidate readings: gap_in_literature | extraction_shadow | tacit_link
-- No normative claim on CPT-legal-education. [ABS-1418] candidate readings: gap_in_literature | extraction_shadow | tacit_link
-- No conceptual claim on CPT-legal-education. [ABS-1419] candidate readings: gap_in_literature | extraction_shadow | tacit_link
-- No predictive claim on CPT-legal-education. [ABS-1420] candidate readings: gap_in_literature | extraction_shadow | tacit_link
-- No methodological claim on CPT-legal-education. [ABS-1421] candidate readings: gap_in_literature | extraction_shadow | tacit_link
-
-## Open questions for the hypothesis register
-
-Entries are made at query time (query-graph skill); none recorded for this concept yet.
+- None recorded at this close-out.

@@ -1,154 +1,78 @@
 ---
-id: "CPT-neuro-symbolic-hybrid"
-label: "Neuro-symbolic hybrids"
-status: "anchor"
-concept_type: "technique_class"
-definition: "Combinations of neural models with symbolic representations, logics, or reasoning engines."
-aliases: []
-broader: []
-sources: ["SRC-0004", "SRC-0014", "SRC-0037", "SRC-0049"]
-deprecated: false
-replaced_by:
-created: "2026-09-02"
+id: CPT-neuro-symbolic-hybrid
+status: anchor
+concept_type: technique_class
+definition: Techniques combining neural components such as LLMs or embeddings with symbolic reasoning such as rules, logic programs or solvers.
+run_ids: [RUN-2026-09-25-01]
 ---
 
-# Neuro-symbolic hybrids
+# CPT-neuro-symbolic-hybrid
 
-_Status: anchor; family: technique_class._
+## What it means
 
-## Definition
+Techniques combining neural components such as LLMs or embeddings with symbolic reasoning such as rules, logic programs or solvers. An anchor concept, given in advance in the grid of `schema/concept.md`; the corpus uses it as the claims below show [CLM-0007-002] [CLM-0007-013] [CLM-0013-009].
 
-Combinations of neural models with symbolic representations, logics, or reasoning engines.
-
-Conceptual claims on this concept, each with its source:
-- Wang et al. (2026): Neuro-symbolic approaches that translate legal text into formal representations expose a key limitation: formal reasoning requires all relevant assumptions to be explicit, whereas legal text is inherently underspecified and legal reasoning depends on background assumptions and contextual interpretation (for example, contractual obligations are typically understood as excluding illegal conduct even when unstated), so such assumptions must be explicitly encoded in formal systems. [CLM-0037-012]
-
-## Claims about the concept
+## Claims
 
 ### Descriptive
 
-**general**
+**US**
 
-- Wang et al. (2026) state that Prior work that uses the LLM itself as the solver reports that this approach outperforms alternatives while reducing syntax errors, but does not evaluate whether the performance boost and error reduction come at the cost of faithfulness to the results a symbolic solver would generate; likewise, round-trip equivalence checking of formalizations detects formalization drift but does not address which unstated assumptions are justified. [CLM-0037-015]. — jurisdiction: general [jurisdiction inferred]; basis: literature
-
-### Interpretive
-
-**EU**
-
-- Gridin (2026) read AI Act, Art. 13(1) as follows: The transparency requirement of Article 13 of the EU AI Act can be satisfied not by explaining the deep neural network but by structurally barricading the deployer from it: when the output delivered to the human is certified by a deterministic Linear AI agent operating on observable Boolean conditions, and each action leaves a micro-code decodable through the organisation's Codification Reference Directory, the deployer receives exact, interpretable criteria. [CLM-0049-024]. — jurisdiction: EU; basis: legislation
-
-### Normative
-
-**EU, US**
-
-- Gridin (2026) argue that The transatlantic regulatory chasm is architecturally bridgeable: by establishing a single apex internal 'High Trust' standard (Risk Interoperability) whose Neuro-Symbolic architecture satisfies the EU AI Act's strictest transparency criteria while generating the cryptographic audit trail required by US tort law, a corporation can dissolve the binary compliance trap without legislative harmonisation, and sandboxed 'Shadow AI Governance' deployment lets it achieve US innovation velocity while producing the evidentiary logs European regulators require. [CLM-0049-019]. — jurisdiction: EU, US (comparative); basis: argument
-
-**general**
-
-- T.Y.S.S. et al. (2024) argue that Future work on legal AI must strive to integrate legal expertise with data-derived models; there is great value in combining knowledge-based and data-driven systems rather than continuing to assume that deep legal expertise will reliably emerge given large enough amounts of data and computation. [CLM-0014-001]. — jurisdiction: general; basis: argument
-- T.Y.S.S. et al. (2024) argue that There is value in NLP that produces, structures and assesses arguments about legal conclusions in an explainable way using domain knowledge representation: even with powerful LLMs available, argumentation support systems for legal practitioners benefit from structured representations of legal information and argumentation and should produce arguments transparently, offering users an intuitive way of resolving multiple complex arguments towards a justification of a decision. [CLM-0014-012]. — jurisdiction: general; basis: argument
-- Wang et al. (2026) argue that Legal ambiguity should be treated not as a failure of the system but as an inherent property of legal text that AI alone cannot resolve. A proposed lawyer-centred approach has SMT solvers surface Minimal Correction Subsets, the minimal set of axioms whose acceptance would shift a classification from Neutral to Entailment or Contradiction, and presents them to legal practitioners as structured entry points for resolving ambiguity, positioning the lawyer as the decision-maker for well-scoped interpretive questions and constraining human review to precisely the assumptions that matter rather than requiring exhaustive document-level verification. [CLM-0037-016]. — jurisdiction: general [jurisdiction inferred]; basis: argument
-- Wang et al. (2026) argue that Progress in faithful legal AI will require not only better models but methods that make the boundary between valid inference and unjustified assumption explicit and actionable, surfacing the minimal assumptions underlying each inference for targeted human review rather than requiring exhaustive verification. [CLM-0037-017]. — jurisdiction: general [jurisdiction inferred]; basis: argument
-- Gridin (2026) argue that The maturation of AI under the Rule of Law cannot be achieved through governance frameworks or legislative policy alone; it requires the codification of legal obligation directly into software architecture (a principle termed 'jurisprudential engineering'), so that compliance becomes a function of code rather than of policy. [CLM-0049-001]. — jurisdiction: general; basis: argument
-
-### Empirical
-
-**geographical_proxy:RU**
-
-- Gridin (2026) report that In a property-management legal workflow in the Republic of Karelia (2023-2026), the introduction of generative LLMs reduced document drafting time from 1-4 hours to 15-30 minutes, raised daily output from 2-3 to 10-15 complex documents, cut the document error rate from 80% to near 0%, reduced regulatory fines from 3-5 per month to zero, and shortened the litigation resolution cycle from 1-1.5 years to about 6 months, according to internal operational data; these figures are presented as illustrative rather than evidentially established. [CLM-0049-046]. — jurisdiction: geographical_proxy:RU; basis: dataset_or_experiment; temporal reference: 2023-2026
+- In statutory tax reasoning, measured data contamination is strongly associated with large language model performance in the direct question-answering setting, especially on the entailment task, while the correlation between contamination and Prolog-based performance is weak, suggesting that structured reasoning pipelines can mitigate contamination effects. — rests on factual basis (SRC-0021). [CLM-0021-003]
+- When the same large language models are used as translators into Prolog, Prolog-based reasoning significantly outperforms direct question answering on numerical tax inference — with the largest gains for models that perform poorly under direct question answering — whereas direct question answering remains strong on entailment and is harder to surpass. — rests on factual basis (SRC-0021). [CLM-0021-004]
+- Under case and rule perturbations of statutory tax reasoning problems, direct question-answering performance of large language models drops sharply, whereas Prolog-based performance remains relatively stable, suggesting that externalizing reasoning to a Prolog solver largely eliminates the generalization gap. — rests on factual basis (SRC-0021). [CLM-0021-006]
+- Prior work on the SARA benchmark suggests that standalone reasoning-optimized large language models achieve the highest accuracy, and that while agentic and symbolic frameworks offer advantages in interpretability, verification, and reliability, they do not clearly outperform strong large language models on that benchmark. — rests on literature (SRC-0021). [CLM-0021-011]
+- Validating generated logical programs and deferring uncertain cases to human experts can substantially reduce tax penalties, underscoring the value of explicit reasoning even when full automation is not feasible. — rests on literature (SRC-0021). [CLM-0021-013]
 
 **undetermined**
 
-- Wang et al. (2026) report that Introducing formal structure improves LLM accuracy on legal contract entailment classification. LLM-based formal reasoning, in which the premise and hypothesis are autoformalized into first-order logic and the LLM is prompted to produce a classification by reasoning over the formal representation, achieves the highest accuracy for several of the five evaluated models, outperforming both pure LLM classification and the Z3 solver-based neuro-symbolic pipeline. [CLM-0037-002]. — jurisdiction: undetermined; basis: dataset_or_experiment
-- Wang et al. (2026) report that There is a consistent trade-off between benchmark accuracy and logical faithfulness in LLM legal entailment reasoning. The accuracy gains of LLM-based methods, particularly LLM reasoning over formal representations, do not imply faithful reasoning, because those methods achieve higher accuracy by leveraging implicit or unverified assumptions that are not grounded in the premise, whereas solver-based reasoning enforces strict logical validity and therefore produces more conservative outputs. [CLM-0037-003]. — jurisdiction: undetermined; basis: dataset_or_experiment
-- Wang et al. (2026) report that LLMs prompted to perform formal reasoning over SMT representations exhibit a recurring failure mode, termed scope laundering, in which the model reports a classification such as Entailment or Contradiction as if derived from solver execution while actual execution of the same formal representation yields Neutral, i.e. the model reasons informally and presents its output as symbolically grounded. All five evaluated models exhibit scope laundering, at rates ranging from 15.3% (GPT-OSS-120B) to 52.5% (Qwen2.5-72B; 28.6% when invalid inputs are excluded). [CLM-0037-004]. — jurisdiction: undetermined; basis: dataset_or_experiment
-- Wang et al. (2026) report that Because scope laundering persists across all models, LLM-based formal reasoning cannot serve as a faithful proxy for solver-based symbolic verification: its apparently better benchmark performance may come at the cost of faithfulness. [CLM-0037-005]. — jurisdiction: undetermined; basis: dataset_or_experiment
-- Wang et al. (2026) report that LLMs reasoning over formal representations exhibit implicit constraint blindness: they systematically overlook logical constraints that are present in the formal representation, such as universals encoded within existential structures, so that the SMT solver produces the correct non-neutral classification while LLM-based reasoning fails. This pattern occurs across models at rates from 0.7% (GPT-OSS-120B) to 4.4% (Claude Sonnet 4.6). [CLM-0037-006]. — jurisdiction: undetermined; basis: dataset_or_experiment
-- Wang et al. (2026) report that Autoformalization is the primary bottleneck in neuro-symbolic legal reasoning systems. Even with structured prompting and explicit instructions to surface assumptions, LLM-generated formalizations remain incomplete or incorrect, actively introducing hallucinated axioms (such as survival obligations or harm assumptions) that are not grounded in the source text, and LLMs fail to consistently recover the minimal assumptions required for faithful reasoning. [CLM-0037-008]. — jurisdiction: undetermined; basis: dataset_or_experiment
+- A hybrid system that pairs a coverage-aware retriever with symbolic rule-based reasoning to surface relevant medical coverage policy language, organize it into explicit facts and rules, and generate auditable rationales minimizes the number of LLM inferences required, achieving a 44% reduction in inference cost alongside a 4.5% improvement in F1 score. — rests on factual basis (SRC-0007). [CLM-0007-002]
+- A neuro-symbolic system supporting medical coverage policy review does not make coverage determinations: human reviewers maintain full adjudication authority, and the system serves as a support tool that finds support from coverage documents and makes the underlying policy logic interpretable, helping humans make informed judgments while the final decision remains in the hands of the human reviewer. — rests on abstract considerations (SRC-0007). [CLM-0007-013]
+- Embedding-based semantic search reduces each verification query over a privacy policy's extracted data practice edges to a small relevant subset - on average 6.4 edges for the TikTok policy and 18.5 for the Meta policy, a 99.38% and 99.50% reduction in the verification problem - enabling tractable formal reasoning by an SMT solver: 23 queries of varying complexity achieved zero timeouts with average query times of 3.39s and 3.91s, and although the Meta policy is 3.9 times larger than the TikTok policy, query times increased by only 1.15 times, demonstrating sub-linear scaling behavior. — rests on factual basis (SRC-0013). [CLM-0013-012]
+- Across three paradigms — pure LLM classification, LLM reasoning over formal logical representations, and a neuro-symbolic pipeline combining LLM formalization with an SMT solver — evaluated over five large language models on contract entailment, formal structure improves accuracy, but accuracy does not imply faithful reasoning: high-performing models succeed by mimicking legal interpretation, including its implicit assumptions, rather than by reasoning formally. — rests on factual basis (SRC-0022). [CLM-0022-007]
+- A neuro-symbolic SMT pipeline for contract entailment is more conservative than LLM classification, returning a neutral classification whenever explicit grounding is lacking, and thereby surfaces the gap between legal interpretation and formal entailment rather than papering over it. — rests on factual basis (SRC-0022). [CLM-0022-008]
 
-### Conceptual
-
-**general**
-
-- Wang et al. (2026) argue that Neuro-symbolic approaches that translate legal text into formal representations expose a key limitation: formal reasoning requires all relevant assumptions to be explicit, whereas legal text is inherently underspecified and legal reasoning depends on background assumptions and contextual interpretation (for example, contractual obligations are typically understood as excluding illegal conduct even when unstated), so such assumptions must be explicitly encoded in formal systems. [CLM-0037-012]. — jurisdiction: general [jurisdiction inferred]; basis: argument
-
-### Predictive
+### Interpretative
 
 **general**
 
-- Mumford et al. (2021) argue that Because there is a considerable conceptual gap between facts and outcomes, which must be bridged by reasoning through factors and issues, but no such gap between facts and factors, machine-learning explanation of the ascription of factors may be more satisfactory than the unsatisfactory standard machine-learning explanations of outcomes; this requires empirical investigation. [CLM-0004-008]. — jurisdiction: general; basis: argument
-- Gridin (2026) argue that Deployed at sufficient scale with public-interest safeguards, a deterministic, hallucination-free legal AI architecture has the structural potential to close the access-to-justice gap in a way no prior legal technology has, because it automates access to legal execution rather than merely to legal information and eliminates the skill-scaling advantage that large firms derive from more lawyers collectively catching more errors, compressing the asymmetry between institutional and individual litigants toward zero where deployed on both sides. [CLM-0049-041]. — jurisdiction: general [jurisdiction inferred]; basis: argument
+- Empirical results on statutory tax reasoning suggest that large language models are more reliable as translators of natural language into formal logic than as standalone reasoners, especially as task complexity increases, supporting a principled role for them as translators between natural language and formal representations. — rests on factual basis (SRC-0021). [CLM-0021-005]
 
-### Methodological
+### Prescriptive
 
 **general**
 
-- Mumford et al. (2021) argue that The key role for machine learning in reasoning with legal cases is not the prediction of outcomes but the identification of the factors present in a case. [CLM-0004-007]. — jurisdiction: general; basis: argument
-- Mumford et al. (2021) argue that Explainable case-outcome prediction can be produced by a hybrid system that separates the two stages of reasoning with cases: factor ascription is performed by a machine-learning natural language processing layer (a Hierarchical BERT model outputting, for each base-level factor, a binary 'ascribed' or 'not ascribed' classification), and the decision is reached by balancing the factors within a pre-determined, non-cyclic Abstract Dialectical Framework derived from expert knowledge. [CLM-0004-009]. — jurisdiction: general; basis: argument
-- Mumford et al. (2021) argue that If domain expertise is of paramount importance in establishing an appropriate Abstract Dialectical Framework, data-driven approaches are less effective at the level of factors and above; accordingly, in a hybrid ML-ADF system only the architecture of the NLP layer should be adjusted by learning, while the expert-derived ADF layer remains unchanged from its initial state. [CLM-0004-010]. — jurisdiction: general; basis: literature
-- Mumford et al. (2021) argue that Because the Boolean acceptance conditions of an Abstract Dialectical Framework are governed by a discontinuous Heaviside step function, backpropagation is not in general appropriate for propagating errors from a wrong decision through the ADF; instead, errors can be propagated backwards through a non-cyclic graphical scaffold of the ADF, in which each node is a linearly separable function and children can only attack their parent, yielding for each base-level factor a tuple of weights (ascribed, not ascribed) that determines the proportion of classification tasks assigned to the NLP layer in the next training epoch. [CLM-0004-012]. — jurisdiction: general; basis: argument
-- T.Y.S.S. et al. (2024) argue that One intuitive way to combine legal knowledge and machine learning in NLP is to ascribe factors from case texts by text processing and then proceed with formalized legal inference; rather than training factor classifiers against an exhaustively defined factor list, the more likely scenario is that generative models are prompted with specific facts to subsume them under a factor pattern description. [CLM-0014-019]. — jurisdiction: general; basis: literature
-- Gridin (2026) argue that AI should be deployed in high-stakes legal environments only through a Neuro-Symbolic 'Sandwich' architecture in which a generative LLM is encapsulated by hundreds of specialised, rule-based Linear AI micro-agents (for example citation, chronological, and arithmetic agents) that verify its output against closed libraries and deterministically halt the workflow on error; delegating creativity to the neural network and factual verification to the linear algorithm is the only computationally sound method to deploy AI in such environments. [CLM-0049-005]. — jurisdiction: general; basis: argument
+- Privacy policy formalization should embrace rather than abstract away the limitations of legal language: a large language model can identify six key elements of each policy statement - the data sender, receiver, data subject, data type, action performed, and any conditions - and the extracted elements can be encoded as first-order logic, while vague terms are preserved as uninterpreted predicates rather than defined, making the ambiguity explicit for human review. — rests on abstract considerations (SRC-0013). [CLM-0013-009]
+- Legal reasoning is an inherently compositional and complex task, and hybrid neuro-symbolic systems that combine large language model capabilities in parsing and formal translation with symbolic reasoning engines offer a more reliable and robust foundation for legal AI, improving generalization, interpretability, and verifiability. — rests on factual basis (SRC-0021). [CLM-0021-008]
+- A neutral entailment classification need not be a dead end: a system can compute the minimal set of additional axioms sufficient to shift the classification to ENTAILMENT or CONTRADICTION and present them to a legal reviewer with a targeted question, so that whether the lawyer validates the implicit norm or confirms the case is genuinely underspecified, legal expertise is applied precisely where formal methods reach their limit. — rests on abstract considerations (SRC-0022). [CLM-0022-011]
+- Rather than using LLM judges or human preferences as feedback, a formal verification tool can be used as a reward signal in training, teaching a model to distinguish formally supportable inferences from assumption-laden ones; when the solver flags an insufficiently grounded claim it also computes the minimal axioms required to ground it, feeding directly into targeted human review at the points where legal interpretation and formal grounding diverge. — rests on abstract considerations (SRC-0022). [CLM-0022-018]
 
-**undetermined**
+## Where papers disagree
 
-- Wang et al. (2026) argue that The core challenge in faithful neuro-symbolic legal reasoning is suggested to lie not in the choice of formalism but in constructing representations that capture all relevant assumptions: since LLMs fail to reliably recover the implicit knowledge required for correct reasoning even under first-order logic, improving assumption and ambiguity handling is a prerequisite for moving to more expressive logical systems such as deontic logic. [CLM-0037-018]. — jurisdiction: undetermined; basis: dataset_or_experiment
+No ATTACKS edge touches the claims mapped to this concept.
 
-## Disagreements
+## The spread
 
-No extracted ATTACKS edge touches a claim on this page.
+| paper | year | claims | by type | by basis | jurisdictions |
+|---|---|---|---|---|---|
+| SRC-0007 | 2026 | 2 | 2 descriptive | 1 factual, 1 abstract | undetermined |
+| SRC-0013 | 2025 | 2 | 1 prescriptive, 1 descriptive | 1 abstract, 1 factual | general, undetermined |
+| SRC-0021 | unknown | 7 | 5 descriptive, 1 interpretative, 1 prescriptive | 5 factual, 2 literature | US, general |
+| SRC-0022 | unknown | 4 | 2 descriptive, 2 prescriptive | 2 factual, 2 abstract | general, undetermined |
 
-### Inferred
+## What is missing
 
-Tensions judged from content alone, with no citation link (hypotheses about the literature, not facts about it; schema/edges.md).
-- The claim that Future work on legal AI must strive to integrate legal expertise with data-derived models; there is great value in combining knowledge-based and data-driven systems rather than continuing to assume that deep legal expertise will reliably emerge given large enough amounts of data and computation. [CLM-0014-001] is in tension with the claim that In the broader context of computational statutory reasoning, a hand-built Prolog solver has three limitations: producing it requires domain experts while automatic generation remains an open question; translating natural language into facts requires semantic parsing capabilities; and small mistakes can lead to catastrophic failure. A machine-learning approach that replaces logical operators and explicit structure with learned dense representations can, by contrast, be adapted to new legislation and new domains automatically. [CLM-0003-007] (inferred, low). Note: One warns against assuming legal expertise will emerge from data alone and urges integrating expert knowledge; the other presents learned dense representations replacing explicit logical structure as the adaptable alternative to hand-built solvers.
+Absence records whose key names this concept (8, computed by `tools/absences.py`). Each is `unresolved` between its three readings — `gap_in_literature` (nobody in the field has written it), `extraction_shadow` (somebody has, and this corpus or extraction missed it), `tacit_link` (so obvious to the field that nobody states it) — which only a person may resolve.
 
-## Distribution
+- ABS-0551 — `concept_pair:CPT-compliance-and-monitoring|CPT-neuro-symbolic-hybrid` — No claim links CPT-compliance-and-monitoring to CPT-neuro-symbolic-hybrid. (reading: unresolved — gap_in_literature | extraction_shadow | tacit_link)
+- ABS-0564 — `concept_pair:CPT-dataset-license-compliance|CPT-neuro-symbolic-hybrid` — No claim links CPT-dataset-license-compliance to CPT-neuro-symbolic-hybrid. (reading: unresolved — gap_in_literature | extraction_shadow | tacit_link)
+- ABS-0595 — `concept_pair:CPT-fatwa-issuance|CPT-neuro-symbolic-hybrid` — No claim links CPT-fatwa-issuance to CPT-neuro-symbolic-hybrid. (reading: unresolved — gap_in_literature | extraction_shadow | tacit_link)
+- ABS-0610 — `concept_pair:CPT-irac-analysis|CPT-neuro-symbolic-hybrid` — No claim links CPT-irac-analysis to CPT-neuro-symbolic-hybrid. (reading: unresolved — gap_in_literature | extraction_shadow | tacit_link)
+- ABS-0628 — `concept_pair:CPT-legal-drafting|CPT-neuro-symbolic-hybrid` — No claim links CPT-legal-drafting to CPT-neuro-symbolic-hybrid. (reading: unresolved — gap_in_literature | extraction_shadow | tacit_link)
+- ABS-0645 — `concept_pair:CPT-legal-education|CPT-neuro-symbolic-hybrid` — No claim links CPT-legal-education to CPT-neuro-symbolic-hybrid. (reading: unresolved — gap_in_literature | extraction_shadow | tacit_link)
+- ABS-0664 — `concept_pair:CPT-review-and-due-diligence|CPT-neuro-symbolic-hybrid` — No claim links CPT-review-and-due-diligence to CPT-neuro-symbolic-hybrid. (reading: unresolved — gap_in_literature | extraction_shadow | tacit_link)
+- ABS-0682 — `concept_pair:CPT-rulemaking|CPT-neuro-symbolic-hybrid` — No claim links CPT-rulemaking to CPT-neuro-symbolic-hybrid. (reading: unresolved — gap_in_literature | extraction_shadow | tacit_link)
 
-Sources with claims on this concept: 4; claims: 25.
+## Open questions
 
-**By contribution type**
-
-| value | sources |
-|---|---|
-| technical | 3 |
-| theoretical | 3 |
-| normative | 2 |
-| doctrinal | 1 |
-| empirical_quantitative | 1 |
-| survey | 1 |
-
-**By source jurisdiction**
-
-| value | sources |
-|---|---|
-| general | 3 |
-| CoE | 1 |
-| EU | 1 |
-| RU | 1 |
-| US | 1 |
-
-**By claim jurisdiction**
-
-| value | sources |
-|---|---|
-| general | 4 |
-| EU | 1 |
-| US | 1 |
-| geographical_proxy:RU | 1 |
-| undetermined | 1 |
-
-**By year**
-
-| value | sources |
-|---|---|
-| 2026 | 2 |
-| 2021 | 1 |
-| 2024 | 1 |
-
-## What the sources do not address
-
-
-## Open questions for the hypothesis register
-
-Entries are made at query time (query-graph skill); none recorded for this concept yet.
+- None recorded at this close-out.

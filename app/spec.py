@@ -1,42 +1,19 @@
-"""Built-in evaluation specification.
+"""The evaluation specification, version 4.0.
 
-The deployed app does not read HE_review_form.xlsx, the schema or the skills at
-runtime. This module is the versioned internal specification: for every
-existing evaluation question it fixes the question key, criterion id, object
-type, wording, answer options, comment requirement and applicability rule.
+Declarative: every question fixes its storage unit, its agreed wording, its
+answer options, which Brain definitions are shown beside it, what follow-up it
+requires, and — separately — what its answers *mean*. Nothing downstream infers
+meaning from the literal text of an answer: "Yes" is a defect for the
+restatement question and a confirmation everywhere else, so the semantics are
+declared per question and read from here by progress, Review and analysis.
 
-Criterion wording and schema definitions are bundled verbatim in
-data/he_criteria.json, extracted from the workbook by tools/extract_criteria.py.
-No wording or answer type is redesigned here.
+Definitions come from `data/definitions_v4.json`, frozen from the Brain's schema
+and skills by `tools/freeze_definitions.py`. The wording is reproduced verbatim;
+only backtick markup is dropped when it is displayed.
 
-Two rules from the workbook that shape this file:
-
-* ``question_key`` exists because criterion ids are not unique. HE-08.1 occurs
-  at Source level (contribution_type) and at Claim level (claim_type); the same
-  holds for HE-08.2 and HE-08.3. The evaluator never sees these keys.
-
-* **HE-16 is not itself a Yes/No answer.** In the workbook its cell is a formula
-  over the per-edge rows: correct / evaluated (%). The app therefore collects
-  one judgment per edge and derives the HE-16 summary, exactly as Excel does.
-  HE-16 has no entry in ``QUESTIONS``; see ``EDGE_QUESTION``.
-
-Three layers, merged in order, so the workbook is never modified and each
-change stays attributable:
-
-    HE_review_form.xlsx
-          |
-    he_criteria.json      verbatim workbook extract
-          |
-    he_criteria_v2.json   the 2026-09-07 calibration meeting
-          |
-    he_criteria_v3.json   the page-by-page UI and instrument review, 2026-09-08
-
-Version 3.0 fixes the final instrument. The scale is ``Yes / In part / No`` with
-a comment required for the two negative values. There is no evaluator-facing
-``Unclear`` flag and no generic evaluator-facing ``N/A``: the three criteria
-that can be inapplicable are decided by the application from the Brain record
-and stored explicitly, so an inapplicable item is never confused with an
-unanswered one.
+Version 3.0 (the HE-xx instrument) is not interpreted by this module. Its
+criteria are archived in `data/archive/v3/` and its answers remain in the round
+workbook they were given in.
 """
 from __future__ import annotations
 
@@ -44,559 +21,357 @@ import dataclasses
 import functools
 import json
 import pathlib
+import re
 
-EVAL_SPEC_VERSION = "3.0"
+EVAL_SPEC_VERSION = "4.0"
 
-DATA = pathlib.Path(__file__).resolve().parent / "data" / "he_criteria.json"
-DATA_V2 = pathlib.Path(__file__).resolve().parent / "data" / "he_criteria_v2.json"
-DATA_V3 = pathlib.Path(__file__).resolve().parent / "data" / "he_criteria_v3.json"
+DEFINITIONS_PATH = pathlib.Path(__file__).resolve().parent / "data" / "definitions_v4.json"
 
-# Qualitative criteria admit a middle value: many outputs are partly correct.
-SCALE = ("Yes", "In part", "No")
+# ------------------------------------------------------------------ answers
+YES, IN_PART, NO = "Yes", "In part", "No"
+BINARY = (YES, NO)
+TERNARY = (YES, IN_PART, NO)
 
-#: Completeness at claim level is not a matter of degree. Either every
-#: mapping-relevant concept this claim needs is present, or at least one is
-#: missing and must be named. A middle value would only record how the evaluator
-#: felt about a set they are about to enumerate anyway.
-BINARY = ("Yes", "No")
+RECALL_NONE = "None are represented"
+RECALL_SOME = "Some are represented"
+RECALL_MOST = "Most are represented"
+RECALL_ALL = "All are represented"
+RECALL_LEVELS = (RECALL_NONE, RECALL_SOME, RECALL_MOST, RECALL_ALL)
 
-FREE_TEXT: tuple[str, ...] = ()
+#: Question 14 state, stored on its RESPONSES row. An empty selection cannot
+#: mean both "not evaluated" and "nothing missing", so the second is explicit.
+Q14_NOT_EVALUATED = ""
+Q14_NONE_MISSING = "none_missing"
+Q14_MISSING = "missing"
+Q14_STATES = (Q14_NOT_EVALUATED, Q14_NONE_MISSING, Q14_MISSING)
 
-#: Ordinal encoding for agreement analysis. N/A has no score.
-SCORE = {"Yes": 3, "In part": 2, "No": 1}
+# ---------------------------------------------------------------- semantics
+RESTATEMENT_FLAG = "restatement_flag"         # Yes = defect
+CORRECTNESS_BINARY = "correctness_binary"     # Yes = correct, No = defect
+CORRECTNESS_TERNARY = "correctness_ternary"   # ordered Yes > In part > No
+SET_VALUED = "set_valued"                     # Question 14
+ORDINAL4 = "ordinal4"                         # Claim recall
+QUALITATIVE = "qualitative"                   # Missing Claims
 
-NEGATIVE = ("In part", "No")
-COMMENT_REQUIRED_ON = NEGATIVE
+# -------------------------------------------------------------------- units
+UNIT_CLAIM = "claim"
+UNIT_CLAIM_CONCEPT = "claim_concept"          # Question 12
+UNIT_CLAIM_CANDIDATE = "claim_candidate"      # Question 13
+UNIT_RELATION = "relation"
+UNIT_DATASET = "dataset"
+UNIT_SOURCE = "source"
 
-#: The stored answer for an inapplicable item.
-#:
-#: Two quite different things can produce it, and the pair must stay
-#: distinguishable in the data:
-#:
-#: * the **application** decided, from the Brain record, that a criterion cannot
-#:   apply — stored with ``applicability = auto_na``;
-#: * the **evaluator** decided, from the paper, that it does not apply — stored
-#:   with ``applicability = applicable``, because answering is exactly what they
-#:   did.
-#:
-#: Only a criterion marked ``human_na`` may offer it as a choice.
-NA_ANSWER = "N/A"
+# Where a unit's answers are stored.
+TAB_RESPONSES = "RESPONSES"
+TAB_CONCEPT_RESPONSES = "CONCEPT_RESPONSES"
+TAB_RELATION_RESPONSES = "RELATION_RESPONSES"
 
-#: The only scale on which an evaluator may choose N/A: see HE-14.3.
-SCALE_WITH_NA = ("Yes", "In part", "No", NA_ANSWER)
+# ------------------------------------------------------ parts of the pages
+PART_CLAIM = "Claim evaluation"
+PART_FIELDS = "Schema fields"
+PART_CONCEPTS = "Concepts"
+PART_RELATIONS = "Relations"
+CLAIM_PARTS = (PART_CLAIM, PART_FIELDS, PART_CONCEPTS, PART_RELATIONS)
+PART_DATASET = "Dataset"
+PART_RECALL = "Claim recall"
 
-# Applicability rules
-ALWAYS = "always"
-# Follow-ups open on any negative answer, so a partly-correct parent still asks
-# what is missing. These questions are not rendered at all while the parent is
-# positive, and are not counted as missing.
-IF_PARENT_IS_NEGATIVE = "if_parent_is_negative"   # HE-20.b, HE-18.3, HE-19.3, HE-20.S.b
-
-# ------------------------------------------------------- automatic N/A rules
-# Three criteria can be inapplicable for a reason the application can read off
-# the Brain record. Asking the evaluator to select N/A for them invites the
-# opposite error — selecting it when the criterion does apply — so the app
-# decides, shows a sentence instead of a control, and stores the outcome as
-# `answer = N/A` with `applicability = auto_na`. That keeps an inapplicable item
-# distinguishable from an unanswered one in the exported data.
-AUTO_NA_NONE = ""
-AUTO_NA_NO_PREMISE = "no_premise_expected"            # HE-07
-AUTO_NA_NO_CANDIDATE = "no_candidate_concept"         # HE-21
-AUTO_NA_NO_OUTGOING_CITES = "no_outgoing_cites"       # HE-18.1
-
-#: Stored in RESPONSES.applicability.
-APPLICABLE = "applicable"
-AUTO_NA = "auto_na"
-
-AUTO_NA_TEXT = {
-    AUTO_NA_NO_PREMISE:
-        "Not applicable — no premise is expected because the source states no ground.",
-    AUTO_NA_NO_CANDIDATE:
-        "Not applicable — no candidate Concept was created for this Claim.",
-    AUTO_NA_NO_OUTGOING_CITES:
-        "Not applicable — the Brain generated no outgoing CITES edges to assess.",
-}
-
-CONCEPT_FAMILIES = ("legal_task", "technique_class", "normative_concern", "other")
-
-CONCEPT_FAMILY_DEFINITION = {
-    "legal_task": "What is being done with legal material — the task.",
-    "technique_class": "How it is done — the class of technique.",
-    "normative_concern": "What is at stake — the value or risk engaged.",
-    "other": "A candidate notion none of the three families fits.",
-}
-
-CONCEPT_STATUS_DEFINITION = {
-    "anchor": "Given in advance; defines the field.",
-    "candidate": "Created during extraction because no anchor captured a claim "
-                 "without distortion.",
-    "emergent": "A candidate promoted at batch close-out after reaching the "
-                "independent-source threshold. Same origin as a candidate.",
-}
-
-#: Shown once at the top of each section instead of repeating the rule per card.
-RESPONSE_SCALE_NOTE = (
-    "**Response scale:** **Yes** = fully complies · **In part** = partly complies · "
-    "**No** = does not comply. A comment is required for **In part** and **No**."
-)
-
-COMMENT_LABEL = "Comment / evidence"
-COMMENT_REQUIRED_NOTE = "Required for In part or No."
-
-
-def comment_required_note(question) -> str:
-    """Which answers oblige a comment, in this question's own terms.
-
-    Nearly every criterion is Yes / In part / No, so the constant above holds.
-    HE-20 is binary, and telling its evaluator that a comment is "required for
-    In part or No" names an answer the question does not offer.
-    """
-    triggers = [a for a in question.answer_options
-                if a in question.comment_required_on]
-    if not triggers:
-        return COMMENT_REQUIRED_NOTE
-    return f"Required for {' or '.join(triggers)}."
-DEFAULT_PLACEHOLDER = (
-    "Explain what is incorrect or missing and, where possible, give the corrected "
-    "value and the relevant location in the source."
-)
-
-ANCHOR_GRID_PATH = pathlib.Path(__file__).resolve().parent / "data" / "anchor_grid.json"
-
-
-@functools.lru_cache(maxsize=1)
-def anchor_grid() -> dict[str, list[dict]]:
-    """The predefined anchor concepts, shipped with the app.
-
-    Built in rather than read from schema/ at runtime, so the instrument stays
-    frozen for this experiment even if the Brain's schema files later evolve.
-    """
-    return json.loads(ANCHOR_GRID_PATH.read_text(encoding="utf-8"))
+COMMENT_LABEL = "Comment"
+CORRECTION_LABEL = "Correction or comment"
+OPTIONAL = "Optional."
 
 
 @dataclasses.dataclass(frozen=True)
 class Question:
-    question_key: str          # SOURCE_HE08_1 — internal, never shown
-    criterion_id: str          # HE-08.1 — shown
-    object_type: str           # source | claim | dataset
-    section: str               # which screen/sub-section it belongs to
-    field_subitem: str         # visible criterion title
-    question_text: str         # UI wording
-    answer_options: tuple[str, ...]
-    comment_required_on: tuple[str, ...] = COMMENT_REQUIRED_ON
-    applicability: str = ALWAYS
-    auto_na_rule: str = AUTO_NA_NONE   # the app decides, from the Brain record
-    human_na: bool = False             # the evaluator may decide, from the paper
-    parent_key: str | None = None      # for IF_PARENT_IS_NEGATIVE
-    free_text: bool = False
-    workbook_key: str = ""             # key into he_criteria.json
-
-    def _text(self, field: str) -> str:
-        """The newest layer that sets this field; workbook text otherwise."""
-        override = override_for(self.question_key)
-        if field in override:
-            return override[field]
-        return _workbook().get(self.workbook_key, {}).get(field, "")
+    key: str                     # internal, never shown
+    unit: str
+    part: str
+    title: str                   # short name for Review and headings
+    text: str                    # the agreed wording, verbatim
+    options: tuple[str, ...]
+    semantics: str
+    table: str = TAB_RESPONSES
+    field: str = ""              # Brain field whose value is under judgment
+    definitions: tuple[str, ...] = ()
+    optional_comment_on: tuple[str, ...] = ()
+    required_comment_on: tuple[str, ...] = ()
+    related_claim_on: tuple[str, ...] = ()   # Question 1
+    comment_label: str = CORRECTION_LABEL
+    comment_help: str = ""
+    parent: str = ""             # shown only for some answers of the parent
+    shown_when_parent_in: tuple[str, ...] = ()
+    column: str = ""             # RELATION_RESPONSES: which judgment column pair
 
     @property
-    def criterion_definition(self) -> str:
-        parts = [self.check_text, self.definition_text]
-        return "\n\n".join(p for p in parts if p)
-
-    @property
-    def check_text(self) -> str:
-        return self._text("check")
-
-    @property
-    def definition_text(self) -> str:
-        return self._text("definition")
-
-    @property
-    def comment_placeholder(self) -> str:
-        return self._text("placeholder") or DEFAULT_PLACEHOLDER
-
-    @property
-    def changed_in_v2(self) -> bool:
-        return bool(_overrides_v2().get(self.question_key))
-
-    @property
-    def changed_in_v3(self) -> bool:
-        return bool(_overrides_v3().get(self.question_key))
-
-    @property
-    def provenance(self) -> str:
-        """Which review settled this criterion's current wording."""
-        return override_for(self.question_key).get("_from", "")
-
-    @property
-    def scores(self) -> bool:
-        """True when this question carries an ordinal judgment."""
-        return not self.free_text
-
-    @property
-    def can_be_auto_na(self) -> bool:
-        return bool(self.auto_na_rule)
-
-    @property
-    def auto_na_text(self) -> str:
-        return AUTO_NA_TEXT.get(self.auto_na_rule, "")
-
-
-@functools.lru_cache(maxsize=1)
-def _workbook() -> dict:
-    """The verbatim workbook extract (v1)."""
-    return json.loads(DATA.read_text(encoding="utf-8"))
-
-
-def _load(path: pathlib.Path) -> dict:
-    data = json.loads(path.read_text(encoding="utf-8"))
-    return {k: v for k, v in data.items() if not k.startswith("_")}
-
-
-@functools.lru_cache(maxsize=1)
-def _overrides_v2() -> dict:
-    """The 2026-09-07 calibration changes, keyed by question_key."""
-    return _load(DATA_V2)
-
-
-@functools.lru_cache(maxsize=1)
-def _overrides_v3() -> dict:
-    """The 2026-09-08 page-by-page review, keyed by question_key."""
-    return _load(DATA_V3)
-
-
-@functools.lru_cache(maxsize=1)
-def _overrides() -> dict:
-    """v2 and v3 merged field by field, with v3 winning."""
-    merged: dict[str, dict] = {k: dict(v) for k, v in _overrides_v2().items()}
-    for key, entry in _overrides_v3().items():
-        merged.setdefault(key, {}).update(entry)
-    return merged
-
-
-def override_for(question_key: str) -> dict:
-    return _overrides().get(question_key, {})
+    def free_text(self) -> bool:
+        return self.semantics == QUALITATIVE
 
 
 def _q(**kwargs) -> Question:
-    """Build a question, applying the newest wording override for its key."""
-    override = override_for(kwargs["question_key"])
-    if "question" in override:
-        kwargs["question_text"] = override["question"]
-    if "field" in override:
-        kwargs["field_subitem"] = override["field"]
-    question = Question(**kwargs)
-    if question.workbook_key and question.workbook_key not in _workbook():
-        raise KeyError(f"{question.workbook_key} missing from the workbook extract")
-    if NA_ANSWER in question.answer_options and not question.human_na:
-        raise ValueError(
-            f"{question.question_key} offers N/A as a choice without human_na. "
-            f"Inapplicability is normally read off the Brain record, not asked "
-            f"of the evaluator; set human_na only where the paper is the only "
-            f"thing that can settle it."
-        )
-    if question.human_na and question.auto_na_rule:
-        raise ValueError(
-            f"{question.question_key} is both decided by the app and offered to "
-            f"the evaluator"
-        )
-    return question
+    return Question(**kwargs)
 
 
-# ---------------------------------------------------------------- sections
-SEC_SOURCE = "source"
-SEC_CLAIMS = "claims"
-SEC_DATASETS = "datasets"
-SEC_CITES = "cites"
-SEC_RECALL = "recall"
+CLAIM_FIELD_QUESTIONS = (
+    ("CLAIM_Q06_CLAIM_OBJECT", "claim_object", "Claim object"),
+    ("CLAIM_Q07_CLAIM_TYPE", "claim_type", "Claim type"),
+    ("CLAIM_Q08_BASIS", "basis", "Basis"),
+    ("CLAIM_Q09_CLAIM_JURISDICTION", "claim_jurisdiction", "Claim jurisdiction"),
+    ("CLAIM_Q10_LEGAL_REFERENCE", "legal_reference", "Legal reference"),
+    ("CLAIM_Q11_TEMPORAL_REFERENCE", "temporal_reference", "Temporal reference"),
+)
 
-# claim sub-sections, in the order they appear on the claim page
-SUB_VALIDITY = "A · Claim"
-SUB_GROUNDING = "B · Grounding"
-SUB_ATTRIBUTES = "C · Attributes"
-SUB_CONCEPTS = "D · Concepts"
-SUB_RELATIONS = "E · Relations"
+DATASET_FIELD_QUESTIONS = (
+    ("DATASET_INTRODUCED_BY", "introduced_by", "Introduced by", ("dataset.introduced_by",)),
+    ("DATASET_LANGUAGE", "language", "Language", ("dataset.language",)),
+    ("DATASET_JURISDICTION", "jurisdiction", "Jurisdiction",
+     ("dataset.jurisdiction", "claim.claim_jurisdiction")),
+)
 
+DESCRIPTION_HELP = (
+    "If you selected In part or No, describe what is missing or incorrect. Where "
+    "possible, provide the corrected information and indicate where it appears "
+    "in the Source."
+)
 
-# Every ``question_text`` and ``field_subitem`` below is the final v3 wording.
-# It is repeated in he_criteria_v3.json, which also carries the criterion
-# definition and the comment placeholder; keeping the two in step means the
-# fallback can never contradict the instrument if a file fails to load.
+MISSING_CLAIMS_HELP = (
+    "Write each missing Claim as a short proposition and, where possible, "
+    "indicate the page or section where the Source advances it."
+)
+
 QUESTIONS: tuple[Question, ...] = (
-    # ---------------------------------------------------------- 1. Source
-    _q(question_key="SOURCE_HE08_1", criterion_id="HE-08.1", object_type="source",
-       section=SEC_SOURCE, field_subitem="Contribution type",
-       question_text="Do the selected `contribution_type` values correctly and completely "
-                     "represent the publication's contribution, including its most "
-                     "pertinent type or types?",
-       answer_options=SCALE, workbook_key="source:HE-08.1"),
-    _q(question_key="SOURCE_HE08_2", criterion_id="HE-08.2", object_type="source",
-       section=SEC_SOURCE, field_subitem="Source jurisdiction",
-       question_text="Does `source_jurisdiction` correctly represent the legal system or "
-                     "systems in which the publication is situated?",
-       answer_options=SCALE, workbook_key="source:HE-08.2"),
-    # HE-08.3 (other_versions) was removed from the human flow on 2026-09-07:
-    # duplicate and version handling already happens during preprocessing, so
-    # only the selected publication is ever ingested. The requirement moves to
-    # automatic/ingest validation, not to a reviewer.
-
-    # ------------------------------------------------ 2A. claim as an item
-    _q(question_key="CLAIM_HE03", criterion_id="HE-03", object_type="claim",
-       section=SUB_VALIDITY, field_subitem="Claim definition",
-       question_text="Does this extracted item qualify as a single claim under the Brain's "
-                     "claim definition?",
-       answer_options=SCALE, workbook_key="claim:HE-03"),
-    _q(question_key="CLAIM_HE25", criterion_id="HE-25", object_type="claim",
-       section=SUB_VALIDITY, field_subitem="No duplicate Claim",
-       question_text="Is this Claim distinct from every other Claim extracted from this paper?",
-       answer_options=SCALE, workbook_key="claim:HE-25"),
-    _q(question_key="CLAIM_HE04", criterion_id="HE-04", object_type="claim",
-       section=SUB_VALIDITY, field_subitem="Independent intelligibility",
-       question_text="Can this Claim be understood on its own, without missing context "
-                     "from the paper?",
-       answer_options=SCALE, workbook_key="claim:HE-04"),
-    _q(question_key="CLAIM_HE05", criterion_id="HE-05", object_type="claim",
-       section=SUB_VALIDITY, field_subitem="Modality preserved",
-       question_text="Does the Claim preserve the strength and modality of the source?",
-       answer_options=SCALE, workbook_key="claim:HE-05"),
-
-    # --------------------------------------------------- 2B. anchoring
-    _q(question_key="CLAIM_HE06", criterion_id="HE-06", object_type="claim",
-       section=SUB_GROUNDING, field_subitem="Textual grounding",
-       question_text="Do the anchors provide sufficient textual grounding for this Claim "
-                     "in the source?",
-       answer_options=SCALE, workbook_key="claim:HE-06"),
-    # N/A when `basis` is none_stated and the premise is correctly empty. The
-    # Brain record settles that, so the app decides it rather than the evaluator.
-    _q(question_key="CLAIM_HE07", criterion_id="HE-07", object_type="claim",
-       section=SUB_GROUNDING, field_subitem="Premise",
-       question_text="Is the premise a defensible reconstruction of the ground the source "
-                     "gives for this Claim?",
-       answer_options=SCALE, auto_na_rule=AUTO_NA_NO_PREMISE,
-       workbook_key="claim:HE-07"),
-
-    # -------------------------------------------------- 2C. attributes
-    _q(question_key="CLAIM_HE08_1", criterion_id="HE-08.1", object_type="claim",
-       section=SUB_ATTRIBUTES, field_subitem="Claim type",
-       question_text="Is `claim_type` a defensible classification of what this Claim does?",
-       answer_options=SCALE, workbook_key="claim:HE-08.1"),
-    # `not_applicable` is a value the Brain may assign; the evaluator judges
-    # whether assigning it was right, so this is an ordinary Yes/In part/No.
-    _q(question_key="CLAIM_HE08_2", criterion_id="HE-08.2", object_type="claim",
-       section=SUB_ATTRIBUTES, field_subitem="Positive form",
-       question_text="If this Claim describes legal practice, is `positive_form` correctly "
-                     "assigned? Otherwise, is it correctly marked `not_applicable`?",
-       answer_options=SCALE, workbook_key="claim:HE-08.2"),
-    _q(question_key="CLAIM_HE08_3", criterion_id="HE-08.3", object_type="claim",
-       section=SUB_ATTRIBUTES, field_subitem="Basis",
-       question_text="Is `basis` a defensible classification of the ground the source gives "
-                     "for this Claim, and is `basis_qualifier` correct where applicable?",
-       answer_options=SCALE, workbook_key="claim:HE-08.3"),
-    _q(question_key="CLAIM_HE08_4", criterion_id="HE-08.4", object_type="claim",
-       section=SUB_ATTRIBUTES, field_subitem="Claim jurisdiction",
-       question_text="Do the jurisdiction fields correctly represent the legal scope of this "
-                     "Claim and how that scope was determined?",
-       answer_options=SCALE, workbook_key="claim:HE-08.4"),
-    _q(question_key="CLAIM_HE08_5", criterion_id="HE-08.5", object_type="claim",
-       section=SUB_ATTRIBUTES, field_subitem="Temporal reference",
-       question_text="Does `temporal_reference` correctly represent the time or period "
-                     "described by this Claim?",
-       answer_options=SCALE, workbook_key="claim:HE-08.5"),
-
-    # ---------------------------------------------------- 2D. concepts
-    _q(question_key="CLAIM_HE12", criterion_id="HE-12", object_type="claim",
-       section=SUB_CONCEPTS, field_subitem="Concept correctness",
-       question_text="Is every Concept currently mapped to this Claim a defensible mapping?",
-       answer_options=SCALE, workbook_key="claim:HE-12"),
-    # N/A unless a candidate concept's own record names this claim as motivating
-    # its creation. Read from the Concept record, never from log.md.
-    _q(question_key="CLAIM_HE21", criterion_id="HE-21", object_type="claim",
-       section=SUB_CONCEPTS, field_subitem="Candidate concept necessary",
-       question_text="Was creating this candidate Concept necessary because no existing "
-                     "anchor or equivalent Concept captured the Claim without distortion?",
-       answer_options=SCALE, auto_na_rule=AUTO_NA_NO_CANDIDATE,
-       workbook_key="claim:HE-21"),
-    # Binary. A partial answer here would say "something is missing" without
-    # saying what, and HE-20.b asks for exactly that list — so `No` and the list
-    # carry the whole judgment between them.
-    _q(question_key="CLAIM_HE20", criterion_id="HE-20", object_type="claim",
-       section=SUB_CONCEPTS, field_subitem="Concept completeness",
-       question_text="Are all Concepts needed to represent what this Claim substantively "
-                     "concerns for mapping purposes included in its mapping?",
-       answer_options=BINARY, comment_required_on=("No",),
-       workbook_key="claim:HE-20"),
-    _q(question_key="CLAIM_HE20B", criterion_id="HE-20.b", object_type="claim",
-       section=SUB_CONCEPTS, field_subitem="Missing Concepts",
-       question_text="If the mapping is incomplete, list the missing Concept(s).",
-       answer_options=FREE_TEXT, free_text=True,
-       applicability=IF_PARENT_IS_NEGATIVE, parent_key="CLAIM_HE20",
-       comment_required_on=(), workbook_key="claim:HE-20.b"),
-
-    # ---------------------------------------------------- 3. Datasets
-    _q(question_key="DATASET_HE14_1", criterion_id="HE-14.1", object_type="dataset",
-       section=SEC_DATASETS, field_subitem="Warranted Dataset node",
-       question_text="Does this Dataset node correspond to a dataset, benchmark, or corpus "
-                     "that the Source actually uses or introduces?",
-       answer_options=SCALE, workbook_key="dataset:HE-14.1"),
-    _q(question_key="DATASET_HE14_2", criterion_id="HE-14.2", object_type="dataset",
-       section=SEC_DATASETS, field_subitem="Introduced by / used by",
-       question_text="Do `introduced_by` and `used_by` correctly represent how this Dataset "
-                     "relates to the Sources in the Brain?",
-       answer_options=SCALE, workbook_key="dataset:HE-14.2"),
-    # The Brain's own value may be `not_applicable` or `not_stated`; the
-    # evaluator judges whether that value is right, so no evaluator-level N/A.
-    _q(question_key="DATASET_HE15_1", criterion_id="HE-15.1", object_type="dataset",
-       section=SEC_DATASETS, field_subitem="Language",
-       question_text="Does `language` correctly identify the language or languages of the "
-                     "texts in this Dataset?",
-       answer_options=SCALE, workbook_key="dataset:HE-15.1"),
-    _q(question_key="DATASET_HE15_2", criterion_id="HE-15.2", object_type="dataset",
-       section=SEC_DATASETS, field_subitem="Jurisdiction",
-       question_text="Does `jurisdiction` correctly identify the legal system or systems "
-                     "from which the Dataset's texts come?",
-       answer_options=SCALE, workbook_key="dataset:HE-15.2"),
-    _q(question_key="DATASET_HE15_3", criterion_id="HE-15.3", object_type="dataset",
-       section=SEC_DATASETS, field_subitem="Document types",
-       question_text="Does `document_types` correctly describe the kinds of documents "
-                     "contained in the Dataset?",
-       answer_options=SCALE, workbook_key="dataset:HE-15.3"),
-    _q(question_key="DATASET_HE15_4", criterion_id="HE-15.4", object_type="dataset",
-       section=SEC_DATASETS, field_subitem="Size",
-       question_text="Does `size` correctly reproduce the Dataset size stated by the "
-                     "Source, including its unit?",
-       answer_options=SCALE, workbook_key="dataset:HE-15.4"),
-    _q(question_key="DATASET_HE15_5", criterion_id="HE-15.5", object_type="dataset",
-       section=SEC_DATASETS, field_subitem="Annotation",
-       question_text="Does `annotation` correctly describe how the Dataset was annotated?",
-       answer_options=SCALE, workbook_key="dataset:HE-15.5"),
-    _q(question_key="DATASET_HE15_6", criterion_id="HE-15.6", object_type="dataset",
-       section=SEC_DATASETS, field_subitem="Agreement reported",
-       question_text="Does `agreement_reported` correctly indicate whether the Source "
-                     "reports an inter-annotator agreement measure for this Dataset?",
-       answer_options=SCALE, workbook_key="dataset:HE-15.6"),
-    _q(question_key="DATASET_HE15_7", criterion_id="HE-15.7", object_type="dataset",
-       section=SEC_DATASETS, field_subitem="Availability",
-       question_text="Does `availability` correctly represent the Dataset's access status "
-                     "as reported by the Source?",
-       answer_options=SCALE, workbook_key="dataset:HE-15.7"),
-    # HE-14.3 sits on the Dataset sheet but its own wording says "answer on the
-    # source as a whole", so it is stored against the Source. It is asked even
-    # when the Brain created no Dataset node: zero nodes is not automatically
-    # correct.
-    # The one criterion where the evaluator may answer N/A. A source that uses no
-    # dataset at all is a real state of the world, and only the paper can settle
-    # it. Deliberately NOT inferred from the Brain having produced no Dataset
-    # node: zero nodes may itself be the recall failure this question is asking
-    # about.
-    _q(question_key="SOURCE_HE14_3", criterion_id="HE-14.3", object_type="source",
-       section=SEC_DATASETS, field_subitem="Dataset completeness",
-       question_text="Has the Brain created a Dataset node for every dataset, benchmark, or "
-                     "corpus that this Source actually uses or introduces?",
-       answer_options=SCALE_WITH_NA, human_na=True,
-       workbook_key="dataset:HE-14.3"),
-
-    # ------------------------------------------------------- 4. CITES
-    # N/A when the Brain generated no outgoing CITES edge — there is nothing to
-    # assess. HE-18.2 is still asked: zero edges is not automatically correct.
-    _q(question_key="SOURCE_HE18_1", criterion_id="HE-18.1", object_type="source",
-       section=SEC_CITES, field_subitem="CITES accuracy",
-       question_text="Do all outgoing CITES edges shown above correspond to citations that "
-                     "this paper actually makes to the indicated Brain Sources, with the "
-                     "correct direction from this paper to the cited Source?",
-       answer_options=SCALE, auto_na_rule=AUTO_NA_NO_OUTGOING_CITES,
-       workbook_key="source:HE-18.1"),
-    _q(question_key="SOURCE_HE18_2", criterion_id="HE-18.2", object_type="source",
-       section=SEC_CITES, field_subitem="CITES completeness",
-       question_text="Are all citations made by this paper to other Sources represented in "
-                     "the Brain captured by outgoing CITES edges?",
-       answer_options=SCALE, workbook_key="source:HE-18.2"),
-    _q(question_key="SOURCE_HE18_3", criterion_id="HE-18.3", object_type="source",
-       section=SEC_CITES, field_subitem="Missing or spurious CITES edges",
-       question_text="List the CITES edges that are missing or spurious.",
-       answer_options=FREE_TEXT, free_text=True,
-       applicability=IF_PARENT_IS_NEGATIVE, parent_key="SOURCE_HE18_1|SOURCE_HE18_2",
-       comment_required_on=(), workbook_key="source:HE-18.3"),
-
-    # ------------------------------------- 5. Source-level completeness
-    _q(question_key="SOURCE_HE19_1", criterion_id="HE-19.1", object_type="source",
-       section=SEC_RECALL, field_subitem="Claim recall",
-       question_text="Does the extracted Claim set capture all central theses or hypotheses "
-                     "that the Source advances as part of its contribution?",
-       answer_options=SCALE, workbook_key="source:HE-19.1"),
-    _q(question_key="SOURCE_HE19_3", criterion_id="HE-19.3", object_type="source",
-       section=SEC_RECALL, field_subitem="Missing Claims",
-       question_text="List each central Claim that is missing from the Brain.",
-       answer_options=FREE_TEXT, free_text=True,
-       applicability=IF_PARENT_IS_NEGATIVE, parent_key="SOURCE_HE19_1",
-       comment_required_on=(), workbook_key="source:HE-19.3"),
-
-    # Added 2026-09-07, settled 2026-09-08. Claim-level concept recall cannot
-    # see that a concept absent from one claim may be carried by another claim
-    # of the same paper; this asks the complementary question across the whole
-    # source. It has no workbook ancestor, so its text comes only from v2/v3.
-    _q(question_key="SOURCE_HE20S", criterion_id="HE-20.S", object_type="source",
-       section=SEC_RECALL, field_subitem="Source conceptual coverage",
-       question_text="Taken across all extracted Claims, does the Concept mapping "
-                     "adequately represent the concepts that this Source materially "
-                     "engages for systematic mapping?",
-       answer_options=SCALE),
-    _q(question_key="SOURCE_HE20S_B", criterion_id="HE-20.S.b", object_type="source",
-       section=SEC_RECALL, field_subitem="Missing mapping-relevant Concepts",
-       question_text="List the Concept or Concepts needed to complete the Source-level "
-                     "mapping.",
-       answer_options=FREE_TEXT, free_text=True,
-       applicability=IF_PARENT_IS_NEGATIVE, parent_key="SOURCE_HE20S",
-       comment_required_on=()),
+    # ------------------------------------------------ Claim evaluation
+    _q(key="CLAIM_Q01_RESTATEMENT", unit=UNIT_CLAIM, part=PART_CLAIM,
+       title="Restatement",
+       text="Is this Claim a restatement of another Claim already extracted from "
+            "this Source?",
+       options=BINARY, semantics=RESTATEMENT_FLAG, related_claim_on=(YES,)),
+    _q(key="CLAIM_Q02_CENTRAL_THESIS", unit=UNIT_CLAIM, part=PART_CLAIM,
+       title="Central thesis or hypothesis",
+       text="Does this statement represent a central thesis or hypothesis that the "
+            "paper advances as part of its contribution?",
+       options=BINARY, semantics=CORRECTNESS_BINARY,
+       definitions=("claim.node", "claim.statement"), optional_comment_on=(NO,),
+       comment_label=COMMENT_LABEL),
+    _q(key="CLAIM_Q03_MODALITY", unit=UNIT_CLAIM, part=PART_CLAIM,
+       title="Strength and modality",
+       text="Does the Claim preserve the strength and modality of the source?",
+       options=BINARY, semantics=CORRECTNESS_BINARY, optional_comment_on=(NO,),
+       comment_label=COMMENT_LABEL),
+    _q(key="CLAIM_Q04_STANDALONE", unit=UNIT_CLAIM, part=PART_CLAIM,
+       title="Understood on its own",
+       text="Can this Claim be understood on its own, without missing context from "
+            "the paper?",
+       options=BINARY, semantics=CORRECTNESS_BINARY, optional_comment_on=(NO,),
+       comment_label=COMMENT_LABEL),
+    _q(key="CLAIM_Q05_GROUNDING", unit=UNIT_CLAIM, part=PART_CLAIM,
+       title="Textual grounding",
+       text="Do the anchors provide sufficient textual grounding for this Claim in "
+            "the source?",
+       options=TERNARY, semantics=CORRECTNESS_TERNARY,
+       definitions=("claim.anchors",), optional_comment_on=(IN_PART, NO),
+       comment_label=COMMENT_LABEL),
+    # ------------------------------------------------- Schema fields
+    *(_q(key=key, unit=UNIT_CLAIM, part=PART_FIELDS, title=label,
+         text=f"Is {label} correctly assigned according to the schema definition?",
+         options=BINARY, semantics=CORRECTNESS_BINARY, field=field,
+         definitions=(f"claim.{field}",), optional_comment_on=(NO,))
+      for key, field, label in CLAIM_FIELD_QUESTIONS),
+    # ------------------------------------------------------- Concepts
+    _q(key="CLAIM_Q12_CONCEPT", unit=UNIT_CLAIM_CONCEPT, part=PART_CONCEPTS,
+       title="Concept assignment",
+       text="Is this Concept correctly assigned to the Claim?",
+       options=BINARY, semantics=CORRECTNESS_BINARY, table=TAB_CONCEPT_RESPONSES,
+       optional_comment_on=(NO,), comment_label=COMMENT_LABEL),
+    _q(key="CLAIM_Q13_CANDIDATE", unit=UNIT_CLAIM_CANDIDATE, part=PART_CONCEPTS,
+       title="Candidate Concept necessary",
+       text="Is this candidate Concept necessary for representing this Claim, given "
+            "the existing Concept vocabulary?",
+       options=BINARY, semantics=CORRECTNESS_BINARY, table=TAB_CONCEPT_RESPONSES,
+       definitions=("concept.status",), optional_comment_on=(NO,),
+       comment_label=COMMENT_LABEL),
+    _q(key="CLAIM_Q14_MISSING_CONCEPTS", unit=UNIT_CLAIM, part=PART_CONCEPTS,
+       title="Missing Concepts",
+       text="Are any mapping-relevant Concepts missing from this Claim?",
+       options=(), semantics=SET_VALUED),
+    # ------------------------------------------------------ Relations
+    _q(key="REL_GROUNDING", unit=UNIT_RELATION, part=PART_RELATIONS,
+       title="Grounding",
+       text="Is the Grounding value correctly assigned according to the schema "
+            "definition?",
+       options=BINARY, semantics=CORRECTNESS_BINARY, table=TAB_RELATION_RESPONSES,
+       field="grounding", definitions=("edge.grounding",),
+       optional_comment_on=(NO,), column="grounding"),
+    _q(key="REL_TYPE", unit=UNIT_RELATION, part=PART_RELATIONS,
+       title="Relation type",
+       text="Is the Relation type correct for the relationship between these two "
+            "Claims?",
+       options=BINARY, semantics=CORRECTNESS_BINARY, table=TAB_RELATION_RESPONSES,
+       field="type", definitions=("edge.relation_type",),
+       optional_comment_on=(NO,), column="type"),
+    # ------------------------------------------------------- Datasets
+    _q(key="DATASET_NODE", unit=UNIT_DATASET, part=PART_DATASET,
+       title="Dataset node",
+       text="Does this record represent a dataset, benchmark or corpus that a Claim "
+            "in this Source actually rests on?",
+       options=BINARY, semantics=CORRECTNESS_BINARY,
+       definitions=("dataset.node",), optional_comment_on=(NO,),
+       comment_label=COMMENT_LABEL),
+    *(_q(key=key, unit=UNIT_DATASET, part=PART_DATASET, title=label,
+         text=f"Is {label} correctly assigned according to the schema definition?",
+         options=BINARY, semantics=CORRECTNESS_BINARY, field=field,
+         definitions=definitions, optional_comment_on=(NO,))
+      for key, field, label, definitions in DATASET_FIELD_QUESTIONS),
+    _q(key="DATASET_DESCRIPTION", unit=UNIT_DATASET, part=PART_DATASET,
+       title="Description",
+       text="Does the Dataset description correctly and sufficiently represent the "
+            "Dataset characteristics reported by the Source?",
+       options=TERNARY, semantics=CORRECTNESS_TERNARY, field="description",
+       definitions=("dataset.description",), required_comment_on=(IN_PART, NO),
+       comment_label=COMMENT_LABEL, comment_help=DESCRIPTION_HELP),
+    _q(key="DATASET_AVAILABILITY", unit=UNIT_DATASET, part=PART_DATASET,
+       title="Availability",
+       text="Is Availability correctly assigned according to the schema definition?",
+       options=BINARY, semantics=CORRECTNESS_BINARY, field="availability",
+       definitions=("dataset.availability",), optional_comment_on=(NO,)),
+    # --------------------------------------------------- Claim recall
+    _q(key="SOURCE_CLAIM_RECALL", unit=UNIT_SOURCE, part=PART_RECALL,
+       title="Claim recall",
+       text="How completely does the current set of extracted Claims represent the "
+            "central theses or hypotheses that this Source advances as part of its "
+            "contribution?",
+       options=RECALL_LEVELS, semantics=ORDINAL4, definitions=("claim.node",)),
+    _q(key="SOURCE_MISSING_CLAIMS", unit=UNIT_SOURCE, part=PART_RECALL,
+       title="Missing Claims",
+       text="Which central Claims are missing from the extracted set?",
+       options=(), semantics=QUALITATIVE, parent="SOURCE_CLAIM_RECALL",
+       shown_when_parent_in=(RECALL_NONE, RECALL_SOME, RECALL_MOST),
+       comment_help=MISSING_CLAIMS_HELP),
 )
 
-BY_KEY = {q.question_key: q for q in QUESTIONS}
+BY_KEY = {q.key: q for q in QUESTIONS}
 
 
-# HE-16 is answered once per edge and its claim-level value is derived.
-EDGE_QUESTION = _q(
-    question_key="EDGE_HE16", criterion_id="HE-16", object_type="edge",
-    section=SUB_RELATIONS, field_subitem="Relation label",
-    question_text="Is the relation label correct for the relationship between these two "
-                  "Claims?",
-    answer_options=SCALE, workbook_key="claim:HE-16",
-)
+def questions(*, unit: str | None = None, part: str | None = None) -> list[Question]:
+    return [q for q in QUESTIONS
+            if (unit is None or q.unit == unit) and (part is None or q.part == part)]
 
 
-def questions_for(section: str) -> list[Question]:
-    return [q for q in QUESTIONS if q.section == section]
-
-
-def claim_questions() -> list[Question]:
-    """Every claim-level question, in page order."""
-    order = (SUB_VALIDITY, SUB_GROUNDING, SUB_ATTRIBUTES, SUB_CONCEPTS)
-    return [q for section in order for q in questions_for(section)]
-
-
-def source_section_questions() -> list[Question]:
-    return questions_for(SEC_SOURCE)
+def claim_scalar_questions(part: str | None = None) -> list[Question]:
+    """Questions 1–11 and the Question 14 state row: one row per Claim."""
+    return [q for q in questions(unit=UNIT_CLAIM, part=part)]
 
 
 def dataset_questions() -> list[Question]:
-    """Per-dataset questions only (HE-14.3 is source-level, asked once)."""
-    return [q for q in questions_for(SEC_DATASETS) if q.object_type == "dataset"]
+    return questions(unit=UNIT_DATASET)
 
 
-def dataset_recall_question() -> Question:
-    return BY_KEY["SOURCE_HE14_3"]
-
-
-def cites_questions() -> list[Question]:
-    return questions_for(SEC_CITES)
+def relation_questions() -> list[Question]:
+    return questions(unit=UNIT_RELATION)
 
 
 def recall_questions() -> list[Question]:
-    return questions_for(SEC_RECALL)
+    return questions(unit=UNIT_SOURCE)
 
 
-def he16_summary(edge_answers: list[str | None]) -> str:
-    """Reproduce the workbook formula: correct / evaluated (percentage)."""
-    evaluated = [a for a in edge_answers if a]
-    if not evaluated:
+Q12 = BY_KEY["CLAIM_Q12_CONCEPT"]
+Q13 = BY_KEY["CLAIM_Q13_CANDIDATE"]
+Q14 = BY_KEY["CLAIM_Q14_MISSING_CONCEPTS"]
+Q1 = BY_KEY["CLAIM_Q01_RESTATEMENT"]
+RECALL = BY_KEY["SOURCE_CLAIM_RECALL"]
+MISSING_CLAIMS = BY_KEY["SOURCE_MISSING_CLAIMS"]
+
+
+# ---------------------------------------------------------------- meaning
+def problem(question: Question, answer: str) -> bool:
+    """Whether this answer records a defect in the Brain output.
+
+    Criterion-specific by construction: the same literal answer means opposite
+    things for the restatement question and for every correctness question.
+    """
+    if not answer:
+        return False
+    if question.semantics == RESTATEMENT_FLAG:
+        return answer == YES
+    if question.semantics in (CORRECTNESS_BINARY, CORRECTNESS_TERNARY):
+        return answer in (NO, IN_PART)
+    if question.semantics == ORDINAL4:
+        return answer != RECALL_ALL
+    if question.semantics == SET_VALUED:
+        return answer == Q14_MISSING
+    return False
+
+
+def ordinal(question: Question, answer: str) -> int | None:
+    """Position on an ordered scale, for weighted agreement. None elsewhere."""
+    if question.semantics == CORRECTNESS_TERNARY and answer in TERNARY:
+        return {NO: 0, IN_PART: 1, YES: 2}[answer]
+    if question.semantics == ORDINAL4 and answer in RECALL_LEVELS:
+        return RECALL_LEVELS.index(answer)
+    return None
+
+
+def comment_visible(question: Question, answer: str) -> bool:
+    return bool(answer) and (answer in question.optional_comment_on
+                             or answer in question.required_comment_on)
+
+
+def comment_required(question: Question, answer: str) -> bool:
+    return bool(answer) and answer in question.required_comment_on
+
+
+def child_visible(question: Question, parent_answer: str) -> bool:
+    return bool(parent_answer) and parent_answer in question.shown_when_parent_in
+
+
+# ------------------------------------------------------------ definitions
+@functools.lru_cache(maxsize=1)
+def definitions() -> dict:
+    return json.loads(DEFINITIONS_PATH.read_text(encoding="utf-8"))
+
+
+def definitions_id() -> str:
+    return definitions()["definitions_id"]
+
+
+def canonical_schema_version() -> str:
+    return definitions()["canonical_schema_version"]
+
+
+def frozen_source_hashes() -> dict[str, str]:
+    return dict(definitions()["source_hashes"])
+
+
+def definition(key: str) -> dict:
+    return definitions()["entries"][key]
+
+
+def concept_grid() -> dict[str, list[str]]:
+    """The anchor grid of the frozen schema, in the schema's family order."""
+    grid = definitions()["concept_grid"]
+    from brain import CONCEPT_FAMILIES
+
+    return {family: list(grid.get(family, [])) for family in CONCEPT_FAMILIES}
+
+
+_TICKS = re.compile(r"`([^`]*)`")
+
+
+def plain(text: str) -> str:
+    """Definition text for display: verbatim, with the code markup dropped."""
+    return _TICKS.sub(r"\1", text or "")
+
+
+def value_label(value) -> str:
+    """A schema value as a reader names it: `on_request` -> `On request`.
+
+    Codes that are identifiers rather than words — `EU`, `US`, `SUPPORTS` —
+    keep their case; only snake_case words are turned into prose.
+    """
+    text = str(value if value is not None else "")
+    if not text:
         return ""
-    yes = sum(1 for a in evaluated if a == "Yes")
-    return f"{yes}/{len(evaluated)} ({yes / len(evaluated) * 100:.0f}%)"
+    if re.fullmatch(r"[a-z]+(_[a-z]+)*", text):
+        words = text.replace("_", " ")
+        return words[:1].upper() + words[1:]
+    if re.fullmatch(r"[A-Z]+(_[A-Z]+)+", text):          # SAME_AS
+        return text.replace("_", " ")
+    return text

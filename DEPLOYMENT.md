@@ -1,292 +1,233 @@
 # Deployment runbook
 
-How to take this repository from a clean checkout to a Streamlit Community Cloud
-deployment that six evaluators can use at the same time, writing into one shared
-Google Sheets workbook.
+How to go from a clean checkout to an evaluation round that six evaluators use
+at the same time.
 
-Read it in order the first time. Every step ends in something you can verify, so
-a failure names the thing to fix rather than surfacing later as lost answers.
+**One evaluation round = one fresh Google Sheets workbook.** The workbook is the
+only persistent store: there is no local database and no fallback. If the
+workbook is missing, unreachable or not initialised for the configured round,
+the app refuses to start.
+
+Read it in order the first time. Every step ends in something you can verify.
 
 ---
 
-## 0. What the deployed app needs
+## 0. What a round needs
 
-| Thing | Why |
+| Thing | Where |
 |---|---|
-| A Google Cloud **service account** and its JSON key | The app authenticates as a robot, not as a person. |
-| The **Google Sheets API** enabled on that project | Reading and writing the workbook. |
-| A **Google Sheets workbook**, shared with the service account as *Editor* | The live evaluation store. Streamlit Community Cloud does not guarantee that runtime-generated local files survive a restart, so SQLite is **not** a safe live store there. |
-| Two secrets — `HE_APP_PASSWORD`, `HE_ADMIN_SECRET` | The shared evaluator password and the separate admin secret. |
-| The **frozen Brain** in `brain/wiki/` | The artifact under evaluation. Its SHA-256 snapshot is pinned in the manifest and checked at startup. |
+| The Brain snapshot under evaluation | `brain/wiki/` and `brain/schema/` |
+| The frozen definitions shown to evaluators | `app/data/definitions_v4.json` |
+| The round id and its allocation file | `app/data/round.yaml`, `app/data/allocation/<round>.yaml` |
+| The generated manifest | `app/data/manifest.yaml` |
+| A Google Cloud service account and its JSON key | outside the repository |
+| A **new, empty** Google Sheets workbook shared with that account as Editor | Google Drive |
+| `HE_APP_PASSWORD`, `HE_ADMIN_SECRET` | environment or Streamlit secrets |
 
-Nothing secret is ever committed. `.gitignore` excludes `.streamlit/`, `*.p12`,
-`*.pem`, `*service-account*.json`, `*credentials*.json` and `.env*`. Confirm
-before your first push:
+Nothing secret is ever committed or archived. `.gitignore` excludes
+`.streamlit/`, keys and `.env*`. Before sharing any archive of the project:
 
 ```bash
-git status --porcelain --ignored | grep -E 'service-account|secrets\.toml|\.p12' || echo "nothing sensitive tracked"
+python app/tools/check_archive.py path/to/archive.zip
 ```
+
+It must report no credential files. **A key that has ever been in an archive or
+a commit must be rotated** (Cloud console → the service account → Keys → delete
+the old key, create a new one).
 
 ---
 
 ## 1. Local environment
 
-Streamlit and gspread must be importable. In this working copy they live in the
-`unibo_env` conda environment, not in `phd_env`:
-
 ```bash
-/home/trdp/anaconda3/envs/unibo_env/bin/python  -c "import streamlit, gspread; print(streamlit.__version__, gspread.__version__)"
+pip install -r requirements.txt            # streamlit, gspread, google-auth, …
+python app/tests/test_app.py               # must end "0 failed"
 ```
 
-For a fresh machine:
-
-```bash
-pip install -r requirements.txt
-```
-
-Run the test suite before changing anything, and record the result:
-
-```bash
-/home/trdp/anaconda3/envs/unibo_env/bin/python app/tests/test_app.py
-```
-
-It runs the real Streamlit script headlessly against a throwaway database and
-prints one line per check, then a summary. Everything must pass.
-
-Run the app locally on SQLite (fine for dry runs, never for a live round):
-
-```bash
-export HE_APP_PASSWORD='…'
-export HE_ADMIN_SECRET='…'
-/home/trdp/anaconda3/envs/unibo_env/bin/streamlit run app/streamlit_app.py
-```
+The tests use an in-memory workbook; they never touch Google.
 
 ---
 
-## 2. Google Cloud service account
+## 2. Prepare the round inputs
 
-1. <https://console.cloud.google.com/> → create or select a project.
-2. **APIs & Services → Library** → enable **Google Sheets API**.
-   Also enable **Google Drive API** *only* if you want
-   `bootstrap_sheets.py --create` to create the spreadsheet for you. Using a
-   sheet you made yourself needs Sheets alone, and is the simpler path.
-3. **IAM & Admin → Service Accounts → Create service account.** No project role
-   is required — access is granted by sharing the sheet, not by IAM.
-4. Open the account → **Keys → Add key → Create new key → JSON**. Download it.
-5. Store it outside the repository, readable only by you:
+### 2.1 The Brain
+
+Copy the Brain export's `wiki/` and `schema/` into `brain/`. Then:
+
+```bash
+python app/tools/preflight.py
+```
+
+It must report `0 error(s)`. The preflight checks every Claim, Concept, Dataset
+and Relation against the structure instrument 4.0 needs, and the snapshot's
+schema files against the frozen definitions.
+
+### 2.2 The definitions
+
+Only when the Brain's schema or the create-edges skill has changed, and the new
+text is the accepted one:
+
+```bash
+python app/tools/freeze_definitions.py --skills ../SLiM_Brain/.claude/skills
+```
+
+This rewrites `definitions_v4.json` word for word from the schema and skills,
+and changes its `definitions_id`. A round's definitions never change once it
+has been bootstrapped.
+
+### 2.3 The allocation
+
+Edit `app/data/allocation/<round>.yaml` — the only place an allocation is
+written — then:
+
+```bash
+python app/tools/build_assignments.py      # validates and writes manifest.yaml
+```
+
+It refuses an invalid allocation and names every problem: a Training paper used
+elsewhere, a Source placed twice or not at all, an Agreement set without a
+pair, an Individual paper without exactly one evaluator, a Source or title the
+Brain does not have, a duplicate assignment.
+
+The current file is a **development allocation**. When the 26th Source is in the
+Brain, add it to `IND-6` as the file's header explains and rerun the tool.
+
+---
+
+## 3. Service account (once)
+
+1. <https://console.cloud.google.com/> → project → **APIs & Services → Library**
+   → enable **Google Sheets API**.
+2. **IAM & Admin → Service Accounts → Create.** No project role is needed.
+3. The account → **Keys → Add key → JSON**. Store it outside the repository:
 
    ```bash
    mkdir -p ~/.config/slim-brain && chmod 700 ~/.config/slim-brain
-   mv ~/Downloads/<project>-<hash>.json ~/.config/slim-brain/service-account.json
+   mv ~/Downloads/<key>.json ~/.config/slim-brain/service-account.json
    chmod 600 ~/.config/slim-brain/service-account.json
    ```
 
-Note the account's address — `something@<project>.iam.gserviceaccount.com`. You
-will share the sheet with it in the next step.
-
-> Download the **JSON key from the service account's Keys tab**. An OAuth client
-> id is a different artifact and will be rejected with a clear message.
-
 ---
 
-## 3. The workbook
+## 4. Create and bootstrap the round workbook
 
-### Option A — a sheet you create (recommended)
-
-1. Create a spreadsheet at <https://sheets.new>, name it e.g.
-   *SLiM Brain HE Evaluation*.
-2. **Share → paste the service-account address → role Editor → Share.**
-   Your own access grants the service account nothing; it must be shared
-   explicitly.
-3. Take the id from the URL — the segment between `/d/` and `/edit`, **not** the
-   whole URL and not the `#gid=` part.
-
-### Option B — let the service account create it
-
-Needs the Drive API enabled:
+1. Create a new spreadsheet at <https://sheets.new>, named after the round, e.g.
+   *SLiM Brain evaluation — ROUND-2026-01*.
+2. **Share** it with the service account's address as **Editor**.
+3. Take its id: the part of the URL between `/d/` and `/edit`.
 
 ```bash
+export GOOGLE_SHEET_ID='<id>'
 export GOOGLE_SERVICE_ACCOUNT_JSON=~/.config/slim-brain/service-account.json
-/home/trdp/anaconda3/envs/unibo_env/bin/python app/tools/bootstrap_sheets.py \
-    --create "SLiM Brain HE Evaluation" --share you@example.com
+
+python app/tools/check_sheets.py --write        # access, and "ready for bootstrap"
+python app/tools/bootstrap_round.py --dry-run   # validates everything, writes nothing
+python app/tools/bootstrap_round.py             # initialises the round
 ```
 
-Without `--share` the sheet lives in the service account's own Drive and nobody
-can open it.
+The bootstrap validates the preflight, the allocation and the manifest's
+freshness first. It then creates every tab with its exact header, and writes
+the round's self-description:
 
-### Create the tabs
+| Tab | Holds |
+|---|---|
+| ROUND | round id, instrument version, definitions id, Brain snapshot, canonical schema version, runs, schema hashes, allocation id and status, creation time and app commit |
+| DEFINITIONS | every definition shown to evaluators, verbatim |
+| CONFIG, EVALUATORS, ASSIGNMENTS | phase switches and the explicit assignments |
+| REVIEWS, RESPONSES, CONCEPT_RESPONSES, RELATION_RESPONSES | one preallocated block per review |
+| MISSING_CONCEPTS, PROPOSED_CONCEPTS | Question 14 selections and proposals |
+| SUBMISSIONS | final phase submissions |
 
-```bash
-export GOOGLE_SHEET_ID='<the id from the URL>'
-export GOOGLE_SERVICE_ACCOUNT_JSON=~/.config/slim-brain/service-account.json
-/home/trdp/anaconda3/envs/unibo_env/bin/python app/tools/bootstrap_sheets.py
-```
+Finally it reads back the first and last row of every block and fails loudly if
+a recorded range is wrong.
 
-This creates each tab with its exact header row, and rewrites a header that has
-drifted. If headers change, rows written under the old layout should be
-**re-preallocated, not migrated in place**.
+It **refuses** a workbook holding anything but blank default sheets, and a
+workbook that already holds a round. `--overwrite-round <ROUND_ID>` names the
+round it may replace; if anybody has started work there, `--discard-evaluations`
+must be given as well. An interrupted bootstrap is replaced with
+`--overwrite-round PARTIAL`.
 
-### Verify end to end
-
-```bash
-/home/trdp/anaconda3/envs/unibo_env/bin/python app/tools/check_sheets.py --write
-```
-
-Each step reports separately: libraries, environment, credential parsing,
-opening the workbook, tabs, reading every tab, and — with `--write` — appending,
-updating and deleting a probe row to prove write access. Run the `--write` form
-at least once **before evaluators start**.
+`--extend` adds reviews for assignments that are new to the same round —
+activated reservations, a Source added to the allocation — without touching
+existing rows. It refuses when the Brain, instrument or definitions differ from
+the round's: those make a new round, in a new workbook.
 
 ---
 
-## 4. Secrets
-
-Streamlit Community Cloud provides no environment variables; secrets are the
-only channel. Generate the block rather than pasting the PEM by hand — the
-`private_key` is a multi-line PEM that must survive as literal `\n` escapes
-inside a quoted TOML string:
+## 5. Secrets and deployment
 
 ```bash
-/home/trdp/anaconda3/envs/unibo_env/bin/python app/tools/make_secrets.py \
-    ~/.config/slim-brain/service-account.json --sheet-id "$GOOGLE_SHEET_ID"
+python app/tools/make_secrets.py ~/.config/slim-brain/service-account.json \
+    --sheet-id "$GOOGLE_SHEET_ID"
 ```
 
-It prints the block to stdout and the service-account address to stderr. Omit
-`--password` / `--admin-secret` and it generates strong ones and tells you what
-they are. Add `--write` to save it to `.streamlit/secrets.toml` for local use
-instead; that path is gitignored and written mode 600.
+It prints the block to paste into Streamlit Cloud → **Advanced settings →
+Secrets** (`--write` saves `.streamlit/secrets.toml` for local use instead).
 
-The block looks like this:
+| Variable | Purpose |
+|---|---|
+| `HE_APP_PASSWORD` | shared evaluator password |
+| `HE_ADMIN_SECRET` | separate admin secret |
+| `GOOGLE_SHEET_ID` | the round workbook |
+| `GOOGLE_SERVICE_ACCOUNT_JSON` or `[gcp_service_account]` | the key |
+| `HE_ROUND_ID` | optional override of `round.yaml`'s round id |
 
-```toml
-HE_APP_PASSWORD   = "…"
-HE_ADMIN_SECRET   = "…"
-GOOGLE_SHEET_ID   = "…"
-HE_REQUIRE_SHEETS = true
+Streamlit Cloud: **New app** → repository → main file `app/streamlit_app.py` →
+paste the secrets → deploy.
 
-[gcp_service_account]
-type = "service_account"
-project_id = "…"
-private_key = "-----BEGIN PRIVATE KEY-----\n…\n-----END PRIVATE KEY-----\n"
-client_email = "…@….iam.gserviceaccount.com"
-…
-```
+At startup the app checks, in order:
 
-### The variables
+1. that the workbook is reachable and every tab has its exact header;
+2. that the Brain snapshot passes the preflight. Evaluators then see "The
+   evaluation is not available", and the admin secret reveals the diagnostic;
+3. that the workbook's ROUND names this round, instrument, definitions and
+   Brain snapshot.
 
-| Variable | Required | Purpose |
-|---|---|---|
-| `HE_APP_PASSWORD` | yes | shared evaluator password |
-| `HE_ADMIN_SECRET` | yes | separate admin secret |
-| `GOOGLE_SHEET_ID` | for the live store | the workbook id |
-| `GOOGLE_SERVICE_ACCOUNT_JSON` | for the live store | path to, or contents of, the key — **or** a `[gcp_service_account]` TOML table, which is the idiomatic Streamlit form |
-| `HE_REQUIRE_SHEETS` | on a deployed run | refuse to start unless the workbook is reachable |
-
-Every one is read from the environment **or** from `st.secrets`. There is no
-default and no fallback value: with a required secret unset the login screen
-refuses everyone and names the missing variable.
-
-`HE_GOOGLE_SHEET_ID` / `HE_GOOGLE_CREDENTIALS` are accepted as aliases, so one
-export can serve this app and the Splitter.
+Any failure stops the app on a screen saying what is wrong.
 
 ---
 
-## 5. Deploy to Streamlit Community Cloud
+## 6. Before opening the round
 
-1. Push the repository to GitHub. `brain/raw/` is gitignored, which holds the
-   deployment near 5 MB instead of 58 MB.
-2. <https://share.streamlit.io> → **New app** → pick the repo and branch.
-3. **Main file path:** `app/streamlit_app.py`.
-4. **Advanced settings → Secrets** → paste the block from step 4. Save.
-5. Deploy, and watch the first boot log.
-
-### Set `HE_REQUIRE_SHEETS = true` on every deployed run
-
-Without it, a half-configured deployment would silently run on local SQLite:
-every answer would be accepted and reported saved, the workbook would stay
-empty, and Community Cloud could then wipe those files between restarts. With it
-set the app stops on a clear screen instead.
-
-The app also refuses to start when only *half* the Google configuration is
-present — a sheet id without a service account, or the reverse. That is a
-misconfiguration, never a request for SQLite.
-
----
-
-## 6. Before opening a phase
-
-The full sequence, in order:
-
-1. **Freeze the Brain.** `brain/wiki/` must be the artifact the split was
-   accepted against. Its SHA-256 snapshot is pinned in the manifest, and the app
-   **stops on a mismatch screen** before the password form rather than letting
-   answers be given against a moved target.
-2. **Freeze the evaluation specification.** `spec.EVAL_SPEC_VERSION` must match
-   the configured `eval_spec_version`; a mismatch stops the app the same way.
-3. **Finalise the assignments** for the phase being opened.
-4. **Snapshot** the configuration so the exact assignment set is reproducible.
-5. **Bootstrap / verify** the workbook (steps 3 above).
-6. **Preallocate** the phase's rows.
-7. **Confirm the guards** — Brain snapshot, spec version, configuration.
-8. Deploy.
-9. Smoke-test as one evaluator: password → identity → paper list → open a paper
-   → answer one question → confirm the row changed in the workbook.
-10. Smoke-test Admin with `HE_ADMIN_SECRET`.
-11. **Open the phase.**
-
-Rows are preallocated so that evaluators never contend for the same row, resume
-is trivial, and writes stay narrow. Never download a tab, edit it and write it
-back while people are working — that silently overwrites a concurrent
-evaluator's newer answer.
+1. Sign in as one evaluator: open a paper, answer one question, and confirm the
+   row changed in the workbook.
+2. Admin → System: the round metadata, 0 preflight errors, a consistent
+   configuration.
+3. `python app/tools/snapshot_config.py` and commit the snapshot.
 
 ---
 
 ## 7. Troubleshooting
 
-**"The workbook exists, but … cannot open it" (403)**
-The sheet is not shared with the service account. Open the sheet → Share → paste
-the address → set the role to **Editor** → Share. Your own access grants it
-nothing.
+**"The workbook exists, but … cannot open it"** — share it with the service
+account as Editor.
 
-**"No workbook with id … exists" (404)**
-`GOOGLE_SHEET_ID` should be only the segment between `/d/` and `/edit` in the
-URL — not the whole URL, not the `#gid=` part.
+**"No workbook with id …"** — `GOOGLE_SHEET_ID` is only the segment between
+`/d/` and `/edit`.
 
-**"google sheets support needs `gspread` and `google-auth`"**
-`pip install -r requirements.txt`, or on Cloud check that `requirements.txt` is
-at the repository root and the build log installed it.
+**"The workbook is missing ROUND, …"** — it was never bootstrapped. Run
+`bootstrap_round.py`.
 
-**"… is neither a readable JSON file path nor inline JSON"**
-`GOOGLE_SERVICE_ACCOUNT_JSON` must be a path that exists, or the JSON itself.
-On Cloud, prefer the `[gcp_service_account]` TOML table.
+**"This workbook does not belong to this deployment"** — the workbook holds a
+different round, instrument, definitions or Brain snapshot. Point the app at the
+right workbook. Never re-bootstrap a workbook that holds a finished round.
 
-**"Brain snapshot mismatch"**
-The Brain on disk is not the artifact the evaluation was configured against. The
-screen prints both digests. Restore the frozen Brain, or regenerate the split
-against the current one and re-import. Do **not** edit the pinned snapshot to
-silence this — answers already given would become uninterpretable.
-
-**"The application is not configured"**
-`HE_APP_PASSWORD` or `HE_ADMIN_SECRET` is unset. The screen names which.
-
-**The app runs but the workbook stays empty**
-It fell back to SQLite. Set `HE_REQUIRE_SHEETS=true` so this fails loudly, and
-re-run `check_sheets.py --write`.
-
-**Quota errors under load (`429`, `RESOURCE_EXHAUSTED`)**
-The Sheets API allows roughly 60 read requests per minute per user. Reads must
-be scoped to one review's row range and cached per session; a full-tab read on
-every rerun will exhaust the quota with six evaluators working.
-
-**An evaluator's answers seem to have vanished after a restart**
-The deployment was running on SQLite. Community Cloud does not guarantee that
-runtime-generated files persist. This is exactly what `HE_REQUIRE_SHEETS`
-prevents.
+**"Google Sheets is busy"** — the per-minute request quota. Nothing is wrong;
+wait and retry. Opening a paper costs one batched read, and answers are
+written in batches.
 
 ---
 
 ## 8. Exports
 
-Admin → Exports downloads each tab as CSV plus a combined XLSX. The workbook
-itself is also directly inspectable and exportable from Google Sheets, which is
-part of why it was chosen as the live store.
+Admin → Exports produces, per round:
+
+- `raw_*` — every tab exactly as stored;
+- `claim_judgments`, `concept_judgments`, `missing_concepts_state`,
+  `missing_concepts`, `proposed_concepts`, `relation_judgments`,
+  `dataset_judgments`, `claim_recall` — joined with review provenance. Each row
+  carries `round_id` and `eval_spec_version`;
+- `agreement_pairs`, `agreement_metrics` — the agreement phase only.
+
+The v3 evaluation data stays in its own workbook, unchanged; nothing in this
+version reads or rewrites it.

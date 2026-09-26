@@ -1,0 +1,360 @@
+{
+  "canonical_schema_version": "0.1.0",
+  "concept_grid": {
+    "interpretation_canon": [
+      "CPT-ordinary-meaning",
+      "CPT-technical-meaning",
+      "CPT-contextual-harmonization",
+      "CPT-precedent",
+      "CPT-statutory-analogy",
+      "CPT-legal-concept",
+      "CPT-general-principle",
+      "CPT-history",
+      "CPT-purpose",
+      "CPT-substantive-reasons",
+      "CPT-intention"
+    ],
+    "interpretation_object_type": [
+      "CPT-statutory-interpretation",
+      "CPT-contractual-interpretation",
+      "CPT-judgment-interpretation",
+      "CPT-treaty-interpretation",
+      "CPT-other-instrument-interpretation"
+    ],
+    "legal_task": [
+      "CPT-legal-drafting",
+      "CPT-review-and-due-diligence",
+      "CPT-legal-discovery",
+      "CPT-compliance-and-monitoring",
+      "CPT-decision-support",
+      "CPT-legal-education"
+    ],
+    "normative_concern": [
+      "CPT-accuracy-and-reliability",
+      "CPT-explainability-and-transparency",
+      "CPT-fairness-and-non-discrimination",
+      "CPT-due-process-and-fair-trial",
+      "CPT-accountability-and-liability",
+      "CPT-privacy-and-data-protection",
+      "CPT-professional-responsibility",
+      "CPT-autonomy-and-human-oversight",
+      "CPT-access-to-justice",
+      "CPT-rule-of-law",
+      "CPT-environmental-cost",
+      "CPT-security-and-misuse"
+    ],
+    "technical_task": [
+      "CPT-information-retrieval",
+      "CPT-question-answering",
+      "CPT-summarisation",
+      "CPT-outcome-prediction",
+      "CPT-argument-mining",
+      "CPT-information-extraction",
+      "CPT-rule-formalisation"
+    ],
+    "technique_class": [
+      "CPT-symbolic-rule-based",
+      "CPT-case-based-reasoning",
+      "CPT-machine-learning",
+      "CPT-computational-argumentation",
+      "CPT-deep-learning",
+      "CPT-large-language-models",
+      "CPT-retrieval-augmented-generation",
+      "CPT-agentic-systems",
+      "CPT-neuro-symbolic-hybrid"
+    ]
+  },
+  "definitions_id": "b91c79054a40c224",
+  "entries": {
+    "claim.anchors": {
+      "items": [
+        {
+          "text": "`quote` is a verbatim passage from the source, at most 50 words, where the claim and its `basis` are put forward.",
+          "value": ""
+        },
+        {
+          "text": "`location` is a page number or, without pagination, section heading plus paragraph ordinal (e.g. \"3.2, para 4\");",
+          "value": ""
+        }
+      ],
+      "label": "Anchors",
+      "source": "schema/claim.md",
+      "text": "a list of 1 to N textual quotes, each `{quote, location}`:"
+    },
+    "claim.basis": {
+      "items": [
+        {
+          "text": "the claim is based on data, experiments, interviews, or observation;",
+          "value": "factual"
+        },
+        {
+          "text": "the claim is based on legislation, regulation and judicial decisions;",
+          "value": "legal"
+        },
+        {
+          "text": "the claim is based on or summarizes previous findings from the scientific literature;",
+          "value": "literature"
+        },
+        {
+          "text": "the claim is based on abstract/conceptual considerations.",
+          "value": "abstract"
+        }
+      ],
+      "label": "Basis",
+      "source": "schema/claim.md",
+      "text": "always filled; what the source offers for the claim:"
+    },
+    "claim.claim_jurisdiction": {
+      "items": [
+        {
+          "text": "an ISO 3166-1 alpha-2 code for a state, or `EU` for the European Union",
+          "value": ""
+        },
+        {
+          "text": "the claim is explicitly not tied to any legal system or concerns law in general (the source presents it as jurisdiction-independent);",
+          "value": "general"
+        },
+        {
+          "text": "the claim does not say and the context does not settle it.",
+          "value": "undetermined"
+        }
+      ],
+      "label": "Claim jurisdiction",
+      "source": "schema/claim.md",
+      "text": "legal system(s) the claim is about or the jurisdiction(s) of the data the claim is based on. It can be more than one. Possible values:"
+    },
+    "claim.claim_object": {
+      "items": [
+        {
+          "text": "the claim is about legislation, legal decisions, legal practices or regulators' behavior.",
+          "value": "law"
+        },
+        {
+          "text": "the claim is about computational technologies, systems or models.",
+          "value": "technology"
+        },
+        {
+          "text": "the claim object does not fit the `law` or `technology` categories.",
+          "value": "other"
+        }
+      ],
+      "label": "Claim object",
+      "source": "schema/claim.md",
+      "text": "what the claim is about. One of:"
+    },
+    "claim.claim_type": {
+      "items": [
+        {
+          "text": "describes an aspect of the object or how it was/is handled.",
+          "value": "descriptive"
+        },
+        {
+          "text": "proposes a prefered view of an aspect or concept of the object;",
+          "value": "interpretative"
+        },
+        {
+          "text": "states how the object should be or should be handled;",
+          "value": "prescriptive"
+        },
+        {
+          "text": "is about future developments of the object and the ways it will or may be handled.",
+          "value": "predictive"
+        }
+      ],
+      "label": "Claim type",
+      "source": "schema/claim.md",
+      "text": "how the object is addressed. One of:"
+    },
+    "claim.legal_reference": {
+      "label": "Legal reference",
+      "source": "schema/claim.md",
+      "text": "instruments and provisions the claim is about, as written in the source, e.g. \"AI Act, Art. 5\"; \"GDPR, Art. 22\"; \"Smith v Jones [2023] EWHC 1\"; empty when none."
+    },
+    "claim.node": {
+      "label": "Claim",
+      "source": "schema/claim.md",
+      "text": "A claim is a central thesis or hypothesis that a paper advances as part of its contribution, especially when supported through arguments or empirical data."
+    },
+    "claim.statement": {
+      "label": "Statement",
+      "source": "schema/claim.md",
+      "text": "the proposition itself, one per claim. Where one claim ends and the next begins is decided by the one-contention test in the `extract-claims` skill."
+    },
+    "claim.temporal_reference": {
+      "label": "Temporal reference",
+      "source": "schema/claim.md",
+      "text": "date or period of the legal or factual state the claim describes, when stated; otherwise `as_of_publication`."
+    },
+    "concept.concept_type": {
+      "items": [
+        {
+          "text": "",
+          "value": "legal_task"
+        },
+        {
+          "text": "",
+          "value": "technical_task"
+        },
+        {
+          "text": "",
+          "value": "technique_class"
+        },
+        {
+          "text": "",
+          "value": "normative_concern"
+        },
+        {
+          "text": "",
+          "value": "interpretation_object_type"
+        },
+        {
+          "text": "",
+          "value": "interpretation_canon"
+        }
+      ],
+      "label": "Concept family",
+      "source": "schema/concept.md",
+      "text": "the concept's family: `legal_task` | `technical_task` | `technique_class` | `normative_concern` | `interpretation_object_type` | `interpretation_canon`."
+    },
+    "concept.definition": {
+      "label": "Concept definition",
+      "source": "schema/concept.md",
+      "text": "brief definition of the concept as understood within the corpus domain; the definition is inferred and continuously refined according to connected extracted claims. Each refinement appends an entry to `wiki/log.md` giving the concept id, the run id, and the replaced definition verbatim;"
+    },
+    "concept.node": {
+      "label": "Concept",
+      "source": "schema/concept.md",
+      "text": "A concept is a notion that claims are about. A notion that nearly every paper in the corpus would trigger discriminates nothing, and is not a concept."
+    },
+    "concept.status": {
+      "items": [
+        {
+          "text": "given in advance, listed in the grid below;",
+          "value": "anchor"
+        },
+        {
+          "text": "created during extraction (`map-concepts`);",
+          "value": "candidate"
+        },
+        {
+          "text": "a candidate promoted (`map-concepts`).",
+          "value": "emergent"
+        }
+      ],
+      "label": "Concept status",
+      "source": "schema/concept.md",
+      "text": "one of:"
+    },
+    "dataset.availability": {
+      "items": [
+        {
+          "text": "",
+          "value": "public"
+        },
+        {
+          "text": "",
+          "value": "on_request"
+        },
+        {
+          "text": "",
+          "value": "proprietary"
+        },
+        {
+          "text": "",
+          "value": "not_stated"
+        }
+      ],
+      "label": "Availability",
+      "source": "schema/dataset.md",
+      "text": "one of `public` | `on_request` | `proprietary` | `not_stated`."
+    },
+    "dataset.description": {
+      "label": "Description",
+      "source": "schema/dataset.md",
+      "text": "quantitative and qualitative features of dataset: the type of data (e.g judgments, statutes, contracts, exam questions, synthetic etc.), annotation method, if present; size;"
+    },
+    "dataset.introduced_by": {
+      "label": "Introduced by",
+      "source": "schema/dataset.md",
+      "text": "source id, when the dataset is introduced in the corpus; otherwise `external`."
+    },
+    "dataset.jurisdiction": {
+      "label": "Jurisdiction",
+      "source": "schema/dataset.md",
+      "text": "legal system(s) the texts come from; jurisdiction codes in `schema/claim.md`."
+    },
+    "dataset.language": {
+      "label": "Language",
+      "source": "schema/dataset.md",
+      "text": "ISO 639-1 codes of the texts in the dataset."
+    },
+    "dataset.name": {
+      "label": "Name",
+      "source": "schema/dataset.md",
+      "text": "the dataset's name as the source gives it."
+    },
+    "dataset.node": {
+      "label": "Dataset",
+      "source": "schema/dataset.md",
+      "text": "One node per dataset, benchmark, or corpus a claim rests on. A dataset a paper merely mentions gets no node: if no claim rests on it, the graph has nothing to say about it."
+    },
+    "edge.grounding": {
+      "items": [
+        {
+          "sub": [
+            "this paper cites the other where it makes the new claim; or",
+            "the other paper's claim carries the citation to this paper in its anchor quotes — by name, or by the marker the register prints for that paper. Read its claim records only, never its text."
+          ],
+          "text": "when a CITES edge drafted at step 5 joins the two papers and the citation is on this point:",
+          "value": "extracted"
+        },
+        {
+          "sub": [],
+          "text": "otherwise.",
+          "value": "inferred"
+        }
+      ],
+      "label": "Grounding",
+      "source": ".claude/skills/create-edges/SKILL.md",
+      "text": "",
+      "verbatim": "- **`extracted`** when a CITES edge drafted at step 5 joins the two papers and the citation is on this point:\n  - this paper cites the other where it makes the new claim; or\n  - the other paper's claim carries the citation to this paper in its anchor quotes — by name, or by the marker the register prints for that paper. Read its claim records only, never its text.\n- **`inferred`** otherwise."
+    },
+    "edge.note": {
+      "label": "Relation Note",
+      "source": "schema/edge.md",
+      "text": "one sentence saying why the edge holds; on `extracted` SUPPORTS and ATTACKS, naming the citation that grounds it. On the three claim-to-claim types only."
+    },
+    "edge.relation_type": {
+      "items": [
+        {
+          "text": "one claim gives reasons or evidence for another claim",
+          "value": "SUPPORTS"
+        },
+        {
+          "text": "one claim denies or gives reasons against another claim",
+          "value": "ATTACKS"
+        },
+        {
+          "text": "two claims from different sources assert the same proposition",
+          "value": "SAME_AS"
+        }
+      ],
+      "label": "Relation type",
+      "source": "schema/edge.md",
+      "text": "one of the four types below."
+    }
+  },
+  "source_hashes": {
+    ".claude/skills/create-edges/SKILL.md": "6a36b20aeac8b8877031b24f0406cb883d5740de342606768cbbc52065081737",
+    "schema/__index__.md": "61b3eb6fbd8b6d2546df026cb9d53bf43e73e5f2d84cc61bbc68cc5f2b807b22",
+    "schema/absence.md": "b1557323715162cc6d6430992bc837d3d44f8e01791a332ea3b18b2f2dc12545",
+    "schema/claim.md": "8277f331411d2ab62f33601a479febe1a7dd98211bf08052d855292832552d0c",
+    "schema/concept.md": "e1acdd005ff2a9ac5a99cbbdcfc37846921f4aa1f57323cee0d64d0238bb43ab",
+    "schema/dataset.md": "067116fb851dfad2aab991b62cd2a600f2330d1db40b565a3ebd37306a37c586",
+    "schema/edge.md": "5805713e685b0bd5a8c83dda6aacb7989f9831f0492f1cd4cd748a70eef8ddea",
+    "schema/hypothesis.md": "6f0238a1d0516fa23157cce34ba4824f8122490c06c42009eef43674afc67e07",
+    "schema/run.md": "b156056b79e229a15254a3f8ac2df2523bd3197433158859ebc2cc992fefa292",
+    "schema/source.md": "cf7364e3e4f8840e8bf4f5b9b1da100c410c17e58427e37ccaa8e8f9ed033eba",
+    "schema/synthesis.md": "cddb91888adef9cc8e8a9c6df7751af8e2c4f92538066949f6014f63975f7ea8"
+  }
+}

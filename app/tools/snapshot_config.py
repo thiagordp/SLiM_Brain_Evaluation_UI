@@ -27,6 +27,8 @@ OUT = pathlib.Path(__file__).resolve().parents[1] / "data" / "config_snapshots"
 
 
 def rows_for(tab: str) -> list[dict]:
+    if tab == sheets.ROUND:
+        return [{"key": k, "value": v} for k, v in manifest.round_metadata().items()]
     if tab == sheets.CONFIG:
         return [{"key": k, "value": str(v)} for k, v in sorted(manifest.config().items())]
     if tab == sheets.EVALUATORS:
@@ -45,21 +47,21 @@ def main() -> None:
         if not args.out.exists():
             print("no snapshots yet")
             return
-        for directory in sorted(args.out.iterdir()):
+        for directory in sorted(p for p in args.out.glob("*/*") if p.is_dir()):
             counts = ", ".join(
                 f"{p.stem} {sum(1 for _ in p.open(encoding='utf-8')) - 1}"
                 for p in sorted(directory.glob("*.csv")))
-            print(f"  {directory.name}   {counts}")
+            print(f"  {directory.parent.name}/{directory.name}   {counts}")
         return
 
     version = manifest.config_version()
     stamp = dt.datetime.now(dt.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    directory = args.out / f"{stamp}_{version}"
+    directory = args.out / manifest.round_id() / f"{stamp}_{version}"
     directory.mkdir(parents=True, exist_ok=True)
 
-    print(f"source: {manifest.source_name()}")
+    print(f"round: {manifest.round_id()}")
     print(f"config_version: {version}\n")
-    for tab in sheets.CONFIG_TABS:
+    for tab in (sheets.ROUND, *sheets.CONFIG_TABS):
         rows = rows_for(tab)
         columns = list(sheets.COLUMNS[tab])
         path = directory / f"{tab}.csv"

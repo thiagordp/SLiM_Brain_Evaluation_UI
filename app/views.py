@@ -1,1279 +1,822 @@
-"""The evaluation screens.
+"""The evaluation screens: Source, Claims, Datasets, Claim recall, Review.
 
-Order of objects, not of questions:
-
-    Source -> Claim -> Concepts -> Relations -> Dataset -> CITES -> Recall -> Review
-
-Every screen shows the structured value from the canonical record; the wiki is
-context in the modal, never the thing parsed for an answer.
+Each value under judgment is shown next to its question, with the Brain's own
+definition directly below the question. Schema names and values are shown in
+normal typography.
 """
 from __future__ import annotations
 
-import functools
 import html
+import re
 
 import streamlit as st
 
+import conceptsearch
 import progress
+import sheets
 import spec
 import store
 import ui
+from brain import CONCEPT_FAMILIES, concept_label, family_label
 from ui import Ctx
 
-
-# ------------------------------------------------------------- 1. Source
-LANGUAGES = {"en": "English", "fr": "French", "de": "German", "it": "Italian",
-             "es": "Spanish", "pt": "Portuguese", "nl": "Dutch", "cs": "Czech"}
-
-
-def _context_metadata(src: dict) -> list[tuple[str, str]]:
-    """The bibliographic context, in the words a reader uses.
-
-    Deliberately not the whole record. `file`, `conversion_tool`,
-    `ingest_position`, `extraction_model` and `run_id` describe how the Brain
-    was built, not what the paper is, and the raw paths in `file` and
-    `other_versions` are of no evaluative use — the Design is explicit that they
-    must not reach the evaluator. Other versions is therefore reported as a
-    count. Everything omitted here remains in the Source wiki.
-    """
-    language = str(src.get("language") or "")
-    others = src.get("other_versions") or []
-    return [
-        ("Title", src.get("title") or ""),
-        ("Authors", "; ".join(src.get("authors") or [])),
-        ("Year", str(src.get("year") or "")),
-        ("Venue", src.get("venue") or ""),
-        ("Venue type", str(src.get("venue_type") or "").replace("_", " ")),
-        ("Length", src.get("pages_or_length") or ""),
-        # Plain prose: monospace is reserved for the schema values under
-        # judgment, and a language tag is context, not one of them.
-        ("Language", f"{LANGUAGES[language]} ({language})"
-                     if language in LANGUAGES else language),
-        ("Other versions", f"{len(others)} additional version"
-                           f"{'s' if len(others) != 1 else ''}" if others else ""),
-        ("Claims extracted", str(src.get("claims_extracted") or "")),
-    ]
+MARK = {progress.COMPLETE: "✓", progress.INCOMPLETE: "●", progress.AVAILABLE: "○",
+        progress.INFO: "·"}
+MARK_LEGEND = "○ not started · ● in progress · ✓ complete"
 
 
-def source_section(ctx: Ctx) -> None:
-    src = ctx.brain.source(ctx.source_id)
-    ui.reset_wiki(f"{ctx.source_id}|source")
-
-    heading, count = st.columns([3, 1], vertical_alignment="bottom")
-    heading.subheader("Source attributes")
-    # Reserved now, written at the end of the section. An answer given on this
-    # run reaches the response cache while the questions render — below this
-    # point — so a count computed here would show the evaluator the state they
-    # were in before they answered, and stay one interaction behind for ever.
-    tally = count.empty()
-    st.caption("Evaluate the Source-level classifications produced by the Brain.")
-
-    with st.container(border=True):
-        title, wiki = st.columns([3, 1], vertical_alignment="top")
-        title.markdown("**Brain values**")
-        with wiki:
-            ui.wiki_button("Open Source wiki", ui.SOURCE, ctx.source_id,
-                           key="wiki_src_section", width="stretch",
-                           help="Context only — it changes nothing you have answered")
-
-        # Only the two values under judgment. `other_versions` stopped being a
-        # human question on 2026-09-07, so it belongs below with the context
-        # rather than among the values someone is being asked about.
-        ui.schema_values("Contribution type", src.get("contribution_type"))
-        ui.schema_values("Source jurisdiction", src.get("source_jurisdiction"))
-
-        with st.expander("Additional source metadata — context only"):
-            ui.definition_list(_context_metadata(src))
-
-    ui.scale_note(spec.RESPONSE_SCALE_NOTE)
-
-    for question in spec.source_section_questions():
-        with st.container(border=True):
-            ui.question_widget(ctx, question, ctx.source_id)
-
-    items = progress.applicable(
-        progress.source_items(ctx.brain, ctx.source_id, ctx.responses))
-    done = sum(1 for item in items if progress.item_complete(item, ctx.responses))
-    tally.markdown(
-        f"<div style='text-align:right'><strong>{done} of {len(items)}</strong>"
-        f" questions complete</div>", unsafe_allow_html=True)
+# -------------------------------------------------------------- navigation
+def _section_key(ctx: Ctx) -> str:
+    return f"section|{ctx.review_id}"
 
 
-# ------------------------------------------------------------- 2. Claims
-BADGE = {progress.COMPLETE: "✓", progress.INCOMPLETE: "●", progress.AVAILABLE: "○"}
-
-#: C · Attributes shows the Brain's values once, in the reader's words. The
-#: schema names stay in the questions, which are about those fields by name.
-CLAIM_ATTRIBUTES = (
-    ("Claim type", "claim_type"),
-    ("Positive form", "positive_form"),
-    ("Basis", "basis"),
-    ("Basis qualifier", "basis_qualifier"),
-    ("Claim jurisdiction", "claim_jurisdiction"),
-    ("Jurisdiction relation", "jurisdiction_relation"),
-    ("Jurisdiction inferred", "jurisdiction_inferred"),
-    ("Temporal reference", "temporal_reference"),
-)
-
-RELATION_MEANINGS = {
-    "SUPPORTS": "explicit source-grounded support",
-    "ATTACKS": "explicit source-grounded opposition",
-    "COMPATIBLE_WITH": "inferred reinforcement without citation grounding",
-    "IN_TENSION_WITH": "inferred tension without citation grounding",
-    "SAME_AS": "same proposition, claim type and jurisdiction",
-}
+def go_to_section(ctx: Ctx, section: str, claim_index: int | None = None,
+                  dataset_index: int | None = None) -> None:
+    st.session_state[_section_key(ctx)] = section
+    if claim_index is not None:
+        st.session_state[f"claim_idx|{ctx.review_id}"] = claim_index
+    if dataset_index is not None:
+        st.session_state[f"ds_idx|{ctx.review_id}"] = dataset_index
+    ui.close_wiki()
+    ui.request_scroll()
 
 
-def _statement_card(claim: dict) -> None:
-    """The Claim itself, given the room it deserves — everything else judges it."""
-    st.markdown(
-        f'<div style="border-left:4px solid rgba(128,128,128,0.5);'
-        f'background:rgba(128,128,128,0.08);border-radius:0 6px 6px 0;'
-        f'padding:0.7rem 1rem;margin:0.2rem 0 0.9rem">'
-        f'<div style="font-size:0.78rem;letter-spacing:0.06em;text-transform:uppercase;'
-        f'opacity:0.65;margin-bottom:0.25rem">Claim statement</div>'
-        f'<div style="font-size:1.05rem;line-height:1.5">'
-        f'{html.escape(claim.get("statement", ""))}</div></div>',
-        unsafe_allow_html=True,
-    )
+def _index(key: str, total: int) -> int:
+    value = st.session_state.get(key, 0)
+    if isinstance(value, bool) or not isinstance(value, int) or not 0 <= value < total:
+        value = 0
+    st.session_state[key] = value
+    return value
 
 
-def _quotation(text: str, location: str) -> None:
-    """An anchor as a reader sees it: the passage, then where it came from."""
-    st.markdown(
-        f'<blockquote style="border-left:3px solid rgba(128,128,128,0.4);'
-        f'margin:0 0 0.6rem;padding:0.15rem 0 0.15rem 0.85rem">'
-        f'<div style="line-height:1.5">“{html.escape(text)}”</div>'
-        f'<div style="font-size:0.82rem;opacity:0.7;margin-top:0.2rem">'
-        f'{html.escape(location) or "location not recorded"}</div></blockquote>',
-        unsafe_allow_html=True,
-    )
+def _move(key: str, delta: int, total: int) -> None:
+    st.session_state[key] = max(0, min(total - 1, st.session_state.get(key, 0) + delta))
+    ui.close_wiki()
+    ui.request_scroll()
 
 
-def _anchors(claim: dict) -> None:
-    """The Claim's anchors, as quotation cards. One rendering, two places.
-
-    They belong in B, where HE-06 asks whether they ground the Claim at all, and
-    again beside HE-05, which asks whether the Claim keeps the force of what
-    they say — a comparison nobody should have to make from memory.
-    """
-    quotes = claim.get("quotes") or []
-    if not quotes:
-        st.caption("No anchor was recorded for this claim.")
-    for quote in quotes:
-        _quotation(quote.get("quote", ""), quote.get("location", ""))
+def _live(ctx: Ctx) -> Ctx:
+    """The context with the session's current review data (for callbacks)."""
+    ctx.data = ui.cached_review(ctx.review_id)
+    return ctx
 
 
-def _modality_evidence(claim: dict) -> None:
-    """The anchors again, under HE-05, where the force is judged."""
-    quotes = claim.get("quotes") or []
-    st.caption(f"The Source's own words ({len(quotes)}), repeated from "
-               f"B · Grounding so the comparison is here."
-               if quotes else "The Source's own words")
-    _anchors(claim)
+# ------------------------------------------------------------ answer controls
+def _answer_changed(ctx: Ctx, question: spec.Question, object_id: str, key: str) -> None:
+    ctx = _live(ctx)
+    answer = st.session_state.get(key) or ""
+    changes = {"answer": answer}
+    if question.related_claim_on and answer not in question.related_claim_on:
+        changes["related_claim_id"] = ""
+    ui.save_response(ctx, question, object_id, **changes)
 
 
-def grounding_panel(ctx: Ctx, claim: dict) -> None:
-    """What HE-06 and HE-07 are about: the anchors, and the premise beside them.
-
-    Kept apart on purpose. HE-06 asks whether the quoted passages ground the
-    Claim in the source; HE-07 asks whether the premise is a defensible
-    reconstruction of the ground the source gives. Showing them as one block
-    invites the evaluator to answer both from the same reading.
-    """
-    with st.container(border=True):
-        quotes = claim.get("quotes") or []
-        st.markdown(f"**Anchors** ({len(quotes)})" if quotes else "**Anchors**")
-        _anchors(claim)
-
-    with st.container(border=True):
-        st.markdown("**Premise**")
-        premise = (claim.get("premise") or "").strip()
-        st.markdown(premise if premise else "_No premise recorded._")
-        st.caption(f"Recorded basis: `{claim.get('basis') or '—'}`"
-                   + (f" · qualifier: `{claim['basis_qualifier']}`"
-                      if claim.get("basis_qualifier") else ""))
+def _text_changed(ctx: Ctx, question: spec.Question, object_id: str, key: str,
+                  field: str) -> None:
+    ui.save_response(_live(ctx), question, object_id,
+                     **{field: st.session_state.get(key) or ""})
 
 
-def attributes_panel(ctx: Ctx, claim: dict) -> None:
-    """Every attribute under judgment in this section, once, in one place."""
-    with st.container(border=True):
-        st.markdown("**Brain values**")
-        ui.definition_list([
-            (label, ui.value_markup(claim.get(field)))
-            for label, field in CLAIM_ATTRIBUTES
-        ], skip_empty=False)
-        if claim.get("dataset"):
-            ui.wiki_button("Open Dataset wiki", ui.DATASET, claim["dataset"],
-                           key=f"wiki_dst|{claim['id']}",
-                           help="The dataset this claim rests on — evaluated in its "
-                                "own section, shown here for context")
+def _concept_changed(ctx: Ctx, question: spec.Question, claim_id: str,
+                     concept_id: str, key: str, field: str) -> None:
+    ui.save_concept(_live(ctx), question, claim_id, concept_id,
+                    **{field: st.session_state.get(key) or ""})
 
 
-def concept_panel(ctx: Ctx, claim: dict) -> None:
-    """Concepts grouped by family, with lifecycle status and a registry."""
-    families = ctx.brain.concepts_by_family(claim.get("concepts"))
-    with st.container(border=True):
-        head, browse = st.columns([3, 1], vertical_alignment="top")
-        head.markdown("**Mapped concepts, by family**")
-        with browse:
-            # The anchor grid and the full registry used to sit here as two
-            # expanders, which pushed the questions off the screen on every
-            # claim. They are the same material, one keystroke away instead of
-            # permanently underfoot.
-            ui.wiki_button("Browse Concept registry", ui.CONCEPT_REGISTRY,
-                           key=f"wiki_reg|{claim['id']}", width="stretch",
-                           help="Every concept in the Brain, with the anchor grid, "
-                                "searchable")
-        any_mapped = False
-        for family in spec.CONCEPT_FAMILIES:
-            concepts = families.get(family) or []
-            st.markdown(f"<div style='font-weight:600;margin:0.5rem 0 0.1rem'>{family}"
-                        f"</div>", unsafe_allow_html=True)
-            if not concepts:
-                st.caption("None mapped")
-                continue
-            any_mapped = True
-            for concept in concepts:
-                cid = concept.get("id", "")
-                text, wiki = st.columns([5, 1], vertical_alignment="center")
-                text.markdown(
-                    f"<div style='line-height:1.4'><strong>"
-                    f"{html.escape(concept.get('label', ''))}</strong> "
-                    f"<code>{html.escape(concept.get('status', '?'))}</code><br>"
-                    f"<span style='opacity:0.75;font-size:0.88rem'>"
-                    f"{html.escape(concept.get('definition', ''))}</span></div>",
-                    unsafe_allow_html=True)
-                with wiki:
-                    ui.wiki_button("Open wiki", ui.CONCEPT, cid, width="stretch",
-                                   key=f"wiki_cpt|{claim['id']}|{cid}")
-        if not any_mapped:
-            st.caption("No concept is mapped to this claim.")
+def _relation_changed(ctx: Ctx, relation_key: str, key: str, field: str) -> None:
+    ui.save_relation(_live(ctx), relation_key, **{field: st.session_state.get(key) or ""})
 
 
-def relations_panel(ctx: Ctx, claim: dict) -> None:
-    """HE-16: one judgment per edge; the claim-level value is derived.
+def _radio(ctx: Ctx, options, stored: str, key: str, on_change, args,
+           horizontal: bool = True):
+    options = list(options)
+    return st.radio("Answer", options,
+                    index=options.index(stored) if stored in options else None,
+                    key=key, horizontal=horizontal, label_visibility="collapsed",
+                    disabled=ctx.locked, on_change=on_change, args=args)
 
-    The methodology is the workbook's, unchanged: the 7 September meeting ended
-    before the relation criteria were discussed, so only the presentation is new.
-    """
-    relations = ctx.brain.relations_of(claim["id"])
-    if not relations:
-        st.caption("No cross-source edge touches this claim. Nothing to evaluate here.")
+
+def _comment_box(ctx: Ctx, question: spec.Question, answer: str, stored: str,
+                 key: str, on_change, args) -> None:
+    if not spec.comment_visible(question, answer):
         return
-
-    summary = progress.he16_for_claim(ctx.brain, claim["id"], ctx.edge_responses)
-    st.caption(f"HE-16 is derived from the judgments below, as in the workbook — "
-               f"currently **{summary or '—'}**")
-
-    question = spec.EDGE_QUESTION
-    with st.expander("Criterion definition"):
-        st.markdown(question.check_text)
-        st.caption(question.definition_text)
-        st.markdown("\n".join(f"- `{name}` — {meaning}"
-                              for name, meaning in RELATION_MEANINGS.items()))
-        st.caption("Extracted and inferred relations are different forms of evidence "
-                   "and must not be treated interchangeably.")
-
-    for relation in relations:
-        _relation_card(ctx, claim, relation, question)
+    required = spec.comment_required(question, answer)
+    label = question.comment_label + ("" if required else f" ({spec.OPTIONAL.lower()[:-1]})")
+    st.text_area(label, value=stored, key=key, height=80, disabled=ctx.locked,
+                 on_change=on_change, args=args,
+                 help=question.comment_help or None)
+    if question.comment_help:
+        st.caption(question.comment_help)
+    if required and not (st.session_state.get(key, stored) or "").strip():
+        st.warning("A comment is required for this answer.")
 
 
-def _relation_card(ctx: Ctx, claim: dict, relation: dict, question) -> None:
-    other = ctx.brain.claims.get(relation["other_claim_id"], {})
-    other_source = other.get("source", "")
-    edge_key = store.edge_key_of(relation)
-    stored = ctx.edge_responses.get(edge_key, {})
-    base = ui.widget_base(ctx, claim["id"], edge_key)
+def scalar_question(ctx: Ctx, question: spec.Question, object_id: str, *,
+                    before=None, show_text: bool = True) -> str:
+    """A RESPONSES question: wording, definitions, answer, comment. Autosaves."""
+    record = ctx.data.response(question.key, object_id)
+    if show_text:
+        st.markdown(f"**{question.text}**")
+    if question.definitions and not question.field:
+        ui.definitions(question.definitions)
+    if before is not None:
+        before()
+    key = ui.wkey(ctx, question.key, object_id)
+    answer = _radio(ctx, question.options, record.get("answer", ""), key + "|a",
+                    _answer_changed, (ctx, question, object_id, key + "|a"))
+    _comment_box(ctx, question, answer or "", record.get("comment", ""), key + "|c",
+                 _text_changed, (ctx, question, object_id, key + "|c", "comment"))
+    return answer or ""
 
+
+def field_question(ctx: Ctx, question: spec.Question, object_id: str,
+                   value, shown_value: str) -> None:
+    """Schema-field pattern: name, assigned value, full definition, question."""
     with st.container(border=True):
-        left, middle, right = st.columns([4, 2, 4], vertical_alignment="top")
-        with left:
-            st.caption(f"THIS CLAIM · {claim['id']} · "
-                       f"{ctx.brain.work_id(ctx.source_id)}")
-            st.markdown(claim.get("statement", ""))
-        with middle:
-            arrow = "→" if relation["direction"] == "outgoing" else "←"
-            st.markdown(
-                f"<div style='text-align:center'>"
-                f"<div style='font-size:1.6rem;line-height:1'>{arrow}</div>"
-                f"<div style='font-weight:600;margin-top:0.2rem'>"
-                f"<code>{html.escape(relation['type'])}</code></div>"
-                f"<div style='font-size:0.82rem;opacity:0.72;margin-top:0.3rem'>"
-                f"{html.escape(str(relation.get('grounding') or '—'))}<br>"
-                f"plausibility: {html.escape(str(relation.get('plausibility') or '—'))}"
-                f"</div></div>", unsafe_allow_html=True)
-        with right:
-            st.caption(f"RELATED CLAIM · {other.get('id', '?')} · "
-                       f"{ctx.brain.work_id(other_source)}")
-            st.markdown(other.get("statement", ""))
-            claim_col, source_col = st.columns(2)
-            with claim_col:
-                ui.wiki_button("Open claim", ui.CLAIM, other.get("id", ""),
-                               key=f"wiki_other|{base}", width="stretch")
-            with source_col:
-                ui.wiki_button("Open Source wiki", ui.SOURCE, other_source,
-                               key=f"wiki_other_src|{base}", width="stretch")
-        if relation.get("note"):
-            st.caption(f"**Why the Brain linked them** — {relation['note']}")
-
-        st.markdown(f"**{question.criterion_id}** · {question.question_text}")
-        options = list(question.answer_options)
-        current = stored.get("label_correct")
-        answer = st.radio(
-            "Label correct?", options,
-            index=options.index(current) if current in options else None,
-            key=base + "|a", horizontal=True, disabled=ctx.locked,
-            label_visibility="collapsed",
-        )
-        required = answer in question.comment_required_on
-        st.markdown(f"**{spec.COMMENT_LABEL}**")
-        note = spec.comment_required_note(question)
-        st.caption(note if required else f"{note} Optional here.")
-        comment = st.text_area(
-            "Comment / correct label", value=stored.get("comment_correct_label") or "",
-            key=base + "|c", disabled=ctx.locked, height=80,
-            label_visibility="collapsed",
-            placeholder=question.comment_placeholder,
-        )
-        if required and not (comment or "").strip():
-            st.warning(f"{question.criterion_id}: a comment is required when the "
-                       f"label is not correct.")
-
-        if not ctx.locked:
-            changed = (answer != stored.get("label_correct")
-                       or (comment or "") != (stored.get("comment_correct_label") or ""))
-            if changed:
-                row = {**stored, "label_correct": answer,
-                       "comment_correct_label": comment}
-                ctx.edge_responses[edge_key] = row
-
-                def written(stamp, row=row):
-                    if stamp:
-                        row["updated_at"] = stamp
-
-                ui.queue().submit(
-                    store.edge_response_key(ctx.review_id, claim["id"], edge_key),
-                    store.save_edge_response,
-                    ctx.review_id, host_claim_id=claim["id"], edge_key=edge_key,
-                    edge_from=relation.get("from"), edge_to=relation.get("to"),
-                    other_claim_id=relation.get("other_claim_id"),
-                    edge_type=relation.get("type"), label_correct=answer,
-                    comment=comment, source_id=ctx.source_id,
-                    on_success=written,
-                )
+        st.markdown(f"##### {question.title}")
+        ui.value_line("Assigned value", shown_value)
+        ui.definitions(question.definitions, assigned=value)
+        scalar_question(ctx, question, object_id)
 
 
-def _questions_of(ctx: Ctx, claim: dict, subsection: str) -> None:
-    """The criteria of one subsection, in the instrument's order and wording."""
-    created = ctx.brain.candidate_created_for(claim["id"])
-    for question in spec.questions_for(subsection):
-        # A conditional follow-up appears only once its parent has been answered
-        # negatively. HE-20 is binary, so HE-20.b appears exactly on "No".
-        if question.applicability == spec.IF_PARENT_IS_NEGATIVE:
-            parent = ctx.response(question.parent_key, claim["id"])
-            if parent.get("answer") not in spec.NEGATIVE:
-                continue
-        note = ""
-        if question.question_key == "CLAIM_HE21" and created:
-            note = "Candidate created for this claim: " + ", ".join(
-                f"`{c['id']}` {c.get('label', '')}" for c in created)
-        # HE-05 asks whether the Claim preserves the modality of the Source, so
-        # the Source's words are shown with the question rather than a
-        # subsection away.
-        evidence = (functools.partial(_modality_evidence, claim)
-                    if question.question_key == "CLAIM_HE05" else None)
-        with st.container(border=True):
-            ui.question_widget(ctx, question, claim["id"], note=note,
-                               evidence=evidence)
-            if question.question_key == "CLAIM_HE25":
-                ui.wiki_button("Compare claims from this paper", ui.SOURCE_CLAIMS,
-                               ctx.source_id, key=f"wiki_dup|{claim['id']}",
-                               help="Every claim the Brain extracted from this "
-                                    "source, to check whether this one repeats another")
+# ------------------------------------------------------------------ Source
+def source_section(ctx: Ctx) -> None:
+    ui.reset_wiki(f"{ctx.source_id}|source")
+    brain, source = ctx.brain, ctx.brain.source(ctx.source_id)
+    st.subheader("Source")
+    st.caption("Context for the evaluation. Nothing on this page is evaluated.")
+    rows = [("Title", source.get("title")), ("Authors", source.get("authors")),
+            ("Year", source.get("year")), ("Venue", source.get("venue")),
+            ("Venue type", source.get("venue_type")),
+            ("Language", source.get("language")), ("DOI", source.get("doi")),
+            ("Publication date", source.get("publication_date")),
+            ("Paper file", brain.pdf_name(ctx.source_id))]
+    with st.container(border=True):
+        for label, value in rows:
+            if label == "Authors":
+                shown = "; ".join(value or []) or "None recorded"
+            elif label in ("Venue type", "Language"):
+                shown = ui.display_value("language" if label == "Language" else "venue_type",
+                                         value)
+            else:
+                shown = str(value) if value not in (None, "") else "None recorded"
+            ui.value_line(label, shown)
+    st.markdown("#### Source wiki")
+    with st.container(border=True):
+        st.markdown(ui.wiki_markdown(brain.source_body(ctx.source_id)))
+    st.button("Continue to Claims →", type="primary", key="source_to_claims",
+              on_click=go_to_section, args=(ctx, "claims"))
 
 
-#: What each subsection puts in front of the evaluator before its questions.
-SUBSECTION_PANEL = {
-    spec.SUB_GROUNDING: grounding_panel,
-    spec.SUB_ATTRIBUTES: attributes_panel,
-    spec.SUB_CONCEPTS: concept_panel,
-}
-
-
+# ------------------------------------------------------------------ Claims
 def claims_section(ctx: Ctx) -> None:
-    claims = ctx.brain.claims_of(ctx.source_id)
+    brain = ctx.brain
+    claims = brain.claims_of(ctx.source_id)
     if not claims:
-        st.warning("This source has no claims in the Brain.")
+        ui.reset_wiki(f"{ctx.source_id}|claims|none")
+        st.subheader("Claims")
+        st.info("No Claims were extracted from this Source. There is nothing to "
+                "evaluate here; the Source is still evaluated under Claim recall.")
+        st.button("Continue to Datasets →", key="claims_empty_next",
+                  on_click=go_to_section, args=(ctx, "datasets"))
         return
 
     idx_key = f"claim_idx|{ctx.review_id}"
-    st.session_state[idx_key] = current_index(idx_key, len(claims))
-
-    # Every claim is directly selectable, in any order. The marker says how each
-    # one stands; it never restricts which can be opened.
-    # Everything on this page is drawn from what the widgets hold now, not from
-    # what was cached before the evaluator's last click. `question_widget`
-    # mirrors a change into `ctx.responses` as it renders, so anything computed
-    # from the cache above the widgets is one interaction behind.
-    claim_at = current_index(idx_key, len(claims))
-    live_items = progress.applicable(progress.claim_items(
-        ctx.brain, ctx.source_id, claims[claim_at]["id"], ctx.responses))
-    answers, changed = ui.live_answers(ctx, live_items)
-    edges, touched_edge = ui.live_edges(
-        ctx, claims[claim_at]["id"],
-        ctx.brain.relations_of(claims[claim_at]["id"]))
-    touched = {item.question.section for item in changed}
-    if touched_edge:
-        touched.add(spec.SUB_RELATIONS)
-
-    states = progress.claim_states(ctx.brain, ctx.source_id, answers, edges)
-    index = st.selectbox(
-        "Go to claim", list(range(len(claims))),
-        format_func=lambda i: (
-            f"{BADGE[states[claims[i]['id']]]} {i+1}. {claims[i]['id']} "
-            f"— {claims[i]['statement'][:64]}…"
-        ),
-        key=idx_key,
-    )
+    index = _index(idx_key, len(claims))
     claim = claims[index]
-    ui.reset_wiki(f"{ctx.source_id}|claim|{claim['id']}")
+    cid = claim["id"]
+    ui.reset_wiki(f"{ctx.source_id}|claim|{cid}")
+    states = progress.claim_states(brain, ctx.source_id, ctx.data)
 
-    completed = sum(1 for state in states.values() if state == progress.COMPLETE)
+    head, pick = st.columns([2, 3])
+    head.subheader(f"Claim {index + 1} of {len(claims)}")
+    head.caption(cid)
+    with pick:
+        st.selectbox(
+            "Go to Claim", range(len(claims)), key=idx_key,
+            format_func=lambda i: (f"{MARK[states[claims[i]['id']]]} {i + 1}. "
+                                   f"{claims[i]['id']} — "
+                                   f"{claims[i].get('statement', '')[:70]}…"),
+            on_change=lambda: (ui.close_wiki(), ui.request_scroll()))
+    ui.statement_card("Claim statement", claim.get("statement", ""))
+    parts = progress.claim_parts(brain, ctx.source_id, cid, ctx.data)
+    st.caption("  ·  ".join(f"{MARK[state]} {part} {done}/{total}"
+                            for part, done, total, state in parts if total)
+               + f"   —   {MARK_LEGEND}")
+    counts = {part: (done, total) for part, done, total, _ in parts}
 
-    heading, tally = st.columns([3, 2], vertical_alignment="bottom")
-    heading.subheader(f"Claim {index + 1} of {len(claims)} · {claim['id']}")
-    # Reserved and written after the questions: an answer given on this run
-    # reaches the response cache below this point, so a count taken here would
-    # show the evaluator where they stood before they answered.
-    claim_tally = tally.empty()
+    _part_heading(spec.PART_CLAIM, counts)
+    claim_evaluation(ctx, claim, claims)
+    _part_heading(spec.PART_FIELDS, counts)
+    schema_fields(ctx, claim)
+    _part_heading(spec.PART_CONCEPTS, counts)
+    concepts_part(ctx, claim)
+    _part_heading(spec.PART_RELATIONS, counts)
+    relations_part(ctx, claim)
 
-    context = st.columns([1, 1, 3])
-    with context[0]:
-        ui.wiki_button("Open Source wiki", ui.SOURCE, ctx.source_id,
-                       key=f"wiki_claim_src|{claim['id']}", width="stretch")
-    with context[1]:
-        ui.wiki_button("View all claims from this paper", ui.SOURCE_CLAIMS,
-                       ctx.source_id, key=f"wiki_claim_all|{claim['id']}",
-                       width="stretch",
-                       help="For judging whether this claim duplicates another")
-
-    _statement_card(claim)
-    _resume_hint(ctx, claims, index, idx_key)
-    st.progress(completed / len(claims))
-    st.caption(f"{completed} of {len(claims)} claims complete in this paper")
-    ui.scale_note(spec.RESPONSE_SCALE_NOTE)
-
-    parts = progress.claim_subsection_progress(
-        ctx.brain, ctx.source_id, claim["id"], answers, edges)
-    open_label = _open_subsection(
-        f"claim_open|{ctx.review_id}|{claim['id']}", parts, touched)
-    for label, done, total, state in parts:
-        count = f"{done}/{total}" if total else "none applicable"
-        with st.expander(f"{BADGE[state] if total else '—'}  {label} · {count}",
-                         expanded=label == open_label):
-            panel = SUBSECTION_PANEL.get(label)
-            if panel:
-                panel(ctx, claim)
-            if label == spec.SUB_RELATIONS:
-                relations_panel(ctx, claim)
-            else:
-                _questions_of(ctx, claim, label)
-
-    done, total = progress.claim_progress(ctx.brain, ctx.source_id, claim["id"],
-                                          answers, edges)
-    claim_tally.markdown(
-        f"<div style='text-align:right'><strong>{done}/{total}</strong>"
-        f" applicable items complete</div>", unsafe_allow_html=True)
-
-    _claim_nav(ctx, claims, index, idx_key, done, total)
-
-
-def _open_subsection(key: str, parts, touched) -> str:
-    """Which subsection is open — decided by where the evaluator is working.
-
-    It used to be pinned when the claim was first opened and never moved, so
-    answering inside C closed C and reopened A on every single answer.
-
-    Now an interaction makes that subsection the active one and it stays open
-    while anything in it is still missing: a ``No`` waiting for its comment, or
-    a parent that has just revealed a conditional follow-up. Once it is
-    genuinely complete the next incomplete one opens instead, which is the part
-    of the old behaviour the evaluator asked to keep.
-    """
-    if touched:
-        st.session_state[key] = sorted(touched)[0] if len(touched) > 1 \
-            else next(iter(touched))
-    state_of = {label: (total, state) for label, _, total, state in parts}
-    active = st.session_state.get(key)
-    if active in state_of:
-        total, state = state_of[active]
-        if total and state != progress.COMPLETE:
-            return active
-    unfinished = [label for label, _, total, state in parts
-                  if total and state != progress.COMPLETE]
-    return unfinished[0] if unfinished else parts[0][0]
-
-
-def _claim_nav(ctx: Ctx, claims, index: int, idx_key: str, done: int, total: int) -> None:
-    """Previous and next. Neither is ever a gate.
-
-    An incomplete claim says so and lets the evaluator go; the paper cannot be
-    marked complete while anything is missing, which is where completeness is
-    enforced. On the last claim the forward control names where it actually
-    leads rather than pretending there is another claim.
-    """
     st.divider()
-    last = index >= len(claims) - 1
-    nav = st.columns([2, 2, 3])
-    with nav[0]:
-        st.button("← Previous claim", disabled=index == 0, width="stretch",
-                  on_click=_move_claim(idx_key, -1, len(claims)), key="prev_claim")
-    with nav[1]:
-        if last:
-            st.button(f"{progress.SECTION_TAB['datasets']} →", width="stretch",
-                      key="claims_to_datasets",
-                      on_click=_go_to_section(ctx, "datasets"))
-        else:
-            st.button("Next claim →", width="stretch", key="next_claim",
-                      on_click=_move_claim(idx_key, +1, len(claims)))
-    with nav[2]:
-        st.caption(f"Claim {index + 1} of {len(claims)}")
-
-    outstanding = total - done
-    if outstanding:
-        st.caption(f"This claim still has {outstanding} item(s) to answer. That does "
-                   f"not block you — move on and come back; the paper can only be "
-                   f"marked complete once nothing is missing.")
-
-
-def _go_to_section(ctx: Ctx, section: str):
-    def callback():
-        st.session_state[f"section|{ctx.review_id}"] = section
-        ui.close_wiki()
-        ui.request_scroll()
-    return callback
-
-
-def _resume_hint(ctx: Ctx, claims, index: int, idx_key: str) -> None:
-    """Offer the place work was left off. A shortcut, never a redirect.
-
-    The evaluator stays wherever they are unless they press it.
-    """
-    first = progress.first_incomplete_claim(ctx.brain, ctx.source_id, ctx.responses,
-                                            ctx.edge_responses)
-    if first == index:
-        return
-    target = claims[first]
-    if progress.claim_complete(ctx.brain, ctx.source_id, target["id"],
-                               ctx.responses, ctx.edge_responses):
-        return
-    st.button(
-        f"Resume at claim {first + 1} ({target['id']})",
-        key=f"resume|{ctx.review_id}",
-        help="The first claim still needing work. You are free to stay here.",
-        on_click=_go_to_claim(idx_key, first),
-    )
-
-
-def _go_to_claim(idx_key: str, index: int):
-    def callback():
-        st.session_state[idx_key] = index
-        ui.request_scroll()
-    return callback
-
-
-def current_index(idx_key: str, total: int) -> int:
-    """The selected index, tolerating Streamlit's widget-state cleanup.
-
-    The key belongs to a selectbox. When the evaluator leaves the section, that
-    widget is no longer rendered and Streamlit drops its state, so the key can be
-    missing — or present but None — by the time a click is processed. That is
-    reachable in normal use: leave Claims for Datasets, or click twice on a slow
-    connection, and a queued click can arrive after the cleanup.
-    """
-    try:
-        value = st.session_state[idx_key]
-    except (KeyError, AttributeError):
-        return 0
-    if isinstance(value, bool) or not isinstance(value, int):
-        return 0
-    return max(0, min(value, max(total - 1, 0)))
-
-
-def _move_claim(idx_key: str, delta: int, total: int):
-    def callback():
-        current = current_index(idx_key, total)
-        st.session_state[idx_key] = max(0, min(current + delta, max(total - 1, 0)))
-        ui.close_wiki()
-        ui.request_scroll()
-    return callback
-
-
-# ----------------------------------------------------------- 3. Datasets
-SUB_DATASET_NODE = "A · Dataset node"
-SUB_DATASET_ATTRIBUTES = "B · Dataset attributes"
-
-#: The Dataset record as a reader sees it. `run_id` says which extraction run
-#: produced the node, which is build provenance and not something anyone here is
-#: asked about; it stays in the Dataset wiki.
-DATASET_FIELDS = (
-    ("Introduced by", "introduced_by"),
-    ("Used by", "used_by"),
-    ("Language", "language"),
-    ("Jurisdiction", "jurisdiction"),
-    ("Document types", "document_types"),
-    ("Size", "size"),
-    ("Annotation", "annotation"),
-    ("Agreement reported", "agreement_reported"),
-    ("Availability", "availability"),
-)
-
-
-def _tally(column, done: int, total: int, noun: str = "questions"):
-    """The local count, right-aligned beside a heading."""
-    column.markdown(
-        f"<div style='text-align:right'><strong>{done} of {total}</strong>"
-        f" {noun} complete</div>", unsafe_allow_html=True)
-
-
-def _subsection_parts(ctx: Ctx, groups, object_id: str, answers) -> list:
-    """Each Dataset subsection's count and state, from the live answers."""
-    parts = []
-    for label, questions in groups:
-        wanted = {q.criterion_id for q in questions}
-        items = [i for i in progress.applicable(
-            progress.dataset_items(ctx.brain, ctx.source_id, answers))
-            if i.object_id == object_id and i.question.criterion_id in wanted]
-        done = sum(1 for i in items if progress.item_complete(i, answers))
-        state = (progress.COMPLETE if items and done == len(items)
-                 else progress.INCOMPLETE if done else progress.AVAILABLE)
-        parts.append((label, done, len(items), state))
-    return parts
-
-
-def _subsection(ctx: Ctx, label: str, questions, object_id: str,
-                done: int, total: int, state: str, expanded: bool) -> None:
-    """One collapsible group of criteria, carrying its own state and count."""
-    with st.expander(f"{BADGE[state]}  {label} · {done}/{total}",
-                     expanded=expanded):
-        for question in questions:
-            with st.container(border=True):
-                ui.question_widget(ctx, question, object_id)
-
-
-def datasets_section(ctx: Ctx) -> None:
-    datasets = ctx.brain.datasets_of(ctx.source_id)
-
-    heading, tally = st.columns([3, 2], vertical_alignment="bottom")
-    heading.subheader("Datasets")
-    count = tally.empty()
-    st.caption("Evaluate the Dataset records the Brain created for this Source. "
-               "A Dataset node stands for a body of legal material the paper "
-               "introduces or uses — not for every corpus the paper mentions.")
-
-    if datasets:
-        idx_key = f"ds_idx|{ctx.review_id}"
-        st.session_state[idx_key] = current_index(idx_key, len(datasets))
-        index = st.selectbox(
-            "Go to dataset", range(len(datasets)),
-            format_func=lambda i: f"{i+1}. {datasets[i]['id']} — {datasets[i].get('name','')}",
-            key=idx_key,
-        )
-        dataset = datasets[index]
-        did = dataset["id"]
-        ui.reset_wiki(f"{ctx.source_id}|dataset|{did}")
-
-        # As on the claim page: what the widgets hold now, so a count drawn
-        # above them is not one interaction behind.
-        live_items = [i for i in progress.applicable(
-            progress.dataset_items(ctx.brain, ctx.source_id, ctx.responses))
-            if i.object_id == did]
-        answers, changed = ui.live_answers(ctx, live_items)
-
-        st.markdown(f"##### Dataset {index + 1} of {len(datasets)} · `{did}`")
-        with st.container(border=True):
-            name, wiki = st.columns([3, 1], vertical_alignment="top")
-            name.markdown(f"**{dataset.get('name', '')}**")
-            with wiki:
-                ui.wiki_button("Open Dataset wiki", ui.DATASET, did, width="stretch",
-                               key=f"wiki_ds|{did}",
-                               help="The generated record — context only")
-            ui.definition_list(
-                [(label, ui.value_markup(dataset.get(field)))
-                 for label, field in DATASET_FIELDS], skip_empty=False)
-
-            using = ctx.brain.claims_using_dataset(ctx.source_id, did)
-            with st.expander(f"Claims resting on this Dataset ({len(using)})"):
-                if not using:
-                    st.caption("No claim from this source rests on this dataset.")
-                for claim in using:
-                    row, detail = st.columns([5, 1], vertical_alignment="center")
-                    row.markdown(f"`{claim['id']}` {claim['statement']}")
-                    with detail:
-                        ui.wiki_button("View details", ui.CLAIM, claim["id"],
-                                       width="stretch",
-                                       key=f"wiki_ds_claim|{did}|{claim['id']}")
-
-        ui.scale_note(spec.RESPONSE_SCALE_NOTE)
-
-        questions = spec.dataset_questions()
-        groups = [
-            (SUB_DATASET_NODE,
-             [q for q in questions if q.criterion_id.startswith("HE-14")]),
-            (SUB_DATASET_ATTRIBUTES,
-             [q for q in questions if q.criterion_id.startswith("HE-15")]),
-        ]
-        parts = _subsection_parts(ctx, groups, did, answers)
-        # HE-14.3 is asked for the Source as a whole, below both groups, so an
-        # edit to it belongs to neither and must not pull one of them open.
-        of_group = {q.criterion_id: label for label, group in groups
-                    for q in group}
-        touched = {of_group[i.question.criterion_id] for i in changed
-                   if i.question.criterion_id in of_group}
-        open_label = _open_subsection(
-            f"ds_open|{ctx.review_id}|{did}", parts, touched)
-        for (label, group), (_, done, total, state) in zip(groups, parts):
-            _subsection(ctx, label, group, did, done, total, state,
-                        expanded=label == open_label)
-
-        if len(datasets) > 1:
-            nav = st.columns([2, 2, 3])
-            nav[0].button("← Previous dataset", disabled=index == 0, width="stretch",
-                          key="prev_ds", on_click=_move_claim(idx_key, -1, len(datasets)))
-            nav[1].button("Next dataset →", disabled=index >= len(datasets) - 1,
-                          width="stretch", key="next_ds",
-                          on_click=_move_claim(idx_key, +1, len(datasets)))
-            nav[2].caption(f"Dataset {index + 1} of {len(datasets)}")
+    cols = st.columns([1, 1, 3])
+    cols[0].button("← Previous Claim", key="prev_claim", disabled=index == 0,
+                   width="stretch", on_click=_move, args=(idx_key, -1, len(claims)))
+    if index + 1 < len(claims):
+        cols[1].button("Next Claim →", key="next_claim", width="stretch",
+                       on_click=_move, args=(idx_key, 1, len(claims)))
     else:
+        cols[1].button("Datasets →", key="claims_to_datasets", width="stretch",
+                       on_click=go_to_section, args=(ctx, "datasets"))
+
+
+def _part_heading(part: str, counts: dict) -> None:
+    done, total = counts.get(part, (0, 0))
+    st.markdown(f"### {part}")
+    if total:
+        st.caption(f"{done} of {total} complete")
+
+
+def claim_evaluation(ctx: Ctx, claim: dict, claims: list[dict]) -> None:
+    cid = claim["id"]
+    anchors = claim.get("anchors") or []
+
+    with st.container(border=True):
+        q1 = spec.Q1
+        answer = scalar_question(ctx, q1, cid)
+        if answer in q1.related_claim_on:
+            record = ctx.data.response(q1.key, cid)
+            stored = record.get("related_claim_id", "")
+            options = progress.evaluated_claims(ctx.brain, ctx.source_id, ctx.data,
+                                                exclude=cid)
+            if stored and stored not in options:
+                options.append(stored)
+            by_id = {c["id"]: c for c in claims}
+            key = ui.wkey(ctx, q1.key, cid, "related")
+            st.selectbox(
+                "Restatement of", options,
+                index=options.index(stored) if stored in options else None,
+                placeholder="Select the Claim this one restates",
+                format_func=lambda c: f"{c} — {by_id.get(c, {}).get('statement', '')[:110]}",
+                key=key, disabled=ctx.locked, on_change=_text_changed,
+                args=(ctx, q1, cid, key, "related_claim_id"))
+            if not options:
+                st.caption("No other Claim of this Source has been evaluated yet. "
+                           "Evaluate the restated Claim first, then return here.")
+            elif not stored:
+                st.warning("Select the Claim this one restates.")
+
+    for question in spec.claim_scalar_questions(spec.PART_CLAIM)[1:]:
+        with st.container(border=True):
+            if question.key == "CLAIM_Q03_MODALITY":
+                scalar_question(ctx, question, cid, before=lambda: _anchors(anchors))
+            elif question.key == "CLAIM_Q05_GROUNDING":
+                scalar_question(ctx, question, cid, before=lambda: _anchors(anchors))
+            else:
+                scalar_question(ctx, question, cid)
+
+
+def _anchors(anchors) -> None:
+    st.caption(f"Anchors ({len(anchors)})")
+    for anchor in anchors:
+        ui.quotation(anchor.get("quote", ""), anchor.get("location", ""))
+
+
+def schema_fields(ctx: Ctx, claim: dict) -> None:
+    for question in spec.claim_scalar_questions(spec.PART_FIELDS):
+        value = claim.get(question.field)
+        field_question(ctx, question, claim["id"], value,
+                       ui.display_value(question.field, value))
+
+
+# ----------------------------------------------------------------- Concepts
+def concepts_part(ctx: Ctx, claim: dict) -> None:
+    brain, cid = ctx.brain, claim["id"]
+    assigned = brain.concepts_of_claim(cid)
+
+    with st.container(border=True):
+        st.markdown(f"**{spec.Q12.text}**")
+        st.caption("Each Concept assigned to this Claim is judged on its own.")
+        for family, ids in brain.group_by_family(assigned).items():
+            if not ids:
+                continue
+            st.markdown(f"###### {family_label(family)}")
+            for concept_id in ids:
+                _concept_judgment(ctx, spec.Q12, cid, concept_id)
+
+    candidates = brain.candidates_of_claim(cid)
+    if candidates:
+        with st.container(border=True):
+            st.markdown(f"**{spec.Q13.text}**")
+            ui.definitions(spec.Q13.definitions)
+            for concept_id in candidates:
+                _concept_judgment(ctx, spec.Q13, cid, concept_id)
+
+    with st.container(border=True):
+        missing_concepts(ctx, claim)
+
+
+def _concept_judgment(ctx: Ctx, question: spec.Question, cid: str, concept_id: str) -> None:
+    concept = ctx.brain.concept(concept_id)
+    record = ctx.data.concept(question.key, cid, concept_id)
+    name, definition = st.columns([2, 3])
+    with name:
+        st.markdown(f"**{concept_label(concept_id)}**")
+        st.caption(f"{spec.value_label(concept.get('status', ''))} · {concept_id}")
+    with definition:
+        st.markdown(html.escape(concept.get("definition", "")))
+    key = ui.wkey(ctx, question.key, cid, concept_id)
+    answer = _radio(ctx, question.options, record.get("answer", ""), key + "|a",
+                    _concept_changed,
+                    (ctx, question, cid, concept_id, key + "|a", "answer"))
+    _comment_box(ctx, question, answer or "", record.get("comment", ""), key + "|c",
+                 _concept_changed, (ctx, question, cid, concept_id, key + "|c", "comment"))
+    st.markdown("<div style='height:0.2rem'></div>", unsafe_allow_html=True)
+
+
+# -------------------------------------------------------------- Question 14
+def _q14_state(ctx: Ctx, cid: str) -> None:
+    """Keep the stored Question 14 state consistent with the selection."""
+    existing, proposed = progress.q14_selection(ctx.data, cid)
+    current = ctx.data.response(spec.Q14.key, cid).get("answer", "")
+    if existing or proposed:
+        wanted = spec.Q14_MISSING
+    else:
+        wanted = current if current == spec.Q14_NONE_MISSING else spec.Q14_NOT_EVALUATED
+    ui.save_response(ctx, spec.Q14, cid, answer=wanted)
+
+
+def _select_concept(ctx: Ctx, cid: str, entry: dict, active: bool) -> None:
+    ctx = _live(ctx)
+    key = store.selection_key(ctx.review_id, cid, entry["id"])
+    ui.save_selection(ctx, sheets.MISSING_CONCEPTS, key,
+                      store.pair_lookup(cid, entry["id"]), {
+                          "selection_key": key, "review_id": ctx.review_id,
+                          "source_id": ctx.source_id, "claim_id": cid,
+                          "concept_id": entry["id"], "concept_family": entry["family"],
+                          "concept_status": entry["status"],
+                          "active": store.TRUE if active else store.FALSE})
+    _q14_state(ctx, cid)
+
+
+def _remove_proposal(ctx: Ctx, cid: str, row: dict) -> None:
+    ctx = _live(ctx)
+    ui.save_selection(ctx, sheets.PROPOSED_CONCEPTS, row["proposal_key"],
+                      store.pair_lookup(cid, row["proposal_id"]),
+                      {**row, "active": store.FALSE})
+    _q14_state(ctx, cid)
+
+
+def _none_missing(ctx: Ctx, cid: str, key: str) -> None:
+    ctx = _live(ctx)
+    checked = bool(st.session_state.get(key))
+    ui.save_response(ctx, spec.Q14, cid,
+                     answer=spec.Q14_NONE_MISSING if checked else spec.Q14_NOT_EVALUATED)
+
+
+def proposal_id(name: str, family: str) -> str:
+    return f"{re.sub(r'[^a-z0-9]+', '-', conceptsearch.normalise(name)).strip('-')}--{family}"
+
+
+def _propose(ctx: Ctx, cid: str, name_key: str, family_key: str, why_key: str) -> None:
+    ctx = _live(ctx)
+    name = (st.session_state.get(name_key) or "").strip()
+    family = st.session_state.get(family_key)
+    if not name or not family:
+        st.session_state[f"{name_key}|error"] = "Give a name and a Concept family."
+        return
+    pid = proposal_id(name, family)
+    key = store.proposal_key(ctx.review_id, cid, pid)
+    ui.save_selection(ctx, sheets.PROPOSED_CONCEPTS, key, store.pair_lookup(cid, pid), {
+        "proposal_key": key, "review_id": ctx.review_id, "source_id": ctx.source_id,
+        "claim_id": cid, "proposal_id": pid, "name": name, "family": family,
+        "explanation": (st.session_state.get(why_key) or "").strip(),
+        "active": store.TRUE})
+    _q14_state(ctx, cid)
+    for k in (name_key, why_key):
+        st.session_state[k] = ""
+    st.session_state[family_key] = None
+    st.session_state.pop(f"{name_key}|error", None)
+
+
+def missing_concepts(ctx: Ctx, claim: dict) -> None:
+    brain, cid = ctx.brain, claim["id"]
+    st.markdown(f"**{spec.Q14.text}**")
+    vocabulary = brain.vocabulary(spec.concept_grid())
+    existing, proposed = progress.q14_selection(ctx.data, cid)
+    selected_ids = {r["concept_id"] for r in existing}
+    excluded = set(brain.concepts_of_claim(cid)) | selected_ids
+    eligible = [e for e in vocabulary if e["id"] not in excluded]
+    by_id = {e["id"]: e for e in vocabulary}
+    state = ctx.data.response(spec.Q14.key, cid).get("answer", "")
+
+    # ---- selected: a separate, persistent area
+    with st.container(border=True):
+        st.markdown("**Selected missing Concepts**")
+        if not existing and not proposed:
+            st.caption("None selected." if state != spec.Q14_NONE_MISSING else
+                       "You recorded that no additional Concepts are missing.")
+        for row in existing:
+            entry = by_id.get(row["concept_id"], {"label": concept_label(row["concept_id"])})
+            st.button(f"{entry['label']}  ×", key=ui.wkey(ctx, "q14rm", cid, row["concept_id"]),
+                      disabled=ctx.locked, help="Remove from the selection",
+                      on_click=_select_concept,
+                      args=(ctx, cid, {"id": row["concept_id"],
+                                       "family": row.get("concept_family", ""),
+                                       "status": row.get("concept_status", "")}, False))
+        for row in proposed:
+            st.button(f"Proposed · {row['name']} ({family_label(row['family'])})  ×",
+                      key=ui.wkey(ctx, "q14rmp", cid, row["proposal_id"]),
+                      disabled=ctx.locked, help="Remove this proposal",
+                      on_click=_remove_proposal, args=(ctx, cid, row))
+        none_key = ui.wkey(ctx, "q14none", cid)
+        st.session_state[none_key] = state == spec.Q14_NONE_MISSING
+        st.checkbox("No additional Concepts are missing", key=none_key,
+                    disabled=ctx.locked or bool(existing or proposed),
+                    on_change=_none_missing, args=(ctx, cid, none_key))
+
+    # ---- search and browse: independent of the selection
+    query = st.text_input("Search Concepts", key=f"q14search|{ctx.review_id}|{cid}",
+                          placeholder="Type one or more words",
+                          disabled=ctx.locked)
+    results = conceptsearch.search(query, eligible)
+    groups = {family: [] for family in CONCEPT_FAMILIES}
+    for entry in results:
+        groups.setdefault(entry["family"], []).append(entry)
+    if query and not results:
+        st.caption("No Concept matches. You can propose a new one below.")
+    for family, entries in groups.items():
+        if query and not entries:
+            continue
+        with st.expander(f"{family_label(family)} ({len(entries)})",
+                         expanded=bool(query)):
+            if not entries:
+                st.caption("No further Concept in this family.")
+            for entry in entries:
+                text, action = st.columns([6, 1])
+                with text:
+                    st.markdown(f"**{entry['label']}**  \n"
+                                + (html.escape(entry["definition"]) if entry["definition"]
+                                   else "_Definition not available in the current "
+                                        "Concept wiki._"))
+                with action:
+                    st.button("Add", key=ui.wkey(ctx, "q14add", cid, entry["id"]),
+                              disabled=ctx.locked, on_click=_select_concept,
+                              args=(ctx, cid, entry, True))
+
+    with st.expander("Propose new Concept"):
+        name_key = ui.wkey(ctx, "q14name", cid)
+        family_key = ui.wkey(ctx, "q14family", cid)
+        why_key = ui.wkey(ctx, "q14why", cid)
+        st.text_input("Proposed Concept name", key=name_key, disabled=ctx.locked)
+        st.selectbox("Concept family", list(CONCEPT_FAMILIES), index=None,
+                     format_func=family_label, key=family_key, disabled=ctx.locked,
+                     placeholder="Select a family")
+        st.text_area("Why the existing vocabulary is insufficient (optional)",
+                     key=why_key, height=70, disabled=ctx.locked)
+        st.button("Add proposal", key=ui.wkey(ctx, "q14propose", cid),
+                  disabled=ctx.locked, on_click=_propose,
+                  args=(ctx, cid, name_key, family_key, why_key))
+        error = st.session_state.get(f"{name_key}|error")
+        if error:
+            st.warning(error)
+        st.caption("A proposal is stored with this evaluation only. It does not "
+                   "create or change a Concept in the Brain.")
+
+
+# ---------------------------------------------------------------- Relations
+def relations_part(ctx: Ctx, claim: dict) -> None:
+    brain, cid = ctx.brain, claim["id"]
+    hosted = brain.relations_from_claim(cid)
+    incoming = brain.relations_to_claim(cid)
+    if not hosted:
+        st.caption("No Relation starts from this Claim." + (
+            " Relations that end at it are listed below as context." if incoming else ""))
+    for n, relation in enumerate(hosted, 1):
+        with st.container(border=True):
+            _relation_card(ctx, relation, cid, n)
+            record = ctx.data.relation(relation["key"])
+            for question in spec.relation_questions():
+                st.markdown(f"**{question.text}**")
+                ui.definitions(question.definitions, assigned=relation.get(question.field))
+                key = ui.wkey(ctx, question.key, relation["key"])
+                answer_field = f"{question.column}_answer"
+                comment_field = f"{question.column}_comment"
+                answer = _radio(ctx, question.options, record.get(answer_field, ""),
+                                key + "|a", _relation_changed,
+                                (ctx, relation["key"], key + "|a", answer_field))
+                _comment_box(ctx, question, answer or "", record.get(comment_field, ""),
+                             key + "|c", _relation_changed,
+                             (ctx, relation["key"], key + "|c", comment_field))
+    if incoming:
+        with st.expander(f"Relations ending at this Claim, evaluated in another "
+                         f"Source's review ({len(incoming)})"):
+            for n, relation in enumerate(incoming, 1):
+                _relation_card(ctx, relation, cid, f"in{n}")
+                st.divider()
+
+
+def _relation_card(ctx: Ctx, relation: dict, current: str, n) -> None:
+    brain = ctx.brain
+    left, middle, right = st.columns([5, 2, 5])
+    for column, label, claim_id in ((left, "From Claim", relation["from"]),
+                                    (right, "To Claim", relation["to"])):
+        with column:
+            marker = " (this Claim)" if claim_id == current else ""
+            st.markdown(f"**{label}**{marker}")
+            st.caption(f"{claim_id} · {brain.source_of_claim(claim_id)}")
+            st.markdown(html.escape(brain.claim(claim_id).get("statement", "")))
+            if claim_id != current:
+                b1, b2 = st.columns(2)
+                with b1:
+                    ui.wiki_button("Open Claim", ui.CLAIM, claim_id,
+                                   key=f"rel_clm|{relation['key']}|{n}")
+                with b2:
+                    ui.wiki_button("Open Source", ui.SOURCE, brain.source_of_claim(claim_id),
+                                   key=f"rel_src|{relation['key']}|{n}")
+    with middle:
+        st.markdown("<div style='text-align:center;padding-top:1.6rem'>"
+                    f"<div style='font-size:0.8rem;opacity:0.7'>Relation type</div>"
+                    f"<div style='font-weight:600'>{html.escape(spec.value_label(relation['type']))}"
+                    f"</div><div style='font-size:1.4rem'>→</div>"
+                    f"<div style='font-size:0.8rem;opacity:0.7'>Grounding</div>"
+                    f"<div>{html.escape(spec.value_label(relation.get('grounding', '')))}"
+                    "</div></div>", unsafe_allow_html=True)
+    st.markdown(f"**Relation Note:** {html.escape(relation.get('note', ''))}")
+
+
+# ----------------------------------------------------------------- Datasets
+def datasets_section(ctx: Ctx) -> None:
+    brain = ctx.brain
+    ids = brain.dataset_ids_of(ctx.source_id)
+    st.subheader("Datasets")
+    if not ids:
         ui.reset_wiki(f"{ctx.source_id}|dataset|none")
-        st.info("The Brain created no Dataset nodes for this Source.")
-        st.caption("Nothing to evaluate node by node. The recall question below is "
-                   "still asked: no node is not the same as nothing to record.")
+        st.info("No Claim of this Source rests on a Dataset, so there is no Dataset "
+                "to evaluate.")
+        st.button("Continue to Claim recall →", key="datasets_empty_next",
+                  type="primary", on_click=go_to_section, args=(ctx, "recall"))
+        return
+
+    idx_key = f"ds_idx|{ctx.review_id}"
+    index = _index(idx_key, len(ids))
+    did = ids[index]
+    dataset = brain.dataset(did)
+    ui.reset_wiki(f"{ctx.source_id}|dataset|{did}")
+
+    head, pick = st.columns([2, 3])
+    head.markdown(f"#### Dataset {index + 1} of {len(ids)}")
+    head.caption(did)
+    if len(ids) > 1:
+        pick.selectbox("Go to Dataset", range(len(ids)), key=idx_key,
+                       format_func=lambda i: f"{i + 1}. {brain.dataset(ids[i]).get('name', ids[i])}",
+                       on_change=lambda: (ui.close_wiki(), ui.request_scroll()))
+    ui.statement_card("Dataset", dataset.get("name", did))
+    ui.wiki_button("Open Dataset wiki", ui.DATASET, did, key=f"ds_wiki|{did}")
+    resting = brain.claims_using_dataset(ctx.source_id, did)
+    with st.expander(f"Claims of this Source resting on it ({len(resting)})"):
+        for claim in resting:
+            st.markdown(f"**{claim['id']}** — {html.escape(claim.get('statement', ''))}")
+
+    items = progress.dataset_items(brain, ctx.source_id, did)
+    done = sum(1 for i in items if progress.item_complete(i, ctx.data))
+    st.caption(f"{done} of {len(items)} complete")
+    for question in spec.dataset_questions():
+        if question.key == "DATASET_NODE":
+            with st.container(border=True):
+                scalar_question(ctx, question, did)
+        elif question.key == "DATASET_DESCRIPTION":
+            with st.container(border=True):
+                st.markdown(f"##### {question.title}")
+                ui.statement_card("Current Dataset description",
+                                  dataset.get("description", "") or "None recorded")
+                ui.definitions(question.definitions)
+                scalar_question(ctx, question, did)
+        else:
+            value = dataset.get(question.field)
+            field_question(ctx, question, did, value,
+                           _dataset_value(ctx, question.field, value))
 
     st.divider()
-    st.markdown("##### Dataset recall — Source as a whole")
-    st.caption("Asked once for the paper, not once per Dataset: whether the Brain "
-               "created a Dataset node for every body of legal material this Source "
-               "introduces or uses.")
-    with st.container(border=True):
-        ui.question_widget(ctx, spec.dataset_recall_question(), ctx.source_id)
-
-    items = progress.applicable(
-        progress.dataset_items(ctx.brain, ctx.source_id, ctx.responses))
-    _tally(count, sum(1 for i in items if progress.item_complete(i, ctx.responses)),
-           len(items))
+    cols = st.columns([1, 1, 3])
+    cols[0].button("← Previous Dataset", key="prev_ds", disabled=index == 0,
+                   width="stretch", on_click=_move, args=(idx_key, -1, len(ids)))
+    if index + 1 < len(ids):
+        cols[1].button("Next Dataset →", key="next_ds", width="stretch",
+                       on_click=_move, args=(idx_key, 1, len(ids)))
+    else:
+        cols[1].button("Claim recall →", key="ds_to_recall", width="stretch",
+                       on_click=go_to_section, args=(ctx, "recall"))
 
 
-# -------------------------------------------------------------- 4. CITES
-def _citation_row(ctx: Ctx, source_id: str, key: str, arrow: str = "") -> None:
-    """One cited or citing paper: what it is, and the way to read it."""
-    source = ctx.brain.source(source_id)
-    text, wiki = st.columns([5, 1], vertical_alignment="center")
-    text.markdown(
-        f"<div style='line-height:1.45'>"
-        f"<code>{html.escape(source_id)}</code> · "
-        f"<code>{html.escape(ctx.brain.work_id(source_id))}</code>"
-        f"{'  ·  ' + html.escape(arrow) if arrow else ''}<br>"
-        f"<strong>{html.escape(source.get('title', ''))}</strong><br>"
-        f"<span style='opacity:0.75;font-size:0.88rem'>"
-        f"{html.escape(_authors_short(source))} · {html.escape(str(source.get('year') or ''))}"
-        f"</span></div>", unsafe_allow_html=True)
-    with wiki:
-        ui.wiki_button("Open Source wiki", ui.SOURCE, source_id, width="stretch",
-                       key=key)
+def _dataset_value(ctx: Ctx, field: str, value) -> str:
+    if field == "introduced_by" and value in ctx.brain.sources:
+        return f"{value} — {ctx.brain.source(value).get('title', '')}"
+    return ui.display_value(field, value)
 
 
-def _authors_short(source: dict) -> str:
-    authors = source.get("authors") or []
-    if not authors:
-        return ""
-    written = authors[0].split(",")[0]
-    if len(authors) == 2:
-        written += f" & {authors[1].split(',')[0]}"
-    elif len(authors) > 2:
-        written += " et al."
-    return written
-
-
-def cites_section(ctx: Ctx) -> None:
-    ui.reset_wiki(f"{ctx.source_id}|cites")
-    outgoing = ctx.brain.cites_from(ctx.source_id)
-    incoming = ctx.brain.cites_to(ctx.source_id)
-    here = ctx.brain.work_id(ctx.source_id)
-
-    heading, tally = st.columns([3, 2], vertical_alignment="bottom")
-    heading.subheader("Citations within the Brain")
-    count = tally.empty()
-    st.caption("This section evaluates citations between this paper and other "
-               "Sources represented in the Brain. **It is not the paper's complete "
-               "bibliography.** A citation becomes a CITES edge only when the cited "
-               "publication is itself a Source in the Brain.")
-    st.caption("References to publications outside the Brain, and citations to "
-               "legislation, case law or other primary legal sources, are "
-               "intentionally excluded.")
-
-    ui.wiki_button("Browse Brain Sources", ui.SOURCE_REGISTRY, ctx.source_id,
-                   key="wiki_src_registry",
-                   help="Which publications the Brain holds — needed to judge "
-                        "whether a citation should have become an edge")
-
-    with st.container(border=True):
-        st.markdown(f"**Citations from this paper — evaluate ({len(outgoing)})**")
-        if not outgoing:
-            st.caption("The Brain generated no outgoing CITES edges for this Source.")
-        for edge in outgoing:
-            _citation_row(ctx, edge["to"], f"wiki_cit|{edge['to']}",
-                          arrow=f"{here} → {ctx.brain.work_id(edge['to'])}")
-
-    with st.container(border=True):
-        st.markdown(f"**Other Brain Sources citing this paper — context only "
-                    f"({len(incoming)})**")
-        st.caption("Shown for orientation only. These citations are not evaluated "
-                   "on this page.")
-        if not incoming:
-            st.caption("No other Brain Source cites this paper.")
-        for edge in incoming:
-            _citation_row(ctx, edge["from"], f"wiki_cited_by|{edge['from']}",
-                          arrow=f"{ctx.brain.work_id(edge['from'])} → {here}")
-
-    ui.scale_note(spec.RESPONSE_SCALE_NOTE)
-
-    for question in spec.cites_questions():
-        if question.applicability == spec.IF_PARENT_IS_NEGATIVE:
-            parents = (question.parent_key or "").split("|")
-            if not any(ctx.response(p, ctx.source_id).get("answer") in spec.NEGATIVE
-                       for p in parents):
-                continue
-        with st.container(border=True):
-            ui.question_widget(ctx, question, ctx.source_id)
-
-    items = progress.applicable(
-        progress.cites_items(ctx.brain, ctx.source_id, ctx.responses))
-    _tally(count, sum(1 for i in items if progress.item_complete(i, ctx.responses)),
-           len(items))
-
-
-# --------------------------------------------- 5. Source-level completeness
-RECALL_DISTINCTION = (
-    "**Claim recall and conceptual coverage test different failures.** Claim "
-    "recall asks whether a central proposition is missing. Conceptual coverage "
-    "asks whether the extracted and mapped Claims, taken together, represent the "
-    "paper's mapping-relevant concepts."
-)
-
-
+# -------------------------------------------------------------- Claim recall
 def recall_section(ctx: Ctx) -> None:
     ui.reset_wiki(f"{ctx.source_id}|recall")
-    claims = ctx.brain.claims_of(ctx.source_id)
-
-    heading, tally = st.columns([3, 2], vertical_alignment="bottom")
-    heading.subheader("Source-level completeness")
-    count = tally.empty()
-    st.caption("Now assess the paper as a whole, after reviewing all of its "
-               "extracted Claims. Judge against the full paper you read, not "
-               "against the wiki.")
-    ui.scale_note(spec.RESPONSE_SCALE_NOTE)
-
-    questions = {q.criterion_id: q for q in spec.recall_questions()}
-
-    # ---- A · Claim recall
-    st.markdown("##### A · Claim recall")
+    brain = ctx.brain
+    claims = brain.claims_of(ctx.source_id)
+    st.subheader("Claim recall")
     with st.container(border=True):
-        head, wiki = st.columns([3, 1], vertical_alignment="top")
-        head.markdown(f"**Extracted Claims ({len(claims)})**")
-        with wiki:
-            ui.wiki_button("Open Source wiki", ui.SOURCE, ctx.source_id,
-                           width="stretch", key="wiki_recall_src")
-        for i, claim in enumerate(claims, 1):
-            row, detail = st.columns([6, 1], vertical_alignment="center")
-            row.markdown(
-                f"<div style='line-height:1.45'><code>{html.escape(claim['id'])}</code>"
-                f"<br>{html.escape(claim['statement'])}</div>",
-                unsafe_allow_html=True)
-            with detail:
-                ui.wiki_button("View details", ui.CLAIM, claim["id"], width="stretch",
-                               key=f"wiki_recall|{claim['id']}")
+        st.markdown(f"**Extracted Claims ({len(claims)})**")
+        if not claims:
+            st.caption("No Claims were extracted from this Source.")
+        for n, claim in enumerate(claims, 1):
+            st.markdown(f"{n}. {html.escape(claim.get('statement', ''))}  \n"
+                        f"<span style='opacity:0.65;font-size:0.85rem'>{claim['id']}</span>",
+                        unsafe_allow_html=True)
+        ui.wiki_button("Open Source wiki", ui.SOURCE, ctx.source_id, key="recall_src")
 
-    _recall_question(ctx, questions["HE-19.1"])
-    _recall_question(ctx, questions["HE-19.3"])
-
-    # ---- B · Conceptual coverage
-    st.markdown("##### B · Conceptual coverage")
-    st.caption(RECALL_DISTINCTION)
+    question = spec.RECALL
+    record = ctx.data.response(question.key, ctx.source_id)
     with st.container(border=True):
-        head, browse = st.columns([3, 1], vertical_alignment="top")
-        head.markdown("**Concepts represented across this Source**")
-        with browse:
-            ui.wiki_button("Browse Concept registry", ui.CONCEPT_REGISTRY,
-                           width="stretch", key="wiki_recall_reg",
-                           help="Every concept in the Brain, with the anchor grid")
-        families = ctx.brain.concepts_of_source(ctx.source_id)
-        for family in spec.CONCEPT_FAMILIES:
-            concepts = families.get(family) or []
-            st.markdown(f"<div style='font-weight:600;margin:0.5rem 0 0.1rem'>"
-                        f"{family}</div>", unsafe_allow_html=True)
-            if not concepts:
-                st.caption("None mapped anywhere in this Source")
-                continue
-            for concept in concepts:
-                row, wiki = st.columns([5, 1], vertical_alignment="center")
-                row.markdown(
-                    f"<div style='line-height:1.4'><strong>"
-                    f"{html.escape(concept['label'])}</strong> "
-                    f"<code>{html.escape(concept['status'])}</code> · "
-                    f"<span style='opacity:0.75'>{concept['claims']} "
-                    f"{'Claim' if concept['claims'] == 1 else 'Claims'}</span></div>",
-                    unsafe_allow_html=True)
-                with wiki:
-                    ui.wiki_button("Open wiki", ui.CONCEPT, concept["id"],
-                                   width="stretch",
-                                   key=f"wiki_srccpt|{concept['id']}")
+        st.markdown(f"**{question.text}**")
+        ui.definitions(question.definitions)
+        key = ui.wkey(ctx, question.key, ctx.source_id)
+        answer = st.segmented_control(
+            "Claim recall", list(question.options), selection_mode="single",
+            default=record.get("answer") or None, key=key + "|a",
+            label_visibility="collapsed", disabled=ctx.locked,
+            on_change=_answer_changed, args=(ctx, question, ctx.source_id, key + "|a"))
+        st.caption("Ordered from None to All.")
 
-    _recall_question(ctx, questions["HE-20.S"])
-    _recall_question(ctx, questions["HE-20.S.b"])
-
-    items = progress.applicable(
-        progress.recall_items(ctx.brain, ctx.source_id, ctx.responses))
-    _tally(count, sum(1 for i in items if progress.item_complete(i, ctx.responses)),
-           len(items))
+    child = spec.MISSING_CLAIMS
+    if spec.child_visible(child, answer or ""):
+        stored = ctx.data.response(child.key, ctx.source_id).get("answer", "")
+        with st.container(border=True):
+            st.markdown(f"**{child.text}**")
+            st.caption(child.comment_help)
+            key = ui.wkey(ctx, child.key, ctx.source_id)
+            st.text_area("Missing Claims", value=stored, key=key, height=160,
+                         label_visibility="collapsed", disabled=ctx.locked,
+                         on_change=_text_changed,
+                         args=(ctx, child, ctx.source_id, key, "answer"))
+            if not (st.session_state.get(key, stored) or "").strip():
+                st.warning("Required for this answer.")
 
 
-def _recall_question(ctx: Ctx, question) -> None:
-    """A source-level criterion, with its conditional follow-up honoured."""
-    if question.applicability == spec.IF_PARENT_IS_NEGATIVE:
-        parents = (question.parent_key or "").split("|")
-        if not any(ctx.response(p, ctx.source_id).get("answer") in spec.NEGATIVE
-                   for p in parents):
-            return
-    with st.container(border=True):
-        ui.question_widget(ctx, question, ctx.source_id)
-
-
-# ------------------------------------------------------------- 6. Review
-#: Free-text findings the evaluator recorded. These are results, not gaps: a
-#: paper with four missing Concepts listed is a *completed* evaluation that
-#: found four missing Concepts. Keeping them apart from "items requiring
-#: attention" is the whole point of the Review page.
-RECORDED = (
-    ("Missing Claims", "SOURCE_HE19_3", "HE-19.3"),
-    ("Missing mapping-relevant Concepts (Source level)", "SOURCE_HE20S_B", "HE-20.S.b"),
-    ("Missing or spurious CITES", "SOURCE_HE18_3", "HE-18.3"),
-)
-
-STATUS_MARK = {progress.COMPLETE: "✓", progress.INCOMPLETE: "●",
-               progress.AVAILABLE: "○", progress.LOCKED: "○"}
-
-
-def _criterion_titles() -> dict[str, str]:
-    return {q.criterion_id: q.field_subitem for q in spec.QUESTIONS}
-
-
+# ------------------------------------------------------------------ Review
 def review_section(ctx: Ctx) -> None:
     ui.reset_wiki(f"{ctx.source_id}|review")
-    st.subheader("Review paper")
-    st.caption("Check that the evaluation is complete before marking this paper "
-               "complete. You may return to any section and revise your responses.")
+    brain, sid = ctx.brain, ctx.source_id
+    st.subheader("Review")
     ui.show_held()
+    missing = progress.missing_items(brain, sid, ctx.data)
+    counts = progress.counts(brain, sid, ctx.data)
+    states = progress.section_states(brain, sid, ctx.data)
 
-    missing = progress.missing_items(ctx.brain, ctx.source_id, ctx.responses,
-                                     ctx.edge_responses)
-    review = store.get_review(ctx.phase_id, ctx.evaluator_id, ctx.source_id) or {}
-
-    _evaluation_status(ctx, missing)
-    _items_requiring_attention(ctx, missing)
-    _recorded_findings(ctx)
-    _evaluation_overview(ctx)
-    _completion(ctx, missing, review)
-
-
-def _evaluation_status(ctx: Ctx, missing) -> None:
-    st.markdown("#### Evaluation status")
-    stats = progress.counts(ctx.brain, ctx.source_id, ctx.responses, ctx.edge_responses)
     if missing:
-        st.warning(f"**Incomplete — {len(missing)} item"
-                   f"{'s' if len(missing) != 1 else ''} require"
-                   f"{'' if len(missing) != 1 else 's'} attention**")
+        st.warning(f"Incomplete: {len(missing)} item(s) need an answer.")
     else:
-        st.success("**Ready to complete** — all required evaluation fields are filled.")
-    total = max(stats["items"], 1)
-    st.progress(min(stats["answered"] / total, 1.0))
+        st.success("Every applicable item is answered.")
+    if counts["items"]:
+        st.progress(counts["done"] / counts["items"])
+    st.caption(f"{counts['done']} of {counts['items']} items · "
+               f"{counts['claims_done']} of {counts['claims']} Claims complete")
 
-    states = progress.section_states(ctx.brain, ctx.source_id, ctx.responses,
-                                     ctx.edge_responses)
-    per_section: dict[str, int] = {}
-    for item in missing:
-        per_section[item.section] = per_section.get(item.section, 0) + 1
-
-    for section in progress.SECTION_IDS:
-        if section == "review":
-            continue
+    for section in ("claims", "datasets", "recall"):
+        items = progress.section_items(section, brain, sid, ctx.data)
+        done = sum(1 for i in items if progress.item_complete(i, ctx.data))
         row, action = st.columns([5, 1], vertical_alignment="center")
-        outstanding = per_section.get(section, 0)
-        if section == "claims":
-            detail = (f"{stats['claims_done']} of {stats['claims']} Claims complete")
-        elif outstanding:
-            detail = f"{outstanding} item{'s' if outstanding != 1 else ''} incomplete"
-        else:
-            detail = "Complete"
-        row.markdown(f"{STATUS_MARK[states[section]]}  **"
-                     f"{progress.SECTION_LABEL[section]}** — {detail}")
-        with action:
-            st.button("Open", key=f"open_sec|{section}", width="stretch",
-                      on_click=_go_to_section(ctx, section))
+        detail = (f"{done} of {len(items)} items" if items
+                  else "nothing to evaluate in this Source")
+        row.markdown(f"{MARK[states[section]]} **{progress.SECTION_LABEL[section]}** — {detail}")
+        action.button("Open", key=f"open_sec|{section}", on_click=go_to_section,
+                      args=(ctx, section))
 
-
-ATTENTION_LIMIT = 25
-
-
-def _items_requiring_attention(ctx: Ctx, missing) -> None:
-    st.markdown("#### Items requiring attention")
-    if not missing:
-        st.caption("Nothing is missing. Every applicable criterion has an answer, "
-                   "and every required comment and conditional field is filled.")
-        return
-    st.caption("Complete the following before this paper can be marked complete. "
-               "A **No** answer is not listed here: it is a completed judgment.")
-    titles = _criterion_titles()
-    shown = missing[:ATTENTION_LIMIT]
-    if len(missing) > len(shown):
-        # A paper that has barely been started has every item outstanding, and a
-        # list of two hundred identical cards is not a list anyone reads. The
-        # section summary above already says where the work is; this list earns
-        # its place as the paper nears completion, which is when it is short.
-        st.info(f"Showing the first {len(shown)} of {len(missing)}. Work through "
-                f"the sections above; as the paper nears completion this list "
-                f"becomes the whole of what is left.")
-    for i, item in enumerate(shown):
-        with st.container(border=True):
-            text, action = st.columns([5, 1], vertical_alignment="center")
-            title = titles.get(item.what, "")
-            text.markdown(
-                f"<div style='line-height:1.45'>"
-                f"<span style='opacity:0.72;font-size:0.85rem'>"
-                f"{html.escape(item.where)}</span><br>"
-                f"<strong>{html.escape(item.what)}</strong>"
-                f"{' · ' + html.escape(title) if title else ''}<br>"
-                f"<span style='opacity:0.8'>{html.escape(item.reason)}</span></div>",
-                unsafe_allow_html=True)
-            with action:
-                st.button("Go to item", key=f"goto|{i}", width="stretch",
-                          on_click=_go_to_item(ctx, item))
-
-
-def _go_to_item(ctx: Ctx, item):
-    def callback():
-        st.session_state[f"section|{ctx.review_id}"] = item.section
-        if item.claim_index is not None:
-            st.session_state[f"claim_idx|{ctx.review_id}"] = item.claim_index
-        ui.close_wiki()
-        ui.request_scroll()
-    return callback
-
-
-def _recorded_findings(ctx: Ctx) -> None:
-    """What the evaluator found, as opposed to what they have yet to do."""
-    st.markdown("#### Recorded omissions and defects")
-    st.caption("These are findings you recorded during the evaluation. They do not "
-               "prevent completion.")
-
-    def written(question_key: str, object_id: str) -> str:
-        row = ctx.response(question_key, object_id)
-        return (row.get("answer") or "").strip()
-
-    groups: list[tuple[str, list[str]]] = []
-    for label, question_key, _criterion in RECORDED:
-        text = written(question_key, ctx.source_id)
-        groups.append((label, [text] if text else []))
-
-    # HE-20.b is per claim, so it is gathered rather than read from one row.
-    per_claim = []
-    for claim in ctx.brain.claims_of(ctx.source_id):
-        text = written("CLAIM_HE20B", claim["id"])
-        if text:
-            per_claim.append(f"`{claim['id']}` — {text}")
-    groups.insert(1, ("Missing Concepts (Claim level)", per_claim))
-
-    # Dataset recall records what is missing in its comment, not in a field of
-    # its own, so the finding is the comment beside a negative answer.
-    recall = ctx.response("SOURCE_HE14_3", ctx.source_id)
-    dataset_finding = []
-    if (recall.get("answer") or "") in spec.NEGATIVE:
-        dataset_finding = [(recall.get("comment_evidence") or "").strip()
-                           or "_Recorded as incomplete, with no detail given._"]
-    groups.insert(3, ("Missing Dataset nodes", dataset_finding))
-
-    if not any(entries for _, entries in groups):
-        st.caption("You have recorded no omissions or defects for this paper.")
-        return
-    for label, entries in groups:
-        with st.expander(f"{label} ({len(entries)})"):
-            if not entries:
-                st.caption("None recorded.")
-            for entry in entries:
-                st.markdown(entry)
-
-
-def _evaluation_overview(ctx: Ctx) -> None:
-    """The answers as recorded, collapsed. Not a second chance to change them."""
-    st.markdown("#### Evaluation overview")
-    st.caption("What you have recorded so far, section by section. Open a section "
-               "to read it back; change anything from the section itself.")
-
-    states = progress.section_states(ctx.brain, ctx.source_id, ctx.responses,
-                                     ctx.edge_responses)
-    gathered = {
-        "source": progress.source_items(ctx.brain, ctx.source_id, ctx.responses),
-        "datasets": progress.dataset_items(ctx.brain, ctx.source_id, ctx.responses),
-        "cites": progress.cites_items(ctx.brain, ctx.source_id, ctx.responses),
-        "recall": progress.recall_items(ctx.brain, ctx.source_id, ctx.responses),
-    }
-    # In the order the evaluator worked, which is the order of the section bar.
-    for section in progress.SECTION_IDS:
-        if section == "review":
-            continue
-        if section == "claims":
-            _claims_overview(ctx, states)
-            continue
-        items = progress.applicable(gathered[section])
-        done = sum(1 for i in items if progress.item_complete(i, ctx.responses))
-        with st.expander(f"{STATUS_MARK[states[section]]}  "
-                         f"{progress.SECTION_LABEL[section]} · {done}/{len(items)}"):
-            _answer_table(ctx, items)
-
-
-def _claims_overview(ctx: Ctx, states) -> None:
-    """One row per claim, as the workbook's Summary tab does.
-
-    Fifteen criteria for every claim would reproduce the whole evaluation, which
-    is exactly what this page exists not to do.
-    """
-    claims = ctx.brain.claims_of(ctx.source_id)
-    done = sum(1 for c in claims
-               if progress.claim_complete(ctx.brain, ctx.source_id, c["id"],
-                                          ctx.responses, ctx.edge_responses))
-    with st.expander(f"{STATUS_MARK[states['claims']]}  "
-                     f"{progress.SECTION_LABEL['claims']} · {done}/{len(claims)} "
-                     f"Claims complete"):
-        for index, claim in enumerate(claims):
-            claim_done, claim_total = progress.claim_progress(
-                ctx.brain, ctx.source_id, claim["id"], ctx.responses,
-                ctx.edge_responses)
-            state = (progress.COMPLETE if claim_done == claim_total
-                     else progress.INCOMPLETE if claim_done else progress.AVAILABLE)
+    if missing:
+        st.markdown("#### Items requiring an answer")
+        for n, item in enumerate(missing[:30]):
             row, action = st.columns([5, 1], vertical_alignment="center")
-            row.markdown(f"{STATUS_MARK[state]}  `{claim['id']}` · "
-                         f"{claim_done}/{claim_total} items")
-            with action:
-                st.button("Open", key=f"open_claim|{claim['id']}", width="stretch",
-                          on_click=_go_to_claim_from_review(ctx, index))
+            row.markdown(f"{html.escape(item.where)} · **{html.escape(item.what)}** — "
+                         f"{html.escape(item.reason)}")
+            action.button("Go", key=f"goto|{n}", on_click=go_to_section,
+                          args=(ctx, item.section, item.claim_index, item.dataset_index))
+        if len(missing) > 30:
+            st.caption(f"{len(missing) - 30} more not listed.")
+
+    st.markdown("#### Answers")
+    st.caption("Answers that record a problem in the Brain output are marked "
+               "“flagged”.")
+    _review_claims(ctx)
+    _review_datasets(ctx)
+    _review_recall(ctx)
+    _completion(ctx, missing)
 
 
-def _go_to_claim_from_review(ctx: Ctx, index: int):
-    def callback():
-        st.session_state[f"section|{ctx.review_id}"] = "claims"
-        st.session_state[f"claim_idx|{ctx.review_id}"] = index
-        ui.close_wiki()
-        ui.request_scroll()
-    return callback
+def _shown(question: spec.Question, answer: str) -> str:
+    if not answer:
+        return "_Not answered_"
+    label = {spec.Q14_NONE_MISSING: "No additional Concepts are missing",
+             spec.Q14_MISSING: "Missing Concepts recorded"}.get(answer, answer)
+    return f"**{html.escape(label)}**" + (" — flagged" if spec.problem(question, answer) else "")
 
 
-def _answer_table(ctx: Ctx, items) -> None:
-    if not items:
-        st.caption("Nothing applies in this section.")
-        return
-    for item in items:
-        row = ctx.response(item.question.question_key, item.object_id)
-        answer = (row.get("answer") or "").strip()
-        if row.get("applicability") == spec.AUTO_NA:
-            shown = "_Not applicable_"
-        elif not answer:
-            shown = "_Not answered_"
-        elif item.question.free_text:
-            shown = answer
-        else:
-            shown = f"**{answer}**"
-        left, right = st.columns([1, 3], gap="small")
-        left.markdown(f"`{item.question.criterion_id}`")
-        right.markdown(shown)
+def _with_comment(text: str, comment: str) -> str:
+    return text + (f"  \n{html.escape(comment)}" if (comment or "").strip() else "")
 
 
-def _completion(ctx: Ctx, missing, review: dict) -> None:
+def _review_claims(ctx: Ctx) -> None:
+    brain, sid, data = ctx.brain, ctx.source_id, ctx.data
+    claims = brain.claims_of(sid)
+    states = progress.claim_states(brain, sid, data)
+    for index, claim in enumerate(claims):
+        cid = claim["id"]
+        done, total = progress.claim_progress(brain, sid, cid, data)
+        with st.expander(f"{MARK[states[cid]]} {index + 1}. {cid} · {done}/{total}"):
+            st.caption(claim.get("statement", ""))
+            for question in spec.claim_scalar_questions():
+                if question is spec.Q14:
+                    continue
+                record = data.response(question.key, cid)
+                text = _shown(question, record.get("answer", ""))
+                if record.get("related_claim_id"):
+                    text += f" · restates {record['related_claim_id']}"
+                st.markdown(f"{question.title}: " + _with_comment(text, record.get("comment", "")))
+            for question, ids in ((spec.Q12, brain.concepts_of_claim(cid)),
+                                  (spec.Q13, brain.candidates_of_claim(cid))):
+                for concept_id in ids:
+                    record = data.concept(question.key, cid, concept_id)
+                    st.markdown(f"{question.title} · {concept_label(concept_id)}: "
+                                + _with_comment(_shown(question, record.get("answer", "")),
+                                                record.get("comment", "")))
+            state = data.response(spec.Q14.key, cid).get("answer", "")
+            st.markdown(f"{spec.Q14.title}: {_shown(spec.Q14, state)}")
+            existing, proposed = progress.q14_selection(data, cid)
+            for row in existing:
+                st.markdown(f"- Selected: {concept_label(row['concept_id'])} "
+                            f"({family_label(row.get('concept_family', ''))})")
+            for row in proposed:
+                st.markdown(f"- Proposed: {html.escape(row['name'])} "
+                            f"({family_label(row['family'])})"
+                            + (f" — {html.escape(row['explanation'])}"
+                               if row.get("explanation") else ""))
+            for relation in brain.relations_from_claim(cid):
+                record = data.relation(relation["key"])
+                label = (f"{spec.value_label(relation['type'])} → {relation['to']} "
+                         f"({spec.value_label(relation.get('grounding', ''))})")
+                for question in spec.relation_questions():
+                    st.markdown(
+                        f"{question.title} · {label}: " + _with_comment(
+                            _shown(question, record.get(f"{question.column}_answer", "")),
+                            record.get(f"{question.column}_comment", "")))
+            st.button("Open Claim", key=f"open_claim|{cid}", on_click=go_to_section,
+                      args=(ctx, "claims", index))
+
+
+def _review_datasets(ctx: Ctx) -> None:
+    ids = ctx.brain.dataset_ids_of(ctx.source_id)
+    for index, did in enumerate(ids):
+        with st.expander(f"Dataset · {ctx.brain.dataset(did).get('name', did)}"):
+            for question in spec.dataset_questions():
+                record = ctx.data.response(question.key, did)
+                st.markdown(f"{question.title}: " + _with_comment(
+                    _shown(question, record.get("answer", "")), record.get("comment", "")))
+            st.button("Open Dataset", key=f"open_ds|{did}", on_click=go_to_section,
+                      args=(ctx, "datasets", None, index))
+
+
+def _review_recall(ctx: Ctx) -> None:
+    record = ctx.data.response(spec.RECALL.key, ctx.source_id)
+    with st.expander("Claim recall", expanded=True):
+        st.markdown(f"{spec.RECALL.title}: {_shown(spec.RECALL, record.get('answer', ''))}")
+        if spec.child_visible(spec.MISSING_CLAIMS, record.get("answer", "")):
+            text = ctx.data.response(spec.MISSING_CLAIMS.key, ctx.source_id).get("answer", "")
+            st.markdown(f"{spec.MISSING_CLAIMS.title}:")
+            st.markdown(html.escape(text) if text.strip() else "_Not answered_")
+
+
+def _completion(ctx: Ctx, missing) -> None:
     st.divider()
     if ctx.locked:
-        st.info("This paper has been finally submitted. It is read-only.")
+        st.info("This paper has been submitted. Answers are read-only.")
         return
-
-    read_confirmed = bool(review.get("pdf_read_confirmed"))
-    if not read_confirmed:
-        st.error("You have not confirmed reading the full paper.")
-
-    st.markdown("#### Paper status")
-    complete = review.get("status") == store.STATUS_COMPLETE
-    if complete:
-        st.success("**Complete.** You can still change any answer until the final "
-                   "submission of this phase, which locks every paper together.")
-        if st.button("Reopen for editing"):
-            store.unmark_complete(ctx.review_id)
-            st.rerun()
+    review = store.get_review(ctx.review_id) or {}
+    if review.get("status") == store.STATUS_COMPLETE:
+        st.success("This paper is marked complete. It stays editable until you submit "
+                   "the phase; any change returns it to in progress.")
         return
-
-    ready = not missing and read_confirmed
-    if ready:
-        st.markdown("**Ready to complete** — all required evaluation fields are "
-                    "filled. You may still return to any section and revise your "
-                    "responses before marking the paper complete.")
-    else:
-        st.markdown(f"**Incomplete** — {len(missing)} required item"
-                    f"{'s' if len(missing) != 1 else ''} still need"
-                    f"{'' if len(missing) != 1 else 's'} attention.")
-
-    if st.button("Mark paper complete", type="primary", disabled=not ready):
-        # The one place that waits for storage. Everything shown above came from
-        # the session's cache; before recording a claim about the answers, get
-        # them into storage and then read them back, because the claim is about
-        # what is stored and not about what this browser remembers.
+    if st.button("Mark paper complete", type="primary", disabled=bool(missing)):
         with st.spinner("Saving your last answers…"):
-            settled, outstanding, detail = ui.settle()
-        if not settled:
-            st.error(
-                f"{outstanding} answer(s) are not yet stored, so the paper was not "
-                f"marked complete. They are kept and retried — nothing is lost. "
-                + (f"Last error: {detail}" if detail else "Try again in a moment.")
-            )
+            ok, outstanding, detail = ui.settle()
+        if not ok:
+            ui.hold(f"{outstanding} answer(s) are not yet stored, so the paper was not "
+                    f"marked complete. They are kept and retried. {detail}")
+            st.rerun()
+        ctx.refresh()
+        remaining = progress.missing_items(ctx.brain, ctx.source_id, ctx.data)
+        if remaining:
+            ui.hold(f"After re-reading the stored answers, {len(remaining)} item(s) are "
+                    f"still missing. Nothing was marked complete.")
         else:
-            ctx.refresh()          # re-read: bypasses the session cache
-            still_missing = progress.missing_items(
-                ctx.brain, ctx.source_id, ctx.responses, ctx.edge_responses)
-            if still_missing:
-                ui.hold(
-                    f"{len(still_missing)} item(s) are still missing once the stored "
-                    f"answers are re-read, so the paper was not marked complete. "
-                    f"The list above has been refreshed from storage."
-                )
-                st.rerun()
-            else:
-                store.mark_complete(ctx.review_id)
-                st.rerun()
-    st.caption("Marking a paper complete does not lock it. Final submission happens "
-               "once, from the paper list, so you can revisit earlier papers as your "
-               "judgment settles across the set.")
-
-
-EVALUATION_STANDARD = (
-    "**How to judge.** Ask whether the output is a *defensible* reconstruction or "
-    "classification under the schema — not whether you would have coded it identically. "
-    "Where another reading would also be plausible, a defensible choice is not a failure. "
-    "Use **In part** when something is partly right, and say in the comment exactly what "
-    "is wrong or missing."
-)
+            store.mark_complete(ctx.review_id)
+        st.rerun()
 
 
 RENDERERS = {
     "source": source_section,
     "claims": claims_section,
     "datasets": datasets_section,
-    "cites": cites_section,
     "recall": recall_section,
     "review": review_section,
 }

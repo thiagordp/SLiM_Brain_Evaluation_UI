@@ -1,3 +1,9 @@
+> **Historical — v3 round only.** This is the allocation of the 50-Source Brain
+> evaluated with instrument 3.0. It is not read by any tool. The current round's
+> allocation is `app/data/allocation/ROUND-2026-01.yaml`, validated and expanded
+> by `app/tools/build_assignments.py`. The Brain's `tools/make_eval_splits.py`
+> belongs to the same era and is not a supported way to allocate a round.
+
 
 ## Set di agreement (una coppia ciascuno)
 

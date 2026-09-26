@@ -1,0 +1,8 @@
+# The evaluation round this checkout serves.
+#
+# One round is one fresh Google Sheets workbook. The workbook id is never
+# written here: it comes from GOOGLE_SHEET_ID (environment or Streamlit
+# secrets). HE_ROUND_ID, when set, overrides round_id below.
+round_id: ROUND-2026-01
+allocation: allocation/ROUND-2026-01.yaml
+manifest: manifest.yaml

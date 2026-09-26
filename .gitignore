@@ -19,12 +19,8 @@ id_rsa*
 .env
 .env.*
 
-# Local development store. Not used when Google Sheets is configured, and never
-# a safe live store on Streamlit Community Cloud. The -wal, -shm and -journal
-# companions matter as much as the file itself: committing one without the
-# others yields a database that will not open.
-app/data/evaluations.sqlite
-app/data/evaluations.sqlite-*
+# Google Sheets is the only evaluation store. No local database file belongs in
+# the repository; these patterns keep a stray one from an old checkout out.
 *.sqlite
 *.sqlite-*
 *.db
@@ -33,16 +29,25 @@ app/data/evaluations.sqlite-*
 # Splitter. Keeping them out holds the deployment under 5 MB instead of 58 MB.
 brain/raw/
 
-# Brain projections the app does not read at runtime (see README, five sources).
+# Brain projections the app does not read at runtime (see README, runtime
+# files). brain/schema/ IS tracked: the preflight hashes it against the frozen
+# definitions the evaluators are shown.
 brain/wiki/log.md
 brain/wiki/index.md
 brain/wiki/coverage.md
 brain/wiki/structure.md
+brain/wiki/usage.md
+brain/wiki/usage.jsonl
+brain/wiki/references.jsonl
 brain/wiki/hypotheses.md
 brain/wiki/absences.jsonl
-brain/schema/
 brain/tools/
 brain/.claude/
+
+# Local working copies: the v3-era Brain fixture kept for reference, and the
+# Brain export the current snapshot was copied from (its corpus holds the PDFs).
+brain_v3_legacy/
+new_brain/
 
 # Working documents, not needed by the deployed app
 Conversation_ChatGPT.md

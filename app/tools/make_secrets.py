@@ -42,7 +42,9 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("key_file", type=pathlib.Path,
                         help="the downloaded service-account JSON key")
-    parser.add_argument("--sheet-id", default="", help="the workbook id from its URL")
+    parser.add_argument("--sheet-id", default="", help="the round workbook's id from its URL")
+    parser.add_argument("--round-id", default="",
+                        help="override the round id of app/data/round.yaml (optional)")
     parser.add_argument("--password", default="", help="evaluator password (generated if omitted)")
     parser.add_argument("--admin-secret", default="", help="admin secret (generated if omitted)")
     parser.add_argument("--write", action="store_true",
@@ -73,7 +75,7 @@ def main() -> None:
         f"HE_APP_PASSWORD   = {toml_string(password)}",
         f"HE_ADMIN_SECRET   = {toml_string(admin)}",
         f"GOOGLE_SHEET_ID   = {toml_string(args.sheet_id)}",
-        "HE_REQUIRE_SHEETS = true",
+        *([f"HE_ROUND_ID       = {toml_string(args.round_id)}"] if args.round_id else []),
         "",
         "[gcp_service_account]",
     ]

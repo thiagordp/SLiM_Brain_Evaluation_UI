@@ -28,7 +28,7 @@ def report(passed: bool, message: str) -> bool:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--write", action="store_true",
-                        help="append and delete a test row to prove write access")
+                        help="write and remove a temporary tab to prove write access")
     args = parser.parse_args()
 
     print("Google Sheets configuration\n")
@@ -85,59 +85,51 @@ def main() -> None:
         print("        and confirm the id is the part of the URL between /d/ and /edit.")
         sys.exit(1)
 
-    # 5. tabs
+    # 5. what the workbook holds
     try:
-        workbook.ensure_tabs()
-        existing = [w.title for w in book.worksheets()]
-        report(all(tab in existing for tab in sheets.ALL_TABS),
-               f"tabs present: {', '.join(sheets.ALL_TABS)}")
-        print(f"        worksheets: {', '.join(existing)}")
+        existing = workbook.tab_titles()
     except Exception as error:
-        report(False, f"could not create/verify tabs (write access?): {error}")
+        report(False, f"could not list the tabs: {error}")
         sys.exit(1)
+    print(f"        worksheets: {', '.join(existing)}")
+    ours = [tab for tab in sheets.ALL_TABS if tab in existing]
+    if not ours:
+        report(True, "the workbook holds no round yet — ready for "
+                     "`python app/tools/bootstrap_round.py`")
+    else:
+        import store
 
-    # 6. read
-    try:
-        counts = {tab: len(workbook.read_tab(tab)) for tab in sheets.ALL_TABS}
-        report(True, "read every tab")
-        for tab, count in counts.items():
-            print(f"        {tab}: {count} data rows")
-    except Exception as error:
-        report(False, f"could not read a tab: {error}")
-        sys.exit(1)
-
-    # 7. optional write round-trip
-    if args.write:
-        probe = "__connection_test__"
+        store.use_workbook(workbook)
         try:
-            workbook.append_rows(sheets.RESPONSES, [{
-                "response_key": probe, "review_id": probe, "answer": "Yes",
-                "comment_evidence": "written by check_sheets.py",
-            }])
-            rows = workbook.read_tab(sheets.RESPONSES)
-            index = sheets.row_index(rows, sheets.RESPONSES)
-            found = probe in index
-            report(found, "appended a test row")
-            if found:
-                workbook.update_row(sheets.RESPONSES, index[probe], {
-                    "response_key": probe, "review_id": probe, "answer": "No",
-                    "comment_evidence": "updated",
-                })
-                after = {r["response_key"]: r["answer"]
-                         for r in workbook.read_tab(sheets.RESPONSES)}
-                report(after.get(probe) == "No", "updated that row in place")
-                book.worksheet(sheets.RESPONSES).delete_rows(index[probe])
-                remaining = sheets.row_index(
-                    workbook.read_tab(sheets.RESPONSES), sheets.RESPONSES)
-                report(probe not in remaining, "removed the test row")
+            store.check_ready()
+            meta = store.round_metadata()
+            report(True, f"round {meta.get('round_id')} · instrument "
+                         f"{meta.get('eval_spec_version')} · definitions "
+                         f"{meta.get('definitions_id')}")
+        except Exception as error:
+            report(False, f"the round tabs are incomplete or wrongly shaped: {error}")
+            sys.exit(1)
+
+    # 6. optional write round-trip, on a temporary tab — never on a round tab
+    if args.write:
+        probe = "_connection_test"
+        try:
+            if probe in existing:
+                workbook.delete_tab(probe)
+            workbook.create_tab(probe)
+            sheet = book.worksheet(probe)
+            sheet.update("A1", [["written by check_sheets.py"]])
+            report(sheet.acell("A1").value == "written by check_sheets.py",
+                   "wrote and read back a cell on a temporary tab")
+            workbook.delete_tab(probe)
+            report(True, "removed the temporary tab")
         except Exception as error:
             report(False, f"write round-trip failed: {error}")
             sys.exit(1)
 
-    print("\nGoogle Sheets is configured. The app will use it automatically:")
-    print("  streamlit run app/streamlit_app.py")
+    print("\nGoogle Sheets access is configured.")
     if not args.write:
-        print("\nRe-run with --write to prove write access before the evaluators start.")
+        print("Re-run with --write to prove write access before the evaluators start.")
 
 
 if __name__ == "__main__":
