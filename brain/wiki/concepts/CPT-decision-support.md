@@ -32,6 +32,9 @@ The legal task of assisting a human decision-maker with retrieval, analysis and 
 - Large language models may be sensitive to input perturbation, so that legal consultation responses can be contradictory when inputs differ only slightly, or even when an identical question is asked in a new conversation; this inconsistency can potentially confuse users and result in a lower-quality consultation. — rests on literature (SRC-0014). [CLM-0014-002]
 - Relevant legal cases can offer users more in-depth reference information when large language models fail to produce coherent and complete responses, yet a legal case retrieval module has rarely been integrated into existing legal-domain large language models in civil law systems. — rests on literature (SRC-0014). [CLM-0014-003]
 - Legal terminology may sometimes be embedded in large language models' legal-advice responses without sufficient explanations, posing potential understanding difficulties for users without domain knowledge. — rests on literature (SRC-0014). [CLM-0014-008]
+- For AI to function reliably in judicial decision-making, it must overcome a set of core challenges: selecting the correct legal framework across jurisdictions, generating sound arguments based on the doctrine of the sources of law, distinguishing ratio decidendi from obiter dicta in case law, resolving ambiguity arising from general clauses such as 'reasonableness', managing conflicting legal provisions, and applying the burden of proof correctly. — rests on abstract considerations (SRC-0026). [CLM-0026-002]
+- While AI can be a powerful tool in the initial issue-discovery phase of legal reasoning, its greatest challenges and potential lie in the two demanding phases of selecting the correct rule and applying it to the facts of the case, where the highest standards of judicial reasoning are required. — rests on abstract considerations (SRC-0026). [CLM-0026-004]
+- Establishing the relevant facts of a case is a precondition for identifying the legal issue and determining the applicable law; issues of evidence and law may be intertwined, evidence presented during court proceedings can lead to a situation where the applicable rules change, and there is thus a continuous interaction between the facts and rules that can be difficult for AI to follow. — rests on abstract considerations (SRC-0026). [CLM-0026-016]
 
 **undetermined**
 
@@ -47,6 +50,8 @@ The legal task of assisting a human decision-maker with retrieval, analysis and 
 **general**
 
 - Large language models occupy an intermediate position in Islamic legal reasoning: they assist juristic research through retrieval, organization, and structured reasoning, yet they cannot assume the epistemic or ethical responsibilities that shape Islamic legal judgment, and therefore cannot take the role of a mufti or a mujtahid. — rests on literature (SRC-0003). [CLM-0003-001]
+- A neuro-symbolic system is a feasible approach to resolving high-volume, low-complexity disputes such as consumer product-defect small claims: an LLM layer operates as an observation engine that reads unstructured inputs and proposes structured facts, while a symbolic layer performs the determinative legal reasoning by handling curated rules and decision tables, a division that delivers both coverage over unstructured inputs and transparent, auditable decisions aligned with core legal maxims. — rests on abstract considerations (SRC-0026). [CLM-0026-021]
+- The most effective current role for AI in law can be understood through a dual-application model: as a high-volume assistant for simple cases — where, with only a few points to consider, LLMs can already work well with today's techniques — and as a sophisticated 'sparring partner' for experts in complex matters, where the LLM is not an adjudicator but an invaluable collaborator for the human lawyer or judge, helping to stress-test arguments and enhance the coherence of a legal strategy. — rests on abstract considerations (SRC-0026). [CLM-0026-023]
 
 ### Prescriptive
 
@@ -54,6 +59,9 @@ The legal task of assisting a human decision-maker with retrieval, analysis and 
 
 - Large language models should be deployed in Islamic legal settings as supervised accelerators and synthesizers — assisting retrieval, classification, and preliminary analysis — with domain experts setting the frame, checking the steps, and making the rulings, leaving authoritative judgments to qualified jurists. — rests on abstract considerations (SRC-0003). [CLM-0003-008]
 - LLM systems in legal settings should support, not replace, human legal judgment, and automated evaluation of legal reasoning should be validated against, not substituted for, expert assessment. — rests on factual basis (SRC-0020). [CLM-0020-020]
+- AI-assisted adjudication must include system-design features for procedural fairness: audit trails recording all inputs, outputs and intermediate reasoning steps of the AI as a discoverable record — a legal necessity if AI outputs are to be contestable evidence in court; clear disclosure to the parties of an AI system's role in judicial decisions; and contestability with human oversight, so that there is always an avenue for a human decision-maker to review and, if necessary, override the AI's output. — rests on abstract considerations (SRC-0026). [CLM-0026-019]
+- A framework for judicial AI should organize requirements into four categories — normative and procedural values; doctrinal and reasoning constraints; fact-finding and evidential requirements; and system-level technical properties — scope them to concrete legal domains, specify an operational design obligation for each requirement, and make those obligations testable through benchmark tasks and metrics, with deployment acceptable only if minimum thresholds are met on a bundle of doctrinal, transparency, evidential and procedural metrics. — rests on abstract considerations (SRC-0026). [CLM-0026-022]
+- Adoption of AI in adjudication should be staged: first capturing efficiency in simple cases with technology already available today, and thereafter sustaining long-term investment in new methods that handle hierarchy, temporality, and other requirements of legally sound reasoning, thus enabling expansion to complex adjudication in the future; the successful automation of high-volume, procedurally simple cases has the potential to free up significant human resources for more complex legal challenges. — rests on abstract considerations (SRC-0026). [CLM-0026-024]
 
 ### Predictive
 
@@ -75,17 +83,19 @@ No extracted disagreement is recorded: every ATTACKS edge touching these claims 
 - SRC-0003 holds “A retrieval-augmented fatwa system's source-based response places substantial weight on the inquirer, leaving source verification and …” [CLM-0003-007]; SRC-0014 holds “Allowing users to interactively select the legal articles a legal large language model uses improves the accuracy and completeness of its …” [CLM-0014-005]. Note: That leaving source relevance and verification to the inquirer's judgment is a weight and a bias risk gives a reason against expecting lay article selection to yield accurate advice.
 - SRC-0014 holds “Even when legal large language models are combined with legal article retrieval components, the advice given can still be incorrect or …” [CLM-0014-001]; SRC-0016 holds “A retrieval-augmented generation method that preserves the structure of legal texts — dividing a legal document into its pre-defined …” [CLM-0016-006]. Note: The finding that legal article retrieval cannot ensure all relevant articles are retrieved and that retrieved noise leads models to incomplete or incorrect responses gives reasons against the claim that a retrieval-augmented method ensures accurate retrieval and interpretation of relevant provisions.
 - SRC-0021 holds “Monolithic large language models are relatively robust to linguistic variation in legal case descriptions: paraphrasing tax cases while …” [CLM-0021-007]; SRC-0014 holds “Large language models may be sensitive to input perturbation, so that legal consultation responses can be contradictory when inputs differ …” [CLM-0014-002]. Note: The finding that monolithic LLMs remain stable under semantics-preserving paraphrases of legal case descriptions gives a reason against the contention that slightly differing inputs make LLM legal responses contradictory, at least for purely linguistic variation.
+- SRC-0024 holds “Having a human in the loop to review the conclusions reached by a large language model does not make an agency's action reasonable, since the human …” [CLM-0024-022]; SRC-0026 holds “AI-assisted adjudication must include system-design features for procedural fairness: audit trails recording all inputs, outputs and intermediate …” [CLM-0026-019]. Note: The claim that a human in the loop cannot recreate or verify a model's reasoning and so does not make reliance on it reasonable gives reasons against human review and override sufficing as a procedural-fairness safeguard.
 
 ## The spread
 
 | paper | year | claims | by type | by basis | jurisdictions |
 |---|---|---|---|---|---|
 | SRC-0003 | 2026 | 2 | 1 interpretative, 1 prescriptive | 1 literature, 1 abstract | general |
-| SRC-0007 | 2026 | 3 | 3 descriptive | 2 factual, 1 abstract | general, undetermined |
+| SRC-0007 | 2026 | 3 | 3 descriptive | 2 factual, 1 abstract | undetermined, general |
 | SRC-0009 | 2025 | 1 | 1 interpretative | 1 factual | EU |
 | SRC-0012 | 2025 | 3 | 2 descriptive, 1 predictive | 2 factual, 1 abstract | CN, general |
 | SRC-0014 | unknown | 8 | 8 descriptive | 5 factual, 3 literature | CN, general |
 | SRC-0020 | 2025 | 2 | 1 prescriptive, 1 predictive | 2 factual | general, undetermined |
+| SRC-0026 | 2026 | 8 | 3 descriptive, 3 prescriptive, 2 interpretative | 8 abstract | general |
 
 ## What is missing
 

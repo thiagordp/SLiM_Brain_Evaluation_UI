@@ -83,6 +83,7 @@ The systematic design of prompts for large language models — instructions, rol
 
 - Prompt engineering functions as a form of 'soft programming' that can replace complex feature extraction pipelines or rigid rule-based frameworks, placing prompts at the core of any LLM-driven compliance automation system and motivating the need to treat them as first-class artifacts in the design of legal analysis tools. — rests on abstract considerations (SRC-0001). [CLM-0001-009]
 - Carefully designed prompts can serve as the primary mechanism for guiding legal reasoning in LLM-based systems, offering a scalable, explainable, and cost-effective solution for continuous compliance assessment under evolving regulations such as the GDPR. — rests on factual basis (SRC-0001). [CLM-0001-013]
+- The principle of procedural fairness dictates that if an AI's output is to be used as evidence or to support a judicial decision, the process that generated that output must be transparent and open to challenge: the specific prompt used to generate a legal analysis becomes a piece of discoverable evidence, and the choice of a particular AI model is a methodological decision comparable to an expert witness selecting a specific scientific instrument, necessitating a transparency that extends beyond the final output to the entire generative process. — rests on abstract considerations (SRC-0026). [CLM-0026-017]
 
 **undetermined**
 
@@ -128,18 +129,19 @@ No extracted disagreement is recorded: every ATTACKS edge touching these claims 
 | SRC-0004 | unknown | 3 | 2 descriptive, 1 predictive | 2 factual, 1 abstract | KR, general |
 | SRC-0007 | 2026 | 1 | 1 descriptive | 1 factual | undetermined |
 | SRC-0010 | unknown | 1 | 1 descriptive | 1 factual | general |
-| SRC-0011 | 2025 | 2 | 2 descriptive | 1 literature, 1 factual | CN, general |
+| SRC-0011 | 2025 | 2 | 2 descriptive | 1 literature, 1 factual | general, CN |
 | SRC-0012 | 2025 | 1 | 1 descriptive | 1 factual | undetermined |
-| SRC-0015 | unknown | 1 | 1 descriptive | 1 factual | MY+AU |
-| SRC-0017 | 2024 | 7 | 7 descriptive | 3 abstract, 1 literature, 3 factual | DE, general |
+| SRC-0015 | unknown | 1 | 1 descriptive | 1 factual | MY, AU |
+| SRC-0017 | 2024 | 7 | 7 descriptive | 3 abstract, 1 literature, 3 factual | general, DE |
 | SRC-0018 | 2024 | 1 | 1 prescriptive | 1 factual | US |
 | SRC-0019 | 2025 | 3 | 1 descriptive, 1 interpretative, 1 predictive | 1 abstract, 2 literature | US |
 | SRC-0020 | 2025 | 2 | 1 descriptive, 1 interpretative | 2 factual | undetermined |
 | SRC-0023 | unknown | 2 | 1 descriptive, 1 interpretative | 2 factual | NL |
+| SRC-0026 | 2026 | 1 | 1 interpretative | 1 abstract | general |
 
 ## What is missing
 
-Absence records whose key names this concept (7, computed by `tools/absences.py`). Each is `unresolved` between its three readings — `gap_in_literature` (nobody in the field has written it), `extraction_shadow` (somebody has, and this corpus or extraction missed it), `tacit_link` (so obvious to the field that nobody states it) — which only a person may resolve.
+Absence records whose key names this concept (10, computed by `tools/absences.py`). Each is `unresolved` between its three readings — `gap_in_literature` (nobody in the field has written it), `extraction_shadow` (somebody has, and this corpus or extraction missed it), `tacit_link` (so obvious to the field that nobody states it) — which only a person may resolve.
 
 - ABS-0565 — `concept_pair:CPT-dataset-license-compliance|CPT-prompt-engineering` — No claim links CPT-dataset-license-compliance to CPT-prompt-engineering. (reading: unresolved — gap_in_literature | extraction_shadow | tacit_link)
 - ABS-0580 — `concept_pair:CPT-decision-support|CPT-prompt-engineering` — No claim links CPT-decision-support to CPT-prompt-engineering. (reading: unresolved — gap_in_literature | extraction_shadow | tacit_link)
@@ -148,6 +150,9 @@ Absence records whose key names this concept (7, computed by `tools/absences.py`
 - ABS-0646 — `concept_pair:CPT-legal-education|CPT-prompt-engineering` — No claim links CPT-legal-education to CPT-prompt-engineering. (reading: unresolved — gap_in_literature | extraction_shadow | tacit_link)
 - ABS-0665 — `concept_pair:CPT-review-and-due-diligence|CPT-prompt-engineering` — No claim links CPT-review-and-due-diligence to CPT-prompt-engineering. (reading: unresolved — gap_in_literature | extraction_shadow | tacit_link)
 - ABS-0683 — `concept_pair:CPT-rulemaking|CPT-prompt-engineering` — No claim links CPT-rulemaking to CPT-prompt-engineering. (reading: unresolved — gap_in_literature | extraction_shadow | tacit_link)
+- ABS-0701 — `concept_pair:CPT-burden-of-proof|CPT-prompt-engineering` — No claim links CPT-burden-of-proof to CPT-prompt-engineering. (reading: unresolved — gap_in_literature | extraction_shadow | tacit_link)
+- ABS-0718 — `concept_pair:CPT-evidence-evaluation|CPT-prompt-engineering` — No claim links CPT-evidence-evaluation to CPT-prompt-engineering. (reading: unresolved — gap_in_literature | extraction_shadow | tacit_link)
+- ABS-0734 — `concept_pair:CPT-legal-framework-selection|CPT-prompt-engineering` — No claim links CPT-legal-framework-selection to CPT-prompt-engineering. (reading: unresolved — gap_in_literature | extraction_shadow | tacit_link)
 
 ## Open questions
 

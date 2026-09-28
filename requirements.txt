@@ -1,5 +1,7 @@
 # HE Evaluation Interface
-streamlit>=1.40
+# Pinned to the tested version: the evaluation UI must not change under the
+# evaluators because Streamlit released a new minor version.
+streamlit>=1.63,<1.64
 pandas>=2.0
 PyYAML>=6.0
 

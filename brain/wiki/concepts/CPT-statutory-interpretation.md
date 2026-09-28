@@ -40,6 +40,7 @@ Interpretation whose object is legislation. An anchor concept, given in advance 
 **general**
 
 - There is a gap in the literature regarding the efficacy of large language models in specialized legal domains, which a comparison of model performance in interpreting the EU VAT Directive addresses. — rests on literature (SRC-0002). [CLM-0002-010]
+- A reliable AI must construct its legal reasoning by starting with the literal wording of the provision and interpreting it in light of the legislator's purpose, sourcing that purpose from preparatory works and verifying whether Parliament amended the final law — in which case the reasoning in a parliamentary committee report supersedes the original preamble; this demands a structured comparison and logical inferencing about the significance of textual differences between legislative drafts, a higher-order reasoning capability that current LLMs often lack, leading to the risk of overlooking critical changes or hallucinating their importance. — rests on abstract considerations (SRC-0026). [CLM-0026-014]
 
 ### Interpretative
 
@@ -52,6 +53,10 @@ Interpretation whose object is legislation. An anchor concept, given in advance 
 - The determination of a legal text's ordinary meaning is not an empirical project: ordinary meaning is a value-laden construct defined in part by the interpreter's judgment of what is reasonable, and textualist analysis of ordinary meaning is no more empirical or fact-based than the judicial search for congressional intent. — rests on abstract considerations (SRC-0019). [CLM-0019-002]
 - The premise that a tool can identify an objectively correct answer about whether a regulation is unlawful is flawed: in many legal contexts, especially when interpreting ambiguous statutory language, there is no objectively correct answer, and agencies initially, and then judges, must choose among multiple competing values and interests and make policy decisions to interpret ambiguous legal language. — rests on abstract considerations (SRC-0024). [CLM-0024-013]
 - Loper Bright v. Raimondo overruled the Chevron doctrine but left many questions unanswered regarding the scope of deference courts owe to agency interpretations of statutes, including when a statute expressly delegates discretionary authority to an agency, how courts should fix the boundaries of delegated authority and ensure reasoned decisionmaking within them, and to what extent courts will continue to apply Skidmore. — rests on legal sources (SRC-0024). [CLM-0024-017]
+
+**general**
+
+- Legal interpretation is not a matter of deductive logic but of constructing a persuasive argument grounded in accepted sources of law, generally accepted legal principles and the rule of law, so traditional symbolic AI is unable to perform interpretation tasks; traditional and quite universal unwritten interpretation maxims — such as exceptio est strictissimae applicationis, lex specialis derogat legi generali and lex posterior derogat legi priori — can be helpful when integrated into LLM prompting and agent architecture, but these maxims alone are insufficient tools in legal adjudication and may have various nuances and strengths in different legal systems and traditions. — rests on abstract considerations (SRC-0026). [CLM-0026-013]
 
 ### Predictive
 
@@ -78,6 +83,7 @@ No extracted disagreement is recorded: every ATTACKS edge touching these claims 
 | SRC-0009 | 2025 | 1 | 1 descriptive | 1 legal | EU |
 | SRC-0019 | 2025 | 1 | 1 interpretative | 1 abstract | US |
 | SRC-0024 | unknown | 6 | 3 descriptive, 2 interpretative, 1 predictive | 3 legal, 2 abstract, 1 literature | US |
+| SRC-0026 | 2026 | 2 | 1 interpretative, 1 descriptive | 2 abstract | general |
 
 ## Open questions
 

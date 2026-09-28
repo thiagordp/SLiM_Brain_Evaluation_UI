@@ -37,7 +37,11 @@ The administrative-law requirement that agencies make decisions reasonably, cons
 
 ## Where papers disagree
 
-No ATTACKS edge touches the claims mapped to this concept.
+No extracted disagreement is recorded: every ATTACKS edge touching these claims is inferred.
+
+### Inferred
+
+- SRC-0024 holds “Having a human in the loop to review the conclusions reached by a large language model does not make an agency's action reasonable, since the human …” [CLM-0024-022]; SRC-0026 holds “AI-assisted adjudication must include system-design features for procedural fairness: audit trails recording all inputs, outputs and intermediate …” [CLM-0026-019]. Note: The claim that a human in the loop cannot recreate or verify a model's reasoning and so does not make reliance on it reasonable gives reasons against human review and override sufficing as a procedural-fairness safeguard.
 
 ## The spread
 

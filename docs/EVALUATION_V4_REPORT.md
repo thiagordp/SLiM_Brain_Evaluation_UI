@@ -503,3 +503,59 @@ operations, not design. In order:
 5. Add the missing UI tests.
 6. Replace the development allocation once the 26th Source is in the Brain,
    then bootstrap the real round into a fresh workbook.
+
+---
+
+## Addendum — evaluator-UI pass (after the UX density pass)
+
+A UI-only pass. It changes no question wording, answer option, completion rule,
+storage, workbook schema, allocation or agreement analysis.
+
+- **Instructions.** Every closed guidance expander is labelled "Instructions",
+  whether its content comes from the schema or a skill. They all start closed.
+- **Q3 and Q4.** Each now carries its extract-claims passage (modality;
+  standalone statement), frozen verbatim.
+  - `extract-claims` joined `SKILLS_USED`, so its hash is part of the
+    provenance.
+  - `definitions_id` changed from `b91c79054a40c224` to `5e893fd56651b365`.
+  - `manifest.yaml` was regenerated. Only that id changed; the allocation is
+    identical.
+- **No Concept definitions in Q12–Q14.** Generated Concept definitions are
+  neither shown nor used for search or ranking. Concepts show name, family and
+  (when not anchor) status.
+- **Grounding.** A short Quick guide (explanatory UI text) above the question.
+  The create-edges rule is under Instructions, word for word.
+- **Sticky Claim panel.**
+  - *First attempt, not shipped:* `position: sticky` on the keyed container
+    alone cannot work. Streamlit wraps each container in an internal
+    `stLayoutWrapper` exactly as tall as the container.
+  - *Shipped, at the user's choice:* the wrapper is made sticky, via
+    `div[data-testid="stLayoutWrapper"]:has(> .st-key-claim_sticky)`. That is
+    the documented keyed class plus Streamlit's test attribute, not a generated
+    class name. It relies on the Streamlit pin, and it degrades to a normal
+    card if a future version changes the wrapper.
+  - *Measured in a browser (1440×900 window, Streamlit 1.63):*
+    - on load the panel is in normal flow below the 60 px header, and the first
+      section starts below it;
+    - scrolled to 800 px, 3,000 px and the page bottom, it stays at 60–152 px
+      and hides the content beneath it;
+    - Next Claim updates it;
+    - ordinary statements show no inner scrollbar; the longest statement in the
+      Brain (100 words) overflows the 20vh cap by 3 px on a 694 px viewport and
+      scrolls internally, with the panel at 23% of the viewport;
+    - dark and light backgrounds are correct on render. After a manual theme
+      switch from the ⋮ menu, the panel keeps the old colour until the next
+      interaction, because Streamlit exposes no theme colours to CSS. A
+      translucent, blurred alternative was tried and rejected, because the text
+      beneath showed through.
+- **The 26th Source.** It arrived on 2026-09-28 (RUN-2026-09-28-01, SRC-0026):
+  - it was added to IND-6 of the development allocation, so every evaluator now
+    has three Individual papers;
+  - the Brain counts in the tests are now read from the Brain files instead of
+    being hard-coded.
+- **Raw Markdown.** The exact wiki file (frontmatter included) is available,
+  read-only and copyable, on the Source page and in the wiki modal.
+- **Streamlit pinned** to the tested `>=1.63,<1.64`.
+
+**Consequence.** The shared test workbook records the old `definitions_id`, so
+the app refuses it until that disposable workbook is re-bootstrapped.

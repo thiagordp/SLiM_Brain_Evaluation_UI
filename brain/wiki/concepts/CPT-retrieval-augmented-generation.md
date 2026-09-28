@@ -31,6 +31,9 @@ The technique of grounding a language model's generation in retrieved documents 
 - The SyLeR framework enables explicit syllogistic legal reasoning in large language models by combining a tree-structured hierarchical retrieval mechanism, which links legal statutes with the precedent cases that apply them to form comprehensive major premises, with a two-stage fine-tuning process: a supervised fine-tuning warm-up on GPT-4o-generated syllogistic reasoning paths, followed by reinforcement learning (Proximal Policy Optimization) with a structure-aware reward that scores the alignment of major premise, minor premise and conclusion and assigns zero reward to outputs deviating from the syllogistic structure. — rests on abstract considerations (SRC-0011). [CLM-0011-009]
 - A retrieval-augmented generation method that preserves the structure of legal texts — dividing a legal document into its pre-defined articles and paragraphs and segmenting each paragraph into overlapping passages for dense retrieval — ensures accurate retrieval and interpretation of relevant provisions and more accurate, contextually aware reasoning. — rests on abstract considerations (SRC-0016). [CLM-0016-006]
 - Reasoning on the compliance of AI tools with variable provisions differs from existing legal AI assistants and legal-reasoning benchmarks: given a large language model instructed to reason only on specific retrieved provisions, the user can select which provisions are considered by selecting those that can be retrieved, for example only laws that apply in the EU, plus provisions applying to the financial sector, plus the user's own ethical guidelines. — rests on abstract considerations (SRC-0016). [CLM-0016-009]
+- Evidence evaluation is difficult to improve with techniques like retrieval-augmented generation because legal evidence pertains to the truthfulness of everyday facts: fine-tuning an LLM with legal corpora does not help it answer whether a certain person was in a certain place at a certain time, and LLMs struggle to evaluate the truthfulness of real-world facts, a task often reliant on human experience and credibility assessments. — rests on abstract considerations (SRC-0026). [CLM-0026-005]
+- To apply general clauses — legal rules deliberately formulated in an imprecise manner using open-textured terms like 'reasonable', 'fair' or 'unconscionable' — AI cannot be a mere legal formalist: an understanding of social norms, ethics and common sense is required; such clauses are especially challenging for LLMs and cannot be solved simply with better information retrieval, as there is no reference material for general clauses in every context, nor by agentic systems, because the open-textured terminology cannot be broken down into well-defined factors. — rests on abstract considerations (SRC-0026). [CLM-0026-009]
+- No single AI technique is a panacea for the demands of legal reasoning; a combination of approaches is required to achieve reliability, transparency and fairness in AI-assisted adjudication, and while techniques such as retrieval-augmented generation, multi-agent systems and neuro-symbolic AI can address specific narrow challenges, they fail to solve the more significant ones that remain, particularly in tasks requiring discretion and transparent, justifiable reasoning. — rests on literature (SRC-0026). [CLM-0026-018]
 
 **undetermined**
 
@@ -77,13 +80,14 @@ No extracted disagreement is recorded: every ATTACKS edge touching these claims 
 | SRC-0004 | unknown | 1 | 1 descriptive | 1 literature | general |
 | SRC-0005 | 2026 | 2 | 1 descriptive, 1 interpretative | 2 abstract | general |
 | SRC-0007 | 2026 | 1 | 1 descriptive | 1 factual | undetermined |
-| SRC-0011 | 2025 | 4 | 1 prescriptive, 3 descriptive | 2 abstract, 2 factual | CN, general, undetermined |
+| SRC-0011 | 2025 | 4 | 1 prescriptive, 3 descriptive | 2 abstract, 2 factual | general, CN, undetermined |
 | SRC-0014 | unknown | 2 | 2 descriptive | 2 factual | CN |
 | SRC-0016 | 2024 | 4 | 1 predictive, 3 descriptive | 4 abstract | general |
+| SRC-0026 | 2026 | 3 | 3 descriptive | 2 abstract, 1 literature | general |
 
 ## What is missing
 
-Absence records whose key names this concept (6, computed by `tools/absences.py`). Each is `unresolved` between its three readings — `gap_in_literature` (nobody in the field has written it), `extraction_shadow` (somebody has, and this corpus or extraction missed it), `tacit_link` (so obvious to the field that nobody states it) — which only a person may resolve.
+Absence records whose key names this concept (7, computed by `tools/absences.py`). Each is `unresolved` between its three readings — `gap_in_literature` (nobody in the field has written it), `extraction_shadow` (somebody has, and this corpus or extraction missed it), `tacit_link` (so obvious to the field that nobody states it) — which only a person may resolve.
 
 - ABS-0567 — `concept_pair:CPT-dataset-license-compliance|CPT-retrieval-augmented-generation` — No claim links CPT-dataset-license-compliance to CPT-retrieval-augmented-generation. (reading: unresolved — gap_in_literature | extraction_shadow | tacit_link)
 - ABS-0613 — `concept_pair:CPT-irac-analysis|CPT-retrieval-augmented-generation` — No claim links CPT-irac-analysis to CPT-retrieval-augmented-generation. (reading: unresolved — gap_in_literature | extraction_shadow | tacit_link)
@@ -91,6 +95,7 @@ Absence records whose key names this concept (6, computed by `tools/absences.py`
 - ABS-0648 — `concept_pair:CPT-legal-education|CPT-retrieval-augmented-generation` — No claim links CPT-legal-education to CPT-retrieval-augmented-generation. (reading: unresolved — gap_in_literature | extraction_shadow | tacit_link)
 - ABS-0667 — `concept_pair:CPT-review-and-due-diligence|CPT-retrieval-augmented-generation` — No claim links CPT-review-and-due-diligence to CPT-retrieval-augmented-generation. (reading: unresolved — gap_in_literature | extraction_shadow | tacit_link)
 - ABS-0685 — `concept_pair:CPT-rulemaking|CPT-retrieval-augmented-generation` — No claim links CPT-rulemaking to CPT-retrieval-augmented-generation. (reading: unresolved — gap_in_literature | extraction_shadow | tacit_link)
+- ABS-0703 — `concept_pair:CPT-burden-of-proof|CPT-retrieval-augmented-generation` — No claim links CPT-burden-of-proof to CPT-retrieval-augmented-generation. (reading: unresolved — gap_in_literature | extraction_shadow | tacit_link)
 
 ## Open questions
 

@@ -1,2 +1,2 @@
 {"id": "RUN-2026-09-25-01", "date": "2026-09-25", "kind": "ingest", "schema_version": "0.1.0", "model": "claude-fable-5", "corpus": {"sources": 25, "claims": 374, "edges": 266}}
-{"id": "RUN-2026-09-26-01", "date": "2026-09-26", "kind": "query", "schema_version": "0.1.0", "model": "claude-opus-5-5", "corpus": {"sources": 25, "claims": 374, "edges": 266}}
+{"id": "RUN-2026-09-28-01", "date": "2026-09-28", "kind": "ingest", "schema_version": "0.1.0", "model": "claude-fable-5", "corpus": {"sources": 26, "claims": 399, "edges": 308}}

@@ -32,6 +32,7 @@ Adapting a pre-trained language model to a domain or task by further training on
 - For a given legal question there may exist multiple valid syllogistic reasoning paths leading to the same conclusion, and annotating diverse reasoning paths for supervised fine-tuning is expensive and labor-intensive, particularly in the legal domain where expert annotation is required. — rests on abstract considerations (SRC-0011). [CLM-0011-006]
 - SyLeR pioneered the explicit incorporation of syllogistic legal reasoning into large language models through reinforcement fine-tuning, enabling a model to generate responses in the format of major premise, minor premise and conclusion. — rests on literature (SRC-0011). [CLM-0011-008]
 - The SyLeR framework enables explicit syllogistic legal reasoning in large language models by combining a tree-structured hierarchical retrieval mechanism, which links legal statutes with the precedent cases that apply them to form comprehensive major premises, with a two-stage fine-tuning process: a supervised fine-tuning warm-up on GPT-4o-generated syllogistic reasoning paths, followed by reinforcement learning (Proximal Policy Optimization) with a structure-aware reward that scores the alignment of major premise, minor premise and conclusion and assigns zero reward to outputs deviating from the syllogistic structure. — rests on abstract considerations (SRC-0011). [CLM-0011-009]
+- Evidence evaluation is difficult to improve with techniques like retrieval-augmented generation because legal evidence pertains to the truthfulness of everyday facts: fine-tuning an LLM with legal corpora does not help it answer whether a certain person was in a certain place at a certain time, and LLMs struggle to evaluate the truthfulness of real-world facts, a task often reliant on human experience and credibility assessments. — rests on abstract considerations (SRC-0026). [CLM-0026-005]
 
 **undetermined**
 
@@ -79,14 +80,15 @@ No extracted disagreement is recorded: every ATTACKS edge touching these claims 
 | SRC-0002 | unknown | 3 | 1 predictive, 2 prescriptive | 2 factual, 1 abstract | EU, general |
 | SRC-0005 | 2026 | 4 | 2 interpretative, 1 descriptive, 1 prescriptive | 4 abstract | general |
 | SRC-0007 | 2026 | 1 | 1 descriptive | 1 factual | undetermined |
-| SRC-0011 | 2025 | 9 | 9 descriptive | 3 literature, 2 abstract, 4 factual | CN, general |
+| SRC-0011 | 2025 | 9 | 9 descriptive | 3 literature, 2 abstract, 4 factual | general, CN |
 | SRC-0012 | 2025 | 2 | 2 descriptive | 2 factual | undetermined |
 | SRC-0014 | unknown | 1 | 1 descriptive | 1 factual | CN |
 | SRC-0022 | unknown | 1 | 1 prescriptive | 1 abstract | general |
+| SRC-0026 | 2026 | 1 | 1 descriptive | 1 abstract | general |
 
 ## What is missing
 
-Absence records whose key names this concept (8, computed by `tools/absences.py`). Each is `unresolved` between its three readings — `gap_in_literature` (nobody in the field has written it), `extraction_shadow` (somebody has, and this corpus or extraction missed it), `tacit_link` (so obvious to the field that nobody states it) — which only a person may resolve.
+Absence records whose key names this concept (10, computed by `tools/absences.py`). Each is `unresolved` between its three readings — `gap_in_literature` (nobody in the field has written it), `extraction_shadow` (somebody has, and this corpus or extraction missed it), `tacit_link` (so obvious to the field that nobody states it) — which only a person may resolve.
 
 - ABS-0546 — `concept_pair:CPT-compliance-and-monitoring|CPT-fine-tuning` — No claim links CPT-compliance-and-monitoring to CPT-fine-tuning. (reading: unresolved — gap_in_literature | extraction_shadow | tacit_link)
 - ABS-0575 — `concept_pair:CPT-decision-support|CPT-fine-tuning` — No claim links CPT-decision-support to CPT-fine-tuning. (reading: unresolved — gap_in_literature | extraction_shadow | tacit_link)
@@ -96,6 +98,8 @@ Absence records whose key names this concept (8, computed by `tools/absences.py`
 - ABS-0638 — `concept_pair:CPT-legal-education|CPT-fine-tuning` — No claim links CPT-legal-education to CPT-fine-tuning. (reading: unresolved — gap_in_literature | extraction_shadow | tacit_link)
 - ABS-0657 — `concept_pair:CPT-review-and-due-diligence|CPT-fine-tuning` — No claim links CPT-review-and-due-diligence to CPT-fine-tuning. (reading: unresolved — gap_in_literature | extraction_shadow | tacit_link)
 - ABS-0676 — `concept_pair:CPT-rulemaking|CPT-fine-tuning` — No claim links CPT-rulemaking to CPT-fine-tuning. (reading: unresolved — gap_in_literature | extraction_shadow | tacit_link)
+- ABS-0694 — `concept_pair:CPT-burden-of-proof|CPT-fine-tuning` — No claim links CPT-burden-of-proof to CPT-fine-tuning. (reading: unresolved — gap_in_literature | extraction_shadow | tacit_link)
+- ABS-0727 — `concept_pair:CPT-legal-framework-selection|CPT-fine-tuning` — No claim links CPT-legal-framework-selection to CPT-fine-tuning. (reading: unresolved — gap_in_literature | extraction_shadow | tacit_link)
 
 ## Open questions
 

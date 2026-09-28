@@ -238,6 +238,7 @@ class Brain:
     source_bodies: dict[str, str]
     concept_bodies: dict[str, str]
     dataset_bodies: dict[str, str]
+    raw_pages: dict                 # (kind, id) -> the page's exact file text
     load_problems: tuple            # (where, what) — surfaced by the preflight
     snapshot_id: str
 
@@ -272,6 +273,10 @@ class Brain:
 
     def source_body(self, source_id: str) -> str:
         return self.source_bodies.get(source_id, "")
+
+    def raw_page(self, kind: str, identifier: str) -> str:
+        """The wiki page exactly as it is on disk, frontmatter included."""
+        return self.raw_pages.get((kind, identifier), "")
 
     def label(self, source_id: str) -> str:
         """`SRC-0006 — Title`: how a paper is named everywhere in the UI."""
@@ -396,10 +401,10 @@ def relation_key(edge: dict) -> str:
     return f"{edge.get('type', '')}|{edge.get('from', '')}|{edge.get('to', '')}"
 
 
-def _read_pages(folder: pathlib.Path, prefix: str, problems: list):
+def _read_pages(folder: pathlib.Path, prefix: str, problems: list, raw: dict, kind: str):
     records, bodies = {}, {}
     for path in sorted(folder.glob(f"{prefix}-*.md")):
-        text = path.read_text(encoding="utf-8")
+        text = path.read_bytes().decode("utf-8")      # exact: no newline translation
         data = parse_frontmatter(text)
         if data is None:
             problems.append((path.name, "no frontmatter"))
@@ -412,15 +417,17 @@ def _read_pages(folder: pathlib.Path, prefix: str, problems: list):
             problems.append((path.name, f"duplicate id {identifier}"))
         records[identifier] = data
         bodies[identifier] = _body(text)
+        raw[(kind, identifier)] = text
     return records, bodies
 
 
 def load_brain_from(root: pathlib.Path) -> Brain:
     problems: list = []
     wiki = root / "wiki"
-    sources, source_bodies = _read_pages(wiki / "sources", "SRC", problems)
-    concepts, concept_bodies = _read_pages(wiki / "concepts", "CPT", problems)
-    datasets, dataset_bodies = _read_pages(wiki / "datasets", "DST", problems)
+    raw: dict = {}
+    sources, source_bodies = _read_pages(wiki / "sources", "SRC", problems, raw, "source")
+    concepts, concept_bodies = _read_pages(wiki / "concepts", "CPT", problems, raw, "concept")
+    datasets, dataset_bodies = _read_pages(wiki / "datasets", "DST", problems, raw, "dataset")
 
     claims: dict[str, dict] = {}
     for row in _jsonl(wiki / "claims" / "claims.jsonl", problems):
@@ -438,7 +445,7 @@ def load_brain_from(root: pathlib.Path) -> Brain:
         root=root, sources=sources, claims=claims, concepts=concepts,
         datasets=datasets, edges=edges, runs=runs,
         source_bodies=source_bodies, concept_bodies=concept_bodies,
-        dataset_bodies=dataset_bodies, load_problems=tuple(problems),
+        dataset_bodies=dataset_bodies, raw_pages=raw, load_problems=tuple(problems),
         snapshot_id=compute_snapshot(root),
     )
 

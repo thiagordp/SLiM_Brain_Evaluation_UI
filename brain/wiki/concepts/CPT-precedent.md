@@ -34,6 +34,7 @@ The canon that grounds interpretation in prior decisions and their authority. An
 - Explicit traffic rules such as speed limits and right-of-way regulations can be directly programmed into automated driving systems, but implicit traffic rules — which emerge from judicial decisions and may not be formally written in statutes — are crucial for autonomous vehicles to navigate ambiguous or unusual driving scenarios. — rests on abstract considerations (SRC-0017). [CLM-0017-001]
 - Large language models were not designed to engage in legal reasoning and are notoriously bad at it: studies have found that most models do no better than random guessing when asked to measure the precedential relationship between cases, hallucinate about 75% of the time in answering questions about a court's holding, provide inaccurate information in 40% or more of legal reasoning tasks, and deteriorate as tasks require more nuanced understanding of legal issues or texts. — rests on literature (SRC-0024). [CLM-0024-015]
 - Large language models perform poorly on legal reasoning tasks for several identified reasons: legal reasoning often requires comprehensive simultaneous analysis of many interconnected documents that do not fit within limited context windows, so compressed information is lost; legal documents may have constituted only a small portion of the training corpus, leaving limited exemplars for prediction; and the models struggle to make the independent, evaluative judgments needed for legal analogy and have difficulty recognizing and applying the hierarchy of sources of law. — rests on literature (SRC-0024). [CLM-0024-016]
+- Distinguishing the ratio decidendi from obiter dicta and conducting a legally relevant comparison of the facts between a precedent and the current case is one of the most difficult tasks for AI: the ratio decidendi is an abstract legal concept, not an explicit piece of text, legal analogy is an evaluative judgment about whether the facts of two cases are comparable in legally relevant ways, and current AI systems, which excel at identifying semantic patterns in text, struggle to make the independent, evaluative judgments needed to formulate or apply the underlying normative principles. — rests on abstract considerations (SRC-0026). [CLM-0026-010]
 
 ### Interpretative
 
@@ -57,10 +58,11 @@ No ATTACKS edge touches the claims mapped to this concept.
 |---|---|---|---|---|---|
 | SRC-0009 | 2025 | 2 | 1 interpretative, 1 descriptive | 1 literature, 1 legal | EU |
 | SRC-0011 | 2025 | 1 | 1 prescriptive | 1 abstract | general |
-| SRC-0015 | unknown | 1 | 1 descriptive | 1 factual | MY+AU |
+| SRC-0015 | unknown | 1 | 1 descriptive | 1 factual | MY, AU |
 | SRC-0017 | 2024 | 1 | 1 descriptive | 1 abstract | general |
 | SRC-0018 | 2024 | 2 | 2 descriptive | 1 literature, 1 legal | US |
 | SRC-0024 | unknown | 2 | 2 descriptive | 2 literature | general |
+| SRC-0026 | 2026 | 1 | 1 descriptive | 1 abstract | general |
 
 ## Open questions
 

@@ -25,6 +25,7 @@ Interpretation whose object is a judicial decision. An anchor concept, given in 
 
 - Explicit traffic rules such as speed limits and right-of-way regulations can be directly programmed into automated driving systems, but implicit traffic rules — which emerge from judicial decisions and may not be formally written in statutes — are crucial for autonomous vehicles to navigate ambiguous or unusual driving scenarios. — rests on abstract considerations (SRC-0017). [CLM-0017-001]
 - Manual review of court decisions by legal experts to identify and extract normative statements related to specific traffic rules ensures high accuracy but is highly time-consuming and labor-intensive, and as the number of court decisions grows there is an urgent need for more efficient methods of extracting the implicit rules they contain. — rests on literature (SRC-0017). [CLM-0017-002]
+- Distinguishing the ratio decidendi from obiter dicta and conducting a legally relevant comparison of the facts between a precedent and the current case is one of the most difficult tasks for AI: the ratio decidendi is an abstract legal concept, not an explicit piece of text, legal analogy is an evaluative judgment about whether the facts of two cases are comparable in legally relevant ways, and current AI systems, which excel at identifying semantic patterns in text, struggle to make the independent, evaluative judgments needed to formulate or apply the underlying normative principles. — rests on abstract considerations (SRC-0026). [CLM-0026-010]
 
 ### Interpretative
 
@@ -45,7 +46,8 @@ No extracted disagreement is recorded: every ATTACKS edge touching these claims 
 | paper | year | claims | by type | by basis | jurisdictions |
 |---|---|---|---|---|---|
 | SRC-0009 | 2025 | 1 | 1 interpretative | 1 literature | EU |
-| SRC-0017 | 2024 | 4 | 4 descriptive | 1 abstract, 1 literature, 2 factual | DE, general |
+| SRC-0017 | 2024 | 4 | 4 descriptive | 1 abstract, 1 literature, 2 factual | general, DE |
+| SRC-0026 | 2026 | 1 | 1 descriptive | 1 abstract | general |
 
 ## Open questions
 

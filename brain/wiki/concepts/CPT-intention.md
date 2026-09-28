@@ -26,6 +26,7 @@ The interpretive canon that looks to the intention of the law-maker or of the pa
 - In legal theory, the existence of an intention behind the law is widely treated as the condition of the possibility of law-interpretation: on intentionalist accounts, interpretation is impossible without intention, and there is no meaning in the lack of an author or of an intended meaning. — rests on literature (SRC-0010). [CLM-0010-003]
 - Large language model AI in general, and ChatGPT in particular, generate legal texts without having any intention: generative artificial intelligence models do not possess mental states, dispositions, or attitudes that constitute intentions, and there is no evidence of any internal life in large language models. — rests on literature (SRC-0010). [CLM-0010-008]
 - Even theorists whose work justifies a text-focused approach to contract interpretation, such as Alan Schwartz and Robert Scott, and the proponents of LLM-based generative interpretation pay lip service to the 'mutual intention' or 'shared intention of the parties' trope even as their own theses undercut it. — rests on literature (SRC-0025). [CLM-0025-005]
+- A reliable AI must construct its legal reasoning by starting with the literal wording of the provision and interpreting it in light of the legislator's purpose, sourcing that purpose from preparatory works and verifying whether Parliament amended the final law — in which case the reasoning in a parliamentary committee report supersedes the original preamble; this demands a structured comparison and logical inferencing about the significance of textual differences between legislative drafts, a higher-order reasoning capability that current LLMs often lack, leading to the risk of overlooking critical changes or hallucinating their importance. — rests on abstract considerations (SRC-0026). [CLM-0026-014]
 
 ### Interpretative
 
@@ -69,6 +70,7 @@ No extracted disagreement is recorded: every ATTACKS edge touching these claims 
 |---|---|---|---|---|---|
 | SRC-0010 | unknown | 9 | 3 descriptive, 6 interpretative | 3 literature, 6 abstract | general |
 | SRC-0025 | unknown | 6 | 2 descriptive, 2 interpretative, 2 prescriptive | 5 abstract, 1 literature | US, general |
+| SRC-0026 | 2026 | 1 | 1 descriptive | 1 abstract | general |
 
 ## Open questions
 

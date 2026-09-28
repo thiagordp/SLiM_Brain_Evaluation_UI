@@ -1,16 +1,16 @@
 ---
 id: CPT-legal-sources-doctrine
-status: candidate
+status: emergent
 concept_type: normative_concern
 definition: The doctrine determining which materials count as sources of law — its formal frameworks, their ambiguities, and the contested question of what should be ascertained as law.
-run_ids: [RUN-2026-09-25-01]
+run_ids: [RUN-2026-09-25-01, RUN-2026-09-28-01]
 ---
 
 # CPT-legal-sources-doctrine
 
 ## What it means
 
-The doctrine determining which materials count as sources of law — its formal frameworks, their ambiguities, and the contested question of what should be ascertained as law. A candidate concept coined during the ingest of SRC-0005 and drawn from its claims [CLM-0005-005] [CLM-0005-006] [CLM-0005-008].
+The doctrine determining which materials count as sources of law — its formal frameworks, their ambiguities, and the contested question of what should be ascertained as law. Coined as a candidate during the ingest of SRC-0005 and drawn from its claims [CLM-0005-005] [CLM-0005-006] [CLM-0005-008]; promoted to emergent at the close-out of RUN-2026-09-28-01, when claims from three independent sources (SRC-0005, SRC-0024, SRC-0026) were mapped to it.
 
 ## Claims
 
@@ -20,6 +20,7 @@ The doctrine determining which materials count as sources of law — its formal 
 
 - Determining the dataset used to fine-tune an international-law large language model — and the content of a retrieval-augmented generation database — requires taking decisions on contested questions about the sources of international law, including which customs should be used, whether and which international and national case-law is relevant, and whether soft law resources should be included; for the model to provide reliable outputs, the dataset must reflect a coherent and representative understanding of these sources. — rests on abstract considerations (SRC-0005). [CLM-0005-006]
 - Large language models perform poorly on legal reasoning tasks for several identified reasons: legal reasoning often requires comprehensive simultaneous analysis of many interconnected documents that do not fit within limited context windows, so compressed information is lost; legal documents may have constituted only a small portion of the training corpus, leaving limited exemplars for prediction; and the models struggle to make the independent, evaluative judgments needed for legal analogy and have difficulty recognizing and applying the hierarchy of sources of law. — rests on literature (SRC-0024). [CLM-0024-016]
+- A reliable AI must construct its legal reasoning by starting with the literal wording of the provision and interpreting it in light of the legislator's purpose, sourcing that purpose from preparatory works and verifying whether Parliament amended the final law — in which case the reasoning in a parliamentary committee report supersedes the original preamble; this demands a structured comparison and logical inferencing about the significance of textual differences between legislative drafts, a higher-order reasoning capability that current LLMs often lack, leading to the risk of overlooking critical changes or hallucinating their importance. — rests on abstract considerations (SRC-0026). [CLM-0026-014]
 
 ### Interpretative
 
@@ -38,6 +39,7 @@ No ATTACKS edge touches the claims mapped to this concept.
 |---|---|---|---|---|---|
 | SRC-0005 | 2026 | 3 | 2 interpretative, 1 descriptive | 1 literature, 2 abstract | general |
 | SRC-0024 | unknown | 1 | 1 descriptive | 1 literature | general |
+| SRC-0026 | 2026 | 1 | 1 descriptive | 1 abstract | general |
 
 ## What is missing
 

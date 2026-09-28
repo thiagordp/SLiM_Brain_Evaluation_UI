@@ -108,6 +108,10 @@ The concern with whether a system's outputs are correct, consistent and dependab
 - Large language models often produce inconsistent and seemingly random responses to prompts — across different models, across repetitions of the same prompt, and across different wordings of the same question; unless the temperature variable is set at the lowest level this inconsistency is a design feature rather than a bug, and the models are very sensitive to the wording of prompts. — rests on literature (SRC-0024). [CLM-0024-006]
 - Large language models have a sycophancy problem that renders their responses less reliable: due in part to global system prompts that direct them to be helpful assistants, the models aim to please, tailoring responses to match user preferences and incorporating users' factual assertions or assumptions into their analysis even when those assertions or assumptions are incorrect. — rests on literature (SRC-0024). [CLM-0024-007]
 - Large language models were not designed to engage in legal reasoning and are notoriously bad at it: studies have found that most models do no better than random guessing when asked to measure the precedential relationship between cases, hallucinate about 75% of the time in answering questions about a court's holding, provide inaccurate information in 40% or more of legal reasoning tasks, and deteriorate as tasks require more nuanced understanding of legal issues or texts. — rests on literature (SRC-0024). [CLM-0024-015]
+- The limitations of large language models in high-stakes fields such as law remain poorly understood; while it is well understood that LLMs have severe limitations in their ability to reason and produce truthful responses, where the boundaries of these limitations lie across domains is less well understood. — rests on literature (SRC-0026). [CLM-0026-001]
+- For AI to function reliably in judicial decision-making, it must overcome a set of core challenges: selecting the correct legal framework across jurisdictions, generating sound arguments based on the doctrine of the sources of law, distinguishing ratio decidendi from obiter dicta in case law, resolving ambiguity arising from general clauses such as 'reasonableness', managing conflicting legal provisions, and applying the burden of proof correctly. — rests on abstract considerations (SRC-0026). [CLM-0026-002]
+- LLMs face a fundamental challenge in evaluating the truthfulness of information such as evidence, as their knowledge is derived from training data and provided context, not from lived experience or an innate sense of real-world plausibility; assessing witness credibility involves non-verbal cues, demeanor, consistency and potential biases that extend far beyond a written transcript, and evaluating real-world plausibility requires common-sense reasoning, an area in which LLMs continue to show significant limitations. — rests on literature (SRC-0026). [CLM-0026-006]
+- No single AI technique is a panacea for the demands of legal reasoning; a combination of approaches is required to achieve reliability, transparency and fairness in AI-assisted adjudication, and while techniques such as retrieval-augmented generation, multi-agent systems and neuro-symbolic AI can address specific narrow challenges, they fail to solve the more significant ones that remain, particularly in tasks requiring discretion and transparent, justifiable reasoning. — rests on literature (SRC-0026). [CLM-0026-018]
 
 **undetermined**
 
@@ -147,6 +151,7 @@ The concern with whether a system's outputs are correct, consistent and dependab
 - Empirical results on statutory tax reasoning suggest that large language models are more reliable as translators of natural language into formal logic than as standalone reasoners, especially as task complexity increases, supporting a principled role for them as translators between natural language and formal representations. — rests on factual basis (SRC-0021). [CLM-0021-005]
 - The central problem of large language models in legal practice is not simply that they hallucinate facts and references; it is that they systematically draw inferences that go beyond what the source text actually supports, presenting assumption-laden conclusions as if they were logically grounded. — rests on abstract considerations (SRC-0022). [CLM-0022-001]
 - Fabricated citations — references that do not exist — are a problem now largely tractable through retrieval verification; the more difficult and consequential problem is stance misrepresentation, where the source exists and is retrieved correctly but the claim overstates, understates, or mischaracterizes what the source says. — rests on literature (SRC-0022). [CLM-0022-014]
+- Traditional natural language processing metrics like BLEU measure the linguistic properties of a text in reference to another rather than the meaning of the content itself, and are therefore insufficient for legal tasks, where it must be assessed whether the AI found the right law, followed legal reasoning norms and provided justifiable answers; domain-specific evaluation metrics reflecting core competencies in legal reasoning — such as statute recall, ratio decidendi identification accuracy, provenance coverage, and burden-of-proof handling — are being defined for this purpose. — rests on literature (SRC-0026). [CLM-0026-020]
 
 ### Prescriptive
 
@@ -190,10 +195,10 @@ No extracted disagreement is recorded: every ATTACKS edge touching these claims 
 
 | paper | year | claims | by type | by basis | jurisdictions |
 |---|---|---|---|---|---|
-| SRC-0001 | unknown | 7 | 5 descriptive, 2 interpretative | 1 literature, 5 factual, 1 abstract | EU, general |
+| SRC-0001 | unknown | 7 | 5 descriptive, 2 interpretative | 1 literature, 5 factual, 1 abstract | general, EU |
 | SRC-0002 | unknown | 5 | 4 descriptive, 1 predictive | 5 factual | EU |
 | SRC-0003 | 2026 | 5 | 5 descriptive | 3 literature, 2 abstract | general |
-| SRC-0004 | unknown | 3 | 3 descriptive | 1 literature, 2 factual | KR, general |
+| SRC-0004 | unknown | 3 | 3 descriptive | 1 literature, 2 factual | general, KR |
 | SRC-0005 | 2026 | 1 | 1 interpretative | 1 abstract | general |
 | SRC-0006 | 2025 | 2 | 2 descriptive | 1 factual, 1 literature | AU, general |
 | SRC-0007 | 2026 | 6 | 6 descriptive | 1 literature, 5 factual | general, undetermined |
@@ -202,15 +207,16 @@ No extracted disagreement is recorded: every ATTACKS edge touching these claims 
 | SRC-0011 | 2025 | 4 | 4 descriptive | 4 factual | CN |
 | SRC-0012 | 2025 | 5 | 5 descriptive | 5 factual | undetermined |
 | SRC-0014 | unknown | 3 | 3 descriptive | 2 factual, 1 literature | CN, general |
-| SRC-0015 | unknown | 5 | 5 descriptive | 5 factual | MY+AU, MY+AU+US |
+| SRC-0015 | unknown | 5 | 5 descriptive | 5 factual | MY, AU, US |
 | SRC-0016 | 2024 | 1 | 1 descriptive | 1 abstract | general |
-| SRC-0017 | 2024 | 6 | 5 descriptive, 1 prescriptive | 2 abstract, 4 factual | DE, general |
+| SRC-0017 | 2024 | 6 | 5 descriptive, 1 prescriptive | 2 abstract, 4 factual | general, DE |
 | SRC-0018 | 2024 | 5 | 5 descriptive | 5 factual | US |
-| SRC-0020 | 2025 | 5 | 3 descriptive, 1 prescriptive, 1 interpretative | 4 factual, 1 abstract | general, undetermined |
+| SRC-0020 | 2025 | 5 | 3 descriptive, 1 prescriptive, 1 interpretative | 4 factual, 1 abstract | undetermined, general |
 | SRC-0021 | unknown | 6 | 4 descriptive, 1 interpretative, 1 prescriptive | 5 factual, 1 literature | US, general |
 | SRC-0022 | unknown | 5 | 2 interpretative, 3 descriptive | 1 abstract, 2 factual, 2 literature | general, undetermined |
 | SRC-0023 | unknown | 6 | 5 descriptive, 1 prescriptive | 6 factual | NL, general |
-| SRC-0024 | unknown | 5 | 4 descriptive, 1 interpretative | 4 literature, 1 legal | US, general |
+| SRC-0024 | unknown | 5 | 4 descriptive, 1 interpretative | 4 literature, 1 legal | general, US |
+| SRC-0026 | 2026 | 5 | 4 descriptive, 1 interpretative | 4 literature, 1 abstract | general |
 
 ## What is missing
 

@@ -114,10 +114,29 @@ def brain_copy() -> pathlib.Path:
 
 
 # =================================================================== adapter
+def _on_disk():
+    """Counts taken straight from the Brain files, independently of the adapter,
+    so an ingest that adds Sources changes the expectation with it."""
+    wiki = BRAIN.root / "wiki"
+    lines = lambda p: [json.loads(l) for l in p.read_text().splitlines() if l.strip()]
+    claims = lines(wiki / "claims" / "claims.jsonl")
+    edges = lines(wiki / "graph" / "edges.jsonl")
+    claim_ids = {c["id"] for c in claims}
+    return {
+        "sources": len(list((wiki / "sources").glob("SRC-*.md"))),
+        "datasets": len(list((wiki / "datasets").glob("DST-*.md"))),
+        "concepts": {p.stem for p in (wiki / "concepts").glob("CPT-*.md")},
+        "claims": len(claims),
+        "relations": sum(1 for e in edges if e["type"] in ("SUPPORTS", "ATTACKS", "SAME_AS")
+                         and e["from"] in claim_ids and e["to"] in claim_ids),
+    }
+
+
 def test_adapter_reads_current_schema():
-    check(len(BRAIN.sources) == 25 and len(BRAIN.claims) == 374,
-          "adapter: 25 Sources and 374 Claims")
-    check(len(BRAIN.datasets) == 25 and not BRAIN.load_problems,
+    disk = _on_disk()
+    check(len(BRAIN.sources) == disk["sources"] and len(BRAIN.claims) == disk["claims"],
+          f"adapter: all {disk['sources']} Sources and {disk['claims']} Claims")
+    check(len(BRAIN.datasets) == disk["datasets"] and not BRAIN.load_problems,
           "adapter: every Dataset page is read, including those YAML would reject")
     check(":" in BRAIN.dataset("DST-0004")["description"],
           "adapter: a description containing a colon is read whole")
@@ -126,7 +145,7 @@ def test_adapter_reads_current_schema():
     check(BRAIN.dataset_ids_of("SRC-0003") == [], "adapter: SRC-0003 has no Dataset")
     relations = BRAIN.claim_relations()
     hosted = sum(len(BRAIN.relations_hosted(s)) for s in BRAIN.source_ids)
-    check(hosted == len(relations) == 265,
+    check(hosted == len(relations) == disk["relations"],
           "adapter: every Claim Relation is hosted by exactly one Source")
     check(all(r["type"] in ("SUPPORTS", "ATTACKS", "SAME_AS") for r in relations),
           "adapter: only current Claim-to-Claim relation types")
@@ -135,7 +154,9 @@ def test_adapter_reads_current_schema():
           "adapter: Concept names are derived deterministically from ids")
     vocabulary = BRAIN.vocabulary(spec.concept_grid())
     grid_only = [v for v in vocabulary if not v["has_page"]]
-    check(len(grid_only) == 11 and all(v["definition"] == "" for v in grid_only),
+    grid = {c for ids in spec.concept_grid().values() for c in ids}
+    check(len(grid_only) == len(grid - disk["concepts"])
+          and all(v["definition"] == "" for v in grid_only),
           "adapter: grid-only anchors are in the vocabulary, with no invented definition")
     check(BRAIN.canonical_schema_version == "0.1.0", "adapter: canonical schema version")
     parsed = brain_module.parse_frontmatter(
@@ -260,10 +281,13 @@ def test_allocation_rules():
           == {"SRC-0006", "SRC-0009"}, "allocation: 2 Training papers for all six")
     check(len(phases["agreement"]) == 12 and len({r["source_id"] for r in phases["agreement"]}) == 6,
           "allocation: 6 Agreement papers, each for both members of a pair")
-    check(len(phases["individual"]) == 17, "allocation: 17 Individual papers")
+    remaining = len(BRAIN.sources) - 2 - 6
+    check(len(phases["individual"]) == remaining,
+          f"allocation: the other {remaining} papers are Individual")
     per = sorted(sum(1 for r in phases["individual"] if r["evaluator_id"] == e["evaluator_id"])
                  for e in evaluators)
-    check(per == [2, 3, 3, 3, 3, 3], "allocation: Individual papers as even as possible")
+    check(per[-1] - per[0] <= 1 and sum(per) == remaining,
+          "allocation: Individual papers as even as possible")
     pairs = {e["evaluator_id"]: e["pair_id"] for e in evaluators}
     check(pairs["thiago"] == pairs["francesca"] == "A" and pairs["giuseppe"] == "B"
           and pairs["giovanni"] == pairs["alessandro"] == "C", "allocation: the three pairs")
@@ -343,7 +367,9 @@ def test_bootstrap():
           "bootstrap: the runs and their schema versions are recorded")
     check(book.count(sheets.DEFINITIONS) == len(spec.definitions()["entries"]),
           "bootstrap: DEFINITIONS holds every definition shown to evaluators")
-    check(book.count(sheets.REVIEWS) == 41 and book.count(sheets.ASSIGNMENTS) == 41,
+    assignments = len(manifest.load_manifest_file()["assignments"])
+    check(book.count(sheets.REVIEWS) == assignments
+          and book.count(sheets.ASSIGNMENTS) == assignments,
           "bootstrap: one review per assignment")
     check(all(r["review_id"].startswith(ROUND + "|") for r in book.read_tab(sheets.REVIEWS)),
           "bootstrap: review ids carry the round namespace")
@@ -522,6 +548,11 @@ def test_concept_search():
           "search: not every word has to match")
     check(len(conceptsearch.search("", vocabulary)) == len(vocabulary),
           "search: an empty query lists everything")
+    entry = {"id": "CPT-alpha", "label": "Alpha", "family": "legal_task",
+             "definition": "zeppelin"}
+    check(conceptsearch.score("zeppelin", entry) == 0,
+          "search: Concept definitions are neither search nor ranking evidence")
+    check(conceptsearch.score("legal", entry) > 0, "search: the family is searchable")
 
 
 # ================================================================== analysis
@@ -834,8 +865,16 @@ def _inside(expander) -> str:
     return "\n".join(m.value for m in expander.markdown)
 
 
-def test_ui_definitions_collapsed_but_complete():
-    fresh_round()
+OBSOLETE_LABELS = ("Schema definition", "Concept definition", "Criterion definition",
+                   "Extraction rule", "Authoritative extraction rule")
+
+
+def _stored_rows(book) -> dict:
+    return {tab: [list(r) for r in rows] for tab, rows in book.tabs.items()}
+
+
+def test_ui_instructions_and_guidance():
+    book = fresh_round()
     source = "SRC-0001"
     review = rid("agreement", "thiago", source)
     start(review)
@@ -844,45 +883,102 @@ def test_ui_definitions_collapsed_but_complete():
     _open(at, "agreement", source)
     at.button(key="nav|claims").click()
     at.run()
-    schema = _expanders(at, "Schema definition")
-    concept = _expanders(at, "Concept definition")
-    check(schema and concept and all(not e.proto.expanded for e in schema + concept),
-          "ui: every schema and Concept definition starts closed")
-    everything = [_inside(e) for e in schema]
+    instructions = _expanders(at, "Instructions")
+    check(instructions and all(not e.proto.expanded for e in instructions),
+          "ui: every Instructions expander starts closed")
+    labels = [e.label for e in at.expander] + [p.label for p in at.get("popover")]
+    headings = [m.value for m in at.markdown if m.value.lstrip().startswith("#")]
+    check(not any(old in label for label in labels + headings for old in OBSOLETE_LABELS),
+          "ui: no obsolete guidance label on any container or heading")
+    everything = [_inside(e) for e in instructions]
 
     def plain(key, field="text"):
         return html.escape(spec.plain(spec.definition(key)[field]))
 
+    def holds(key) -> str:
+        lines = [html.escape(line) for line in spec.definition(key)["text"].split("\n")
+                 if line.strip()]
+        return next((t for t in everything if all(line in t for line in lines)), "")
+
+    skill = freeze_definitions.DEFAULT_SKILLS / "extract-claims" / "SKILL.md"
+    for key, question in (("skill.extract_claims.modality", "CLAIM_Q03_MODALITY"),
+                          ("skill.extract_claims.standalone", "CLAIM_Q04_STANDALONE")):
+        stored = spec.definition(key)["text"]
+        if skill.exists():
+            check(stored in skill.read_text(encoding="utf-8"),
+                  f"ui: {key} is frozen exactly as the extract-claims skill words it")
+        check(holds(key), f"ui: {question} shows its extract-claims passage in Instructions")
+        check(spec.BY_KEY[question].text == AGREED[question],
+              f"ui: {question} wording is unchanged")
+    check('"may"' in spec.definition("skill.extract_claims.modality")["text"]
+          and "`" not in spec.definition("skill.extract_claims.modality")["text"],
+          "ui: the frozen passage is stored untransformed")
+
     q2 = next((t for t in everything if plain("claim.node") in t), "")
     check(plain("claim.statement") in q2 and "**Claim**" in q2 and "**Statement**" in q2,
-          "ui: Question 2's closed expander holds the Claim and Statement passages")
+          "ui: Question 2's Instructions hold the Claim and Statement passages")
     claim_object = next((t for t in everything if plain("claim.claim_object") in t), "")
     check(all(html.escape(spec.plain(i["text"])) in claim_object
               for i in spec.definition("claim.claim_object")["items"])
           and all(v in claim_object for v in ("Law", "Technology", "Other")),
-          "ui: Claim object's closed expander holds all three values and meanings")
+          "ui: Claim object's Instructions hold all three values and meanings")
     check("(assigned)" not in "\n".join(everything),
           "ui: nothing is added inside a frozen definition")
-    grounding = spec.definition("edge.grounding")
-    check(any(all(html.escape(spec.plain(i["text"])) in t for i in grounding["items"])
-              and all(html.escape(spec.plain(sub)) in t for sub in grounding["items"][0]["sub"])
-              for t in everything),
-          "ui: Relation Grounding keeps the complete create-edges passage")
-    claim = BRAIN.claims_of(source)[0]["id"]
-    first_concept = BRAIN.concepts_of_claim(claim)[0]
-    check(any(html.escape(BRAIN.concept(first_concept)["definition"]) in _inside(e)
-              for e in concept), "ui: a Concept definition is complete when opened")
+    grounding = spec.plain(spec.definition("edge.grounding")["verbatim"])
+    check(any(grounding in t for t in everything),
+          "ui: Grounding Instructions hold the create-edges rule word for word")
     page = _markdown(at)
-    check(html.escape(BRAIN.claim(claim)["anchors"][0]["quote"]) in page
-          and "Assigned value" in page,
-          "ui: anchors and assigned values stay outside the expanders")
+    check(all(term in page and html.escape(text) in page
+              for term, text in spec.GROUNDING_QUICK_GUIDE)
+          and "Quick guide" in page, "ui: the Grounding Quick guide is visible")
+    check(not any(grounding in m.value for m in at.markdown if m.value in page
+                  and "Quick guide" in m.value),
+          "ui: the Quick guide does not replace the authoritative rule")
+
+    claim = BRAIN.claims_of(source)[0]
+    check(html.escape(claim["anchors"][0]["quote"]) in page and "Assigned value" in page,
+          "ui: anchors and assigned values stay outside the Instructions")
+    shown = page + "\n".join(c.value for c in at.caption)
+    definitions = [BRAIN.concept(c)["definition"] for c in BRAIN.concepts_of_claim(claim["id"])]
+    eligible = [e for e in BRAIN.vocabulary(spec.concept_grid()) if e["definition"]]
+    check(not any(html.escape(d) in shown or d in shown for d in definitions),
+          "ui: Q12 and Q13 show no Concept definition")
+    check(not any(e["definition"] in shown or html.escape(e["definition"]) in shown
+                  for e in eligible), "ui: the Q14 browser shows no Concept definition")
+    first = BRAIN.concepts_of_claim(claim["id"])[0]
+    family = brain_module.family_label(BRAIN.concept(first)["concept_type"])
+    check(any(c.value.startswith(family) for c in at.caption),
+          "ui: Concept family is shown with each Concept")
+    concept_captions = [c.value for c in at.caption]
+    for concept_id in BRAIN.concepts_of_claim(claim["id"]):
+        concept = BRAIN.concept(concept_id)
+        expected = brain_module.family_label(concept["concept_type"]) + (
+            "" if concept["status"] == "anchor"
+            else f" · {spec.value_label(concept['status'])}")
+        check(expected in concept_captions,
+              f"ui: {concept_id} shows its family and, where relevant, its status")
+
+    panel = [m.value for m in at.markdown if "Claim under review" in m.value]
+    check(panel and claim["id"] in panel[0] and html.escape(claim["statement"]) in panel[0],
+          "ui: the Claim panel shows the current Claim id and statement")
+    css = "\n".join(m.value for m in at.markdown if "<style>" in m.value)
+    check(".st-key-claim_sticky" in css and 'data-testid="stLayoutWrapper"' in css
+          and "position:sticky" in css, "ui: the Claim panel carries its sticky rule")
+    before = _stored_rows(book)
+    at.button(key="next_claim").click()
+    at.run()
+    second = BRAIN.claims_of(source)[1]
+    panel = [m.value for m in at.markdown if "Claim under review" in m.value]
+    check(panel and second["id"] in panel[0] and html.escape(second["statement"]) in panel[0],
+          "ui: the Claim panel follows Claim navigation")
+    check(_stored_rows(book) == before, "ui: the panel and navigation write nothing")
 
     at.button(key="nav|datasets").click()
     at.run()
-    schema = _expanders(at, "Schema definition")
-    check(schema and all(not e.proto.expanded for e in schema),
-          "ui: Dataset definitions start closed")
-    jurisdiction = next((_inside(e) for e in schema
+    instructions = _expanders(at, "Instructions")
+    check(instructions and all(not e.proto.expanded for e in instructions),
+          "ui: Dataset Instructions start closed")
+    jurisdiction = next((_inside(e) for e in instructions
                          if plain("dataset.jurisdiction") in _inside(e)), "")
     check("**Dataset jurisdiction**" in jurisdiction
           and "**Referenced jurisdiction definition**" in jurisdiction
@@ -892,6 +988,35 @@ def test_ui_definitions_collapsed_but_complete():
           == "legal system(s) the texts come from; jurisdiction codes in `schema/claim.md`.",
           "ui: the stored passage carries no interface heading")
     check(len(_questions(at)) == 6, "ui: the Dataset page keeps all six questions")
+
+
+def test_ui_raw_markdown():
+    book = fresh_round()
+    source = "SRC-0001"
+    review = rid("agreement", "thiago", source)
+    start(review)
+    at = _app()
+    _login(at)
+    _open(at, "agreement", source)
+    before = _stored_rows(book)
+    cached = at.session_state["_review_cache"][review].copy()
+    raw = [e for e in at.expander if e.label == "Raw Markdown"]
+    on_disk = (BRAIN.root / "wiki" / "sources" / f"{source}.md").read_bytes().decode("utf-8")
+    check(raw and any(c.value == on_disk for c in raw[0].code),
+          "ui: Source Raw Markdown is the exact file on disk, frontmatter included")
+    check(on_disk.startswith("---") and on_disk != BRAIN.source_body(source),
+          "ui: the raw view is the file itself, not the rendered body")
+    at.button(key="nav|datasets").click()
+    at.run()
+    dataset = BRAIN.dataset_ids_of(source)[0]
+    at.button(key=f"ds_wiki|{dataset}").click()
+    at.run()
+    dataset_raw = (BRAIN.root / "wiki" / "datasets" / f"{dataset}.md").read_bytes().decode("utf-8")
+    check(any(c.value == dataset_raw for c in at.get("code")),
+          "ui: Dataset wiki Raw Markdown in the modal is the exact file")
+    check(_stored_rows(book) == before
+          and at.session_state["_review_cache"][review].responses == cached.responses,
+          "ui: opening Raw Markdown changes no stored or cached evaluation data")
 
 
 def test_ui_review_groups_missing_items():

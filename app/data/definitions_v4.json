@@ -64,7 +64,7 @@
       "CPT-neuro-symbolic-hybrid"
     ]
   },
-  "definitions_id": "b91c79054a40c224",
+  "definitions_id": "5e893fd56651b365",
   "entries": {
     "claim.anchors": {
       "items": [
@@ -342,10 +342,21 @@
       "label": "Relation type",
       "source": "schema/edge.md",
       "text": "one of the four types below."
+    },
+    "skill.extract_claims.modality": {
+      "label": "Strength and modality",
+      "source": ".claude/skills/extract-claims/SKILL.md",
+      "text": "Keep the modality of the statement as expressed in the source.\nIf the source says \"may\", write \"may\". Never turn \"suggests\" into \"shows\", or \"should\" into \"must\" and so on."
+    },
+    "skill.extract_claims.standalone": {
+      "label": "Claim understood on its own",
+      "source": ".claude/skills/extract-claims/SKILL.md",
+      "text": "Someone who has not read the paper must understand it.\n\nCut every reference to the document. No \"this work\", no \"the authors\", no \"as shown above\"."
     }
   },
   "source_hashes": {
     ".claude/skills/create-edges/SKILL.md": "6a36b20aeac8b8877031b24f0406cb883d5740de342606768cbbc52065081737",
+    ".claude/skills/extract-claims/SKILL.md": "e58ca2b36d4ac6035f44cc8d0eb11ea9b19ae305bb24d4f9bf8c6a1e803a6911",
     "schema/__index__.md": "61b3eb6fbd8b6d2546df026cb9d53bf43e73e5f2d84cc61bbc68cc5f2b807b22",
     "schema/absence.md": "b1557323715162cc6d6430992bc837d3d44f8e01791a332ea3b18b2f2dc12545",
     "schema/claim.md": "8277f331411d2ab62f33601a479febe1a7dd98211bf08052d855292832552d0c",

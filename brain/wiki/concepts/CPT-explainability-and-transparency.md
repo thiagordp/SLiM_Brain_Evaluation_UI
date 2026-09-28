@@ -47,6 +47,7 @@ The concern with whether a system's reasoning, grounds and provenance can be see
 - Current computational methods for detecting undisclosed sponsored content on social media generally lack legal grounding or operate as opaque black boxes: they often lack a solid legal foundation, exposing regulators to pushback in relation to their decisions, and they prioritise accuracy over explanation, producing accurate predictions without interpretable reasoning. — rests on literature (SRC-0023). [CLM-0023-001]
 - Although large language model responses may appear neutral and objective, the process by which the responses are generated embeds important value choices and policy considerations that are not disclosed to users, and models can provide biased responses in light of the biases included in their training data. — rests on literature (SRC-0024). [CLM-0024-005]
 - The assumptions, algorithms and reasoning behind large language model responses are hidden in a black box; even when a user asks a model to explain the reasoning behind a conclusion, the model is not actually explaining its reasoning but predicting an appropriate response to the request for an explanation based on its training. — rests on literature (SRC-0024). [CLM-0024-008]
+- No single AI technique is a panacea for the demands of legal reasoning; a combination of approaches is required to achieve reliability, transparency and fairness in AI-assisted adjudication, and while techniques such as retrieval-augmented generation, multi-agent systems and neuro-symbolic AI can address specific narrow challenges, they fail to solve the more significant ones that remain, particularly in tasks requiring discretion and transparent, justifiable reasoning. — rests on literature (SRC-0026). [CLM-0026-018]
 
 **undetermined**
 
@@ -61,6 +62,9 @@ The concern with whether a system's reasoning, grounds and provenance can be see
 - In legal case forecasting, model reasoning is not merely a path to better predictive accuracy but a lens into the model's decision-making — an explainability factor beyond brute-force pattern matching. — rests on abstract considerations (SRC-0020). [CLM-0020-019]
 - The complexity of the minimal axiom set needed to ground an entailment classification is diagnostic: many or complex axioms signal genuine interpretive difficulty, while few and simple axioms suggest confident automated classification. — rests on abstract considerations (SRC-0022). [CLM-0022-012]
 - Understanding where and why current legal AI systems break is not a limitation but the foundation of an agenda for trustworthy AI legal reasoning: only by honestly characterizing failure modes can it be identified where AI assistance can be responsibly applied, and systems be built that proactively surface interpretive uncertainty rather than asking lawyers to verify conclusions after the fact. — rests on abstract considerations (SRC-0022). [CLM-0022-019]
+- The judicial process is bound by a set of imperatives — impartiality, legal certainty, transparency, and the justifiability and controllability of every step of decision-making — which are not mere aspirations but functional requirements of a legitimate legal system, and these requirements are largely common regardless of how legal argumentation is theoretically or practically constructed. — rests on abstract considerations (SRC-0026). [CLM-0026-003]
+- The principle of procedural fairness dictates that if an AI's output is to be used as evidence or to support a judicial decision, the process that generated that output must be transparent and open to challenge: the specific prompt used to generate a legal analysis becomes a piece of discoverable evidence, and the choice of a particular AI model is a methodological decision comparable to an expert witness selecting a specific scientific instrument, necessitating a transparency that extends beyond the final output to the entire generative process. — rests on abstract considerations (SRC-0026). [CLM-0026-017]
+- A neuro-symbolic system is a feasible approach to resolving high-volume, low-complexity disputes such as consumer product-defect small claims: an LLM layer operates as an observation engine that reads unstructured inputs and proposes structured facts, while a symbolic layer performs the determinative legal reasoning by handling curated rules and decision tables, a division that delivers both coverage over unstructured inputs and transparent, auditable decisions aligned with core legal maxims. — rests on abstract considerations (SRC-0026). [CLM-0026-021]
 
 ### Prescriptive
 
@@ -74,6 +78,7 @@ The concern with whether a system's reasoning, grounds and provenance can be see
 - A legal large language model should communicate its different stages of reasoning, including which information is grounded in the retrieval database, and its main interpretative choices; it must be configurable to adapt its explanations to the user's mental model, level of knowledge, abilities and needs; and its interface should use counterfactual logic, identifying interpretative crossroads that lead to different results. — rests on literature (SRC-0005). [CLM-0005-016]
 - Large language models should not be used for inherently normative tasks such as judging: normative values are always present in the legal process, and it is better to be explicit and choose socially desirable values than to accept without question the hidden and often harmful normative values forced on us by technology companies. — rests on abstract considerations (SRC-0019). [CLM-0019-009]
 - Legal reasoning is an inherently compositional and complex task, and hybrid neuro-symbolic systems that combine large language model capabilities in parsing and formal translation with symbolic reasoning engines offer a more reliable and robust foundation for legal AI, improving generalization, interpretability, and verifiability. — rests on factual basis (SRC-0021). [CLM-0021-008]
+- AI-assisted adjudication must include system-design features for procedural fairness: audit trails recording all inputs, outputs and intermediate reasoning steps of the AI as a discoverable record — a legal necessity if AI outputs are to be contestable evidence in court; clear disclosure to the parties of an AI system's role in judicial decisions; and contestability with human oversight, so that there is always an avenue for a human decision-maker to review and, if necessary, override the AI's output. — rests on abstract considerations (SRC-0026). [CLM-0026-019]
 
 ### Predictive
 
@@ -97,6 +102,7 @@ No extracted disagreement is recorded: every ATTACKS edge touching these claims 
 - SRC-0020 holds “OpenAI GPT-5.4 scores far from ideal in legal reasoning on European Court of Human Rights cases concerning ECHR Article 10: it produces …” [CLM-0020-001]; SRC-0011 holds “Although existing large language models can generate responses to legal questions, they fail to perform explicit syllogistic reasoning, …” [CLM-0011-002]. Note: The finding that a recent top-tier LLM reliably reproduces a structurally complete doctrinal analysis gives reasons against the claim that existing LLMs produce implicit and unstructured answers lacking explicit reasoning steps.
 - SRC-0019 holds “Large language models should not be used for inherently normative tasks such as judging: normative values are always present in the legal …” [CLM-0019-009]; SRC-0025 holds “The third party who observes and understands the objective manifestations of contractual agreement can be a large language model, even …” [CLM-0025-008]. Note: The contention that LLMs should not be used for inherently normative tasks such as judging gives reasons against the claim that an LLM can serve as the third party deciding contract interpretation disputes with a more satisfying result than a coin flip.
 - SRC-0007 holds “For large-scale coverage adjudication, a symbolic rule-based system that performs attribute generation once per procedure code and rule …” [CLM-0007-007]; SRC-0001 holds “Carefully designed prompts can serve as the primary mechanism for guiding legal reasoning in LLM-based systems, offering a scalable, …” [CLM-0001-013]. Note: That a symbolic rule-based coverage system needing no LLM inference at run time is dramatically cheaper at scale ($22 against $4,840-$9,680 for 11,000 codes) gives reasons against carefully designed prompts being a cost-effective solution for continuous compliance assessment.
+- SRC-0024 holds “Having a human in the loop to review the conclusions reached by a large language model does not make an agency's action reasonable, since the human …” [CLM-0024-022]; SRC-0026 holds “AI-assisted adjudication must include system-design features for procedural fairness: audit trails recording all inputs, outputs and intermediate …” [CLM-0026-019]. Note: The claim that a human in the loop cannot recreate or verify a model's reasoning and so does not make reliance on it reasonable gives reasons against human review and override sufficing as a procedural-fairness safeguard.
 
 ## The spread
 
@@ -107,16 +113,17 @@ No extracted disagreement is recorded: every ATTACKS edge touching these claims 
 | SRC-0005 | 2026 | 1 | 1 prescriptive | 1 literature | general |
 | SRC-0007 | 2026 | 2 | 2 descriptive | 1 abstract, 1 factual | general |
 | SRC-0008 | 2026 | 1 | 1 predictive | 1 abstract | general |
-| SRC-0009 | 2025 | 3 | 3 descriptive | 2 literature, 1 factual | EU, general |
-| SRC-0011 | 2025 | 3 | 3 descriptive | 2 literature, 1 factual | CN, general |
+| SRC-0009 | 2025 | 3 | 3 descriptive | 2 literature, 1 factual | general, EU |
+| SRC-0011 | 2025 | 3 | 3 descriptive | 2 literature, 1 factual | general, CN |
 | SRC-0014 | unknown | 3 | 3 descriptive | 2 factual, 1 literature | CN, general |
 | SRC-0015 | unknown | 2 | 2 descriptive | 2 literature | general |
 | SRC-0019 | 2025 | 1 | 1 prescriptive | 1 abstract | general |
-| SRC-0020 | 2025 | 3 | 1 descriptive, 2 interpretative | 2 factual, 1 abstract | general, undetermined |
-| SRC-0021 | unknown | 2 | 1 prescriptive, 1 descriptive | 1 factual, 1 literature | US, general |
+| SRC-0020 | 2025 | 3 | 1 descriptive, 2 interpretative | 2 factual, 1 abstract | undetermined, general |
+| SRC-0021 | unknown | 2 | 1 prescriptive, 1 descriptive | 1 factual, 1 literature | general, US |
 | SRC-0022 | unknown | 2 | 2 interpretative | 2 abstract | general |
 | SRC-0023 | unknown | 1 | 1 descriptive | 1 literature | general |
-| SRC-0024 | unknown | 6 | 3 descriptive, 1 predictive, 2 prescriptive | 2 literature, 1 factual, 2 legal, 1 abstract | US, general |
+| SRC-0024 | unknown | 6 | 3 descriptive, 1 predictive, 2 prescriptive | 2 literature, 1 factual, 2 legal, 1 abstract | general, US |
+| SRC-0026 | 2026 | 5 | 3 interpretative, 1 descriptive, 1 prescriptive | 4 abstract, 1 literature | general |
 
 ## What is missing
 

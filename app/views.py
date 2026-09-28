@@ -174,6 +174,7 @@ def source_section(ctx: Ctx) -> None:
     st.markdown("#### Source wiki")
     with st.container(border=True):
         st.markdown(ui.wiki_markdown(brain.source_body(ctx.source_id)))
+    ui.raw_markdown(brain.raw_page("source", ctx.source_id))
     st.button("Continue to Claims →", type="primary", key="source_to_claims",
               on_click=go_to_section, args=(ctx, "claims"))
 
@@ -208,7 +209,7 @@ def claims_section(ctx: Ctx) -> None:
                                    f"{claims[i]['id']} — "
                                    f"{claims[i].get('statement', '')[:70]}…"),
             on_change=lambda: (ui.close_wiki(), ui.request_scroll()))
-    ui.statement_card("Claim statement", claim.get("statement", ""))
+    claim_panel(cid, claim.get("statement", ""))
     parts = progress.claim_parts(brain, ctx.source_id, cid, ctx.data)
     st.caption("  ·  ".join(f"{MARK[state]} {part} {done}/{total}"
                             for part, done, total, state in parts if total)
@@ -234,6 +235,65 @@ def claims_section(ctx: Ctx) -> None:
     else:
         cols[1].button("Datasets →", key="claims_to_datasets", width="stretch",
                        on_click=go_to_section, args=(ctx, "datasets"))
+
+
+def concept_caption(family: str, status: str) -> str:
+    """Family, and the status where it tells the evaluator something."""
+    caption = family_label(family) if family else ""
+    if status and status != "anchor":
+        caption += f" · {spec.value_label(status)}"
+    return caption
+
+
+def grounding_quick_guide() -> None:
+    """Explanatory interface text; the authoritative rule is under Instructions."""
+    lines = "".join(f"<div><strong>{html.escape(term)}:</strong> {html.escape(text)}</div>"
+                    for term, text in spec.GROUNDING_QUICK_GUIDE)
+    st.markdown("<div style='margin:0.2rem 0 0.5rem'><div style='font-weight:600'>"
+                f"Quick guide</div>{lines}</div>", unsafe_allow_html=True)
+
+
+#: The Claim under review stays at the top of the page while it scrolls.
+#:
+#: Streamlit wraps each container in an element exactly as tall as the
+#: container, so a sticky container cannot move. The wrapper is made sticky
+#: instead, found through the documented keyed-container class
+#: (`.st-key-claim_sticky`) and Streamlit's `data-testid` attribute — never a
+#: generated `st-emotion-cache-*` class. Streamlit is pinned (requirements.txt),
+#: and if a future version changes the wrapper the selector simply matches
+#: nothing: the panel stays a normal card at the top of the page.
+STICKY_KEY = "claim_sticky"
+STICKY_TOP = "60px"                       # the Streamlit header's measured height
+#: Opaque, so questions scrolling underneath are hidden, not shown through.
+#: The colour follows the viewer's theme as the server last saw it; Streamlit
+#: exposes no theme colours to CSS. After a manual Light/Dark switch from the ⋮
+#: menu it therefore catches up on the next interaction (measured). A
+#: translucent, blurred background was tried and let the text beneath show.
+STICKY_BACKGROUND = {"dark": "#3a3212", "light": "#fff8d6"}      # yellow, per theme
+STICKY_BORDER = {"dark": "#c9a227", "light": "#e0b400"}
+
+
+def claim_panel(claim_id: str, statement: str) -> None:
+    """Claim id and statement, kept in view. Display only: writes nothing."""
+    theme = getattr(getattr(st.context, "theme", None), "type", None) or "light"
+    background = STICKY_BACKGROUND.get(theme, STICKY_BACKGROUND["light"])
+    border = STICKY_BORDER.get(theme, STICKY_BORDER["light"])
+    st.markdown(
+        f'<style>div[data-testid="stLayoutWrapper"]:has(> .st-key-{STICKY_KEY})'
+        f"{{position:sticky;top:{STICKY_TOP};z-index:50}}"
+        f".st-key-{STICKY_KEY}{{background:{background};"
+        f"border:1px solid {border};border-left:5px solid {border};border-radius:6px;"
+        f"padding:1.1rem 1.5rem 1.6rem;margin:0 0 2rem}}</style>",
+        unsafe_allow_html=True)
+    with st.container(key=STICKY_KEY):
+        st.markdown(
+            f"<div style='font-size:0.75rem;letter-spacing:0.04em;opacity:0.7;"
+            f"text-transform:uppercase'>Claim under review · {html.escape(claim_id)}</div>"
+            f"<div class='claim-panel-statement' style='font-size:1.02rem;"
+            f"line-height:1.5;margin-top:0.4rem;padding-right:0.3rem;"
+            f"max-height:20vh;overflow-y:auto'>"
+            f"{html.escape(statement)}</div>",
+            unsafe_allow_html=True)
 
 
 def _part_heading(part: str, counts: dict) -> None:
@@ -329,8 +389,7 @@ def _concept_judgment(ctx: Ctx, question: spec.Question, cid: str, concept_id: s
     concept = ctx.brain.concept(concept_id)
     record = ctx.data.concept(question.key, cid, concept_id)
     st.markdown(f"**{concept_label(concept_id)}**")
-    st.caption(f"{spec.value_label(concept.get('status', ''))} · {concept_id}")
-    ui.concept_definition(concept.get("definition", ""))
+    st.caption(concept_caption(concept.get("concept_type", ""), concept.get("status", "")))
     key = ui.wkey(ctx, question.key, cid, concept_id)
     answer = _radio(ctx, question.options, record.get("answer", ""), key + "|a",
                     _concept_changed,
@@ -463,17 +522,10 @@ def missing_concepts(ctx: Ctx, claim: dict) -> None:
             if not entries:
                 st.caption("No further Concept in this family.")
             for entry in entries:
-                text, definition, action = st.columns([6, 2, 1],
-                                                      vertical_alignment="center")
+                text, action = st.columns([7, 1], vertical_alignment="center")
                 with text:
                     st.markdown(f"**{html.escape(entry['label'])}**")
-                    st.caption(spec.value_label(entry["status"]))
-                with definition:
-                    if entry["definition"]:
-                        with st.popover("Definition"):
-                            st.markdown(html.escape(entry["definition"]))
-                    else:
-                        st.caption(ui.NO_CONCEPT_DEFINITION)
+                    st.caption(concept_caption(entry["family"], entry["status"]))
                 with action:
                     st.button("Add", key=ui.wkey(ctx, "q14add", cid, entry["id"]),
                               disabled=ctx.locked, on_click=_select_concept,
@@ -512,8 +564,13 @@ def relations_part(ctx: Ctx, claim: dict) -> None:
             _relation_card(ctx, relation, cid, n)
             record = ctx.data.relation(relation["key"])
             for question in spec.relation_questions():
-                st.markdown(f"**{question.text}**")
+                st.markdown(f"##### {question.title}")
+                ui.value_line("Assigned value",
+                              spec.value_label(relation.get(question.field, "")))
                 ui.definitions(question.definitions)
+                if question.key == "REL_GROUNDING":
+                    grounding_quick_guide()
+                st.markdown(f"**{question.text}**")
                 key = ui.wkey(ctx, question.key, relation["key"])
                 answer_field = f"{question.column}_answer"
                 comment_field = f"{question.column}_comment"

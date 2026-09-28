@@ -74,8 +74,9 @@ Standardized benchmark suites and frameworks used to evaluate and compare langua
 
 - Because different large language models produce varying responses, there is a need to create and use standardized evaluation benchmarks across model families, and human oversight and domain-specific fine-tuning remain crucial in applications where consistency is essential, such as the legal domain. — rests on factual basis (SRC-0002). [CLM-0002-009]
 - Any benchmark trying to capture (international) legal work should add two layers: the relevance of the context of the users and the promotion of the law as a rich interpretative practice; a large language model cannot be benchmarked in a vacuum, and its performance must be measured on the basis of a specific type of user and context. — rests on abstract considerations (SRC-0005). [CLM-0005-018]
-- Conventional text-generation metrics such as accuracy and ROUGE fall short in assessing the logical consistency, coherence and legal validity of a model's reasoning processes, and task-specific evaluation methods are needed to measure the soundness and transparency of reasoning chains in syllogistic legal reasoning. — rests on abstract considerations (SRC-0011). [CLM-0011-007]
+- Conventional text-generation metrics such as accuracy and ROUGE fall short in assessing the logical consistency, coherence and legal validity of a model's reasoning processes, and task-specific evaluation methods are needed to measure the soundness and transparency of reasoning chains in syllogistic legal reasoning. — rests on abstract considerations (SRC-0011). (same proposition also asserted by SRC-0026, resting on literature) [CLM-0011-007] [CLM-0026-020]
 - A benchmark dataset for stance misrepresentation should consist of LLM-generated legal and academic text annotated for stance misrepresentation at the claim level, using a three-way entailment framework and minimal pair methodology. — rests on abstract considerations (SRC-0022). [CLM-0022-017]
+- A framework for judicial AI should organize requirements into four categories — normative and procedural values; doctrinal and reasoning constraints; fact-finding and evidential requirements; and system-level technical properties — scope them to concrete legal domains, specify an operational design obligation for each requirement, and make those obligations testable through benchmark tasks and metrics, with deployment acceptable only if minimum thresholds are met on a bundle of doctrinal, transparency, evidential and procedural metrics. — rests on abstract considerations (SRC-0026). [CLM-0026-022]
 
 ## Where papers disagree
 
@@ -93,16 +94,17 @@ No extracted disagreement is recorded: every ATTACKS edge touching these claims 
 | SRC-0003 | 2026 | 3 | 3 descriptive | 3 literature | general |
 | SRC-0004 | unknown | 1 | 1 interpretative | 1 abstract | KR |
 | SRC-0005 | 2026 | 2 | 1 prescriptive, 1 interpretative | 2 abstract | general |
-| SRC-0008 | 2026 | 2 | 2 descriptive | 2 literature | RU, general |
+| SRC-0008 | 2026 | 2 | 2 descriptive | 2 literature | general, RU |
 | SRC-0009 | 2025 | 1 | 1 descriptive | 1 factual | EU |
 | SRC-0010 | unknown | 1 | 1 descriptive | 1 literature | general |
 | SRC-0011 | 2025 | 1 | 1 prescriptive | 1 abstract | general |
 | SRC-0012 | 2025 | 2 | 2 descriptive | 2 factual | undetermined |
 | SRC-0014 | unknown | 1 | 1 descriptive | 1 factual | CN |
-| SRC-0015 | unknown | 2 | 2 descriptive | 1 factual, 1 literature | MY+AU, general |
-| SRC-0020 | 2025 | 3 | 3 descriptive | 2 factual, 1 literature | general, undetermined |
+| SRC-0015 | unknown | 2 | 2 descriptive | 1 factual, 1 literature | MY, AU, general |
+| SRC-0020 | 2025 | 3 | 3 descriptive | 2 factual, 1 literature | undetermined, general |
 | SRC-0021 | unknown | 4 | 4 descriptive | 4 factual | US |
-| SRC-0022 | unknown | 3 | 1 descriptive, 1 interpretative, 1 prescriptive | 2 factual, 1 abstract | general, undetermined |
+| SRC-0022 | unknown | 3 | 1 descriptive, 1 interpretative, 1 prescriptive | 2 factual, 1 abstract | undetermined, general |
+| SRC-0026 | 2026 | 2 | 1 interpretative, 1 prescriptive | 1 literature, 1 abstract | general |
 
 ## Open questions
 

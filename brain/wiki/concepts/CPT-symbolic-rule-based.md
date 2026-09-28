@@ -38,6 +38,7 @@ Techniques operating on explicit symbolic rules, hand-crafted or generated, with
 
 - Prompt engineering functions as a form of 'soft programming' that can replace complex feature extraction pipelines or rigid rule-based frameworks, placing prompts at the core of any LLM-driven compliance automation system and motivating the need to treat them as first-class artifacts in the design of legal analysis tools. — rests on abstract considerations (SRC-0001). [CLM-0001-009]
 - The gap between legal interpretation and formal validity is largely invisible in legal AI research, because most systems either mimic legal interpretation through language model training or enforce formal validity through symbolic methods without acknowledging that the two regularly diverge; making this gap explicit, measurable and addressable is one of the most important open problems in legal AI. — rests on abstract considerations (SRC-0022). [CLM-0022-003]
+- Legal interpretation is not a matter of deductive logic but of constructing a persuasive argument grounded in accepted sources of law, generally accepted legal principles and the rule of law, so traditional symbolic AI is unable to perform interpretation tasks; traditional and quite universal unwritten interpretation maxims — such as exceptio est strictissimae applicationis, lex specialis derogat legi generali and lex posterior derogat legi priori — can be helpful when integrated into LLM prompting and agent architecture, but these maxims alone are insufficient tools in legal adjudication and may have various nuances and strengths in different legal systems and traditions. — rests on abstract considerations (SRC-0026). [CLM-0026-013]
 
 ## Where papers disagree
 
@@ -54,14 +55,15 @@ No extracted disagreement is recorded: every ATTACKS edge touching these claims 
 | paper | year | claims | by type | by basis | jurisdictions |
 |---|---|---|---|---|---|
 | SRC-0001 | unknown | 2 | 1 descriptive, 1 interpretative | 1 literature, 1 abstract | general |
-| SRC-0007 | 2026 | 3 | 3 descriptive | 3 factual | general, undetermined |
+| SRC-0007 | 2026 | 3 | 3 descriptive | 3 factual | undetermined, general |
 | SRC-0013 | 2025 | 2 | 2 descriptive | 1 abstract, 1 factual | general, undetermined |
 | SRC-0021 | unknown | 1 | 1 descriptive | 1 literature | US |
 | SRC-0022 | unknown | 1 | 1 interpretative | 1 abstract | general |
+| SRC-0026 | 2026 | 1 | 1 interpretative | 1 abstract | general |
 
 ## What is missing
 
-Absence records whose key names this concept (7, computed by `tools/absences.py`). Each is `unresolved` between its three readings — `gap_in_literature` (nobody in the field has written it), `extraction_shadow` (somebody has, and this corpus or extraction missed it), `tacit_link` (so obvious to the field that nobody states it) — which only a person may resolve.
+Absence records whose key names this concept (10, computed by `tools/absences.py`). Each is `unresolved` between its three readings — `gap_in_literature` (nobody in the field has written it), `extraction_shadow` (somebody has, and this corpus or extraction missed it), `tacit_link` (so obvious to the field that nobody states it) — which only a person may resolve.
 
 - ABS-0569 — `concept_pair:CPT-dataset-license-compliance|CPT-symbolic-rule-based` — No claim links CPT-dataset-license-compliance to CPT-symbolic-rule-based. (reading: unresolved — gap_in_literature | extraction_shadow | tacit_link)
 - ABS-0599 — `concept_pair:CPT-fatwa-issuance|CPT-symbolic-rule-based` — No claim links CPT-fatwa-issuance to CPT-symbolic-rule-based. (reading: unresolved — gap_in_literature | extraction_shadow | tacit_link)
@@ -70,6 +72,9 @@ Absence records whose key names this concept (7, computed by `tools/absences.py`
 - ABS-0650 — `concept_pair:CPT-legal-education|CPT-symbolic-rule-based` — No claim links CPT-legal-education to CPT-symbolic-rule-based. (reading: unresolved — gap_in_literature | extraction_shadow | tacit_link)
 - ABS-0669 — `concept_pair:CPT-review-and-due-diligence|CPT-symbolic-rule-based` — No claim links CPT-review-and-due-diligence to CPT-symbolic-rule-based. (reading: unresolved — gap_in_literature | extraction_shadow | tacit_link)
 - ABS-0687 — `concept_pair:CPT-rulemaking|CPT-symbolic-rule-based` — No claim links CPT-rulemaking to CPT-symbolic-rule-based. (reading: unresolved — gap_in_literature | extraction_shadow | tacit_link)
+- ABS-0705 — `concept_pair:CPT-burden-of-proof|CPT-symbolic-rule-based` — No claim links CPT-burden-of-proof to CPT-symbolic-rule-based. (reading: unresolved — gap_in_literature | extraction_shadow | tacit_link)
+- ABS-0721 — `concept_pair:CPT-evidence-evaluation|CPT-symbolic-rule-based` — No claim links CPT-evidence-evaluation to CPT-symbolic-rule-based. (reading: unresolved — gap_in_literature | extraction_shadow | tacit_link)
+- ABS-0737 — `concept_pair:CPT-legal-framework-selection|CPT-symbolic-rule-based` — No claim links CPT-legal-framework-selection to CPT-symbolic-rule-based. (reading: unresolved — gap_in_literature | extraction_shadow | tacit_link)
 
 ## Open questions
 

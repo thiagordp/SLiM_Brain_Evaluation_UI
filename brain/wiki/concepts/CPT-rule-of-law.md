@@ -20,6 +20,10 @@ The concern with legality, consistency and the constraint of arbitrary power whe
 
 - Substituting a polling proxy — a panel drawn from the public or a large language model prediction of aggregated public opinion — for a judge's individual reasoning is not the process mandated for legal decisions by the text of the US Constitution and by US legal culture; a judge who handed over her ultimate decision to such a proxy would be violating her duty to decide the case. — rests on legal sources (SRC-0019). [CLM-0019-003]
 
+**general**
+
+- The judicial process is bound by a set of imperatives — impartiality, legal certainty, transparency, and the justifiability and controllability of every step of decision-making — which are not mere aspirations but functional requirements of a legitimate legal system, and these requirements are largely common regardless of how legal argumentation is theoretically or practically constructed. — rests on abstract considerations (SRC-0026). [CLM-0026-003]
+
 ### Predictive
 
 **general**
@@ -39,6 +43,7 @@ No extracted disagreement is recorded: every ATTACKS edge touching these claims 
 | paper | year | claims | by type | by basis | jurisdictions |
 |---|---|---|---|---|---|
 | SRC-0019 | 2025 | 2 | 1 interpretative, 1 predictive | 1 legal, 1 abstract | US, general |
+| SRC-0026 | 2026 | 1 | 1 interpretative | 1 abstract | general |
 
 ## What is missing
 

@@ -33,7 +33,7 @@ re-read the stored answers first.
 
 | Page | Asks |
 |---|---|
-| Source | nothing — metadata and the complete Source wiki, as context |
+| Source | nothing — metadata and the complete Source wiki, as context, with its exact file under "Raw Markdown" |
 | Claims, one at a time | **Claim evaluation** Q1–Q5 · **Schema fields** Q6–Q11 · **Concepts** Q12–Q14 · **Relations** |
 | Datasets, one at a time | Dataset node, Introduced by, Language, Jurisdiction, Description, Availability |
 | Claim recall | four-level completeness, and Missing Claims below "All" |
@@ -46,28 +46,43 @@ it). Evaluators never see an internal identifier.
   already-evaluated Claim of the Source is restated. The Claim id is stored as
   structured data (`related_claim_id`). A restatement is an extraction problem,
   not a SAME_AS edge.
+- **Guidance** is always in a closed expander labelled **Instructions**, whether
+  it comes from the schema or a skill. Values and evidence (statement, assigned
+  values, anchors, Description, relation endpoints, type, grounding, Note) stay
+  outside it.
+- **Claim under review.** On the Claim page the Claim id and statement stay
+  pinned under the header while the page scrolls. It uses the documented
+  keyed-container class and Streamlit's `stLayoutWrapper` test attribute, and it
+  relies on the Streamlit pin: if a future version changes that wrapper, the
+  panel becomes an ordinary card at the top of the page, and nothing else is
+  affected.
+- **Questions 3 and 4** carry the extract-claims skill's modality and
+  standalone-statement passages, frozen verbatim.
 - **Question 5**: Yes / In part / No, with all anchors (quote and location)
   shown in place.
-- **Questions 6–11** each show the field, the value the Brain assigned, the
-  complete definition, and every category with its meaning. The assigned
-  category is marked in words.
+- **Questions 6–11** each show the field, the value the Brain assigned, and —
+  under Instructions — the complete frozen definition with every category and
+  its meaning.
 - **Question 12**: one independent Yes / No per assigned Concept, grouped by
-  the six Concept families.
+  the six Concept families; each Concept shows its name, family and, when not
+  an anchor, its status. **No generated Concept definition is shown** in Q12,
+  Q13 or Q14: Concepts are judged by the shared vocabulary itself.
 - **Question 13**: one per assigned *candidate* Concept; absent when there is
   none.
-- **Question 14**: a Concept browser. It offers local, ranked search over name,
-  id and definition, with results grouped by family. Already-assigned Concepts
-  are excluded. A separate *Selected missing Concepts* area shows each choice
-  as "Name ×". There is an explicit "No additional Concepts are missing", and a
-  new Concept can be proposed (name, family, optional reason). A proposal is
-  stored with the evaluation and never creates a Brain Concept. Anchors in the
-  frozen grid that have no Concept page show "Definition not available in the
-  current Concept wiki". No definition is invented.
+- **Question 14**: a Concept browser with local, ranked search over name, id and
+  family — never definitions — and results grouped by family. Already-assigned
+  Concepts are excluded. A separate *Selected missing Concepts* area lists each
+  choice with its × on the right. There is an explicit "No additional Concepts
+  are missing", and a new Concept can be proposed (name, family, optional
+  reason). A proposal is stored with the evaluation and never creates a Brain
+  Concept.
 - **Relations**: only SUPPORTS, ATTACKS and SAME_AS between Claims. Each graph
   Relation is evaluated exactly once, on the page of its **From** Claim (every
   Claim Relation in this Brain joins two Sources). The To side shows it as
   context. The card keeps the true From → To direction, marks the current
-  Claim, and shows grounding and Note. Grounding and Relation type are two
+  Claim, and shows grounding and Note. Grounding has a short Quick guide above
+  its question; the create-edges rule itself is under Instructions, word for
+  word. Grounding and Relation type are two
   independent judgments.
 - **Datasets**: the Datasets the Source's Claims rest on. With none, no Dataset
   question is asked. There is intentionally no Dataset-recall question.

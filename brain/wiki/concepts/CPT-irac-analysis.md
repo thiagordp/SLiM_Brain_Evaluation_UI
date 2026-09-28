@@ -29,6 +29,7 @@ The structured method of legal analysis proceeding through Issue, Rule, Applicat
 **general**
 
 - IRAC — standing for Issue, Rule, Application and Conclusion — is the most popular legal analysis methodology used by legal professionals and law schools, applied for solving legal problems in a systematic manner. — rests on literature (SRC-0015). [CLM-0015-011]
+- While AI can be a powerful tool in the initial issue-discovery phase of legal reasoning, its greatest challenges and potential lie in the two demanding phases of selecting the correct rule and applying it to the facts of the case, where the highest standards of judicial reasoning are required. — rests on abstract considerations (SRC-0026). [CLM-0026-004]
 
 ## Where papers disagree
 
@@ -38,7 +39,8 @@ No ATTACKS edge touches the claims mapped to this concept.
 
 | paper | year | claims | by type | by basis | jurisdictions |
 |---|---|---|---|---|---|
-| SRC-0015 | unknown | 5 | 5 descriptive | 4 factual, 1 literature | MY+AU, MY+AU+US, general |
+| SRC-0015 | unknown | 5 | 5 descriptive | 4 factual, 1 literature | MY, AU, US, general |
+| SRC-0026 | 2026 | 1 | 1 descriptive | 1 abstract | general |
 
 ## What is missing
 

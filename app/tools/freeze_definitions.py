@@ -32,7 +32,38 @@ from brain import brain_dir  # noqa: E402
 
 OUT = APP / "data" / "definitions_v4.json"
 DEFAULT_SKILLS = ROOT.parent / "SLiM_Brain" / ".claude" / "skills"
-SKILLS_USED = ("create-edges",)
+SKILLS_USED = ("create-edges", "extract-claims")
+
+#: Skill passages shown to evaluators, located by their exact text (never by
+#: line number). Each is stored exactly as written in the skill; if the skill
+#: no longer contains it word for word, freezing fails.
+SKILL_PASSAGES = {
+    "skill.extract_claims.standalone": (
+        "extract-claims", "Claim understood on its own",
+        'Someone who has not read the paper must understand it.\n'
+        '\n'
+        'Cut every reference to the document. No "this work", no "the authors", '
+        'no "as shown above".'),
+    "skill.extract_claims.modality": (
+        "extract-claims", "Strength and modality",
+        'Keep the modality of the statement as expressed in the source.\n'
+        'If the source says "may", write "may". Never turn "suggests" into '
+        '"shows", or "should" into "must" and so on.'),
+}
+
+
+class PassageMissing(RuntimeError):
+    pass
+
+
+def skill_passage(text: str, passage: str, where: str) -> str:
+    """The passage, exactly as it stands in the skill — or a loud failure."""
+    if passage not in text:
+        raise PassageMissing(
+            f"{where} no longer contains this passage word for word:\n{passage}\n"
+            f"Nothing was written. Update SKILL_PASSAGES only if the new wording is "
+            f"the accepted one.")
+    return passage
 
 FIELD = re.compile(r"^- \*\*`([a-z_]+)`\*\*(?:, \*\*`[a-z_]+`\*\*)?\s*(?:—\s*)?(.*)$")
 CATEGORY = re.compile(r"^`([^`]+)`:\s*(.*)$")
@@ -207,6 +238,11 @@ def build(schema_dir: pathlib.Path, skills_dir: pathlib.Path) -> dict:
         "concept.definition": entry("Concept definition", "schema/concept.md",
                                     concept["definition"]["text"]),
     }
+    for key, (skill, label, passage) in SKILL_PASSAGES.items():
+        path = skills_dir / skill / "SKILL.md"
+        entries[key] = entry(label, f".claude/skills/{skill}/SKILL.md",
+                             skill_passage(path.read_text(encoding="utf-8"), passage,
+                                           f".claude/skills/{skill}/SKILL.md"))
 
     sources = {f"schema/{p.name}": sha(p) for p in sorted(schema_dir.glob("*.md"))}
     for name in SKILLS_USED:

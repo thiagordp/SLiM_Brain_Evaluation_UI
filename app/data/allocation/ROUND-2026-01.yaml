@@ -1,18 +1,17 @@
 # Allocation for ROUND-2026-01 — DEVELOPMENT ALLOCATION.
 #
 # This is NOT the accepted scientific allocation. It exists so the round can be
-# bootstrapped and exercised end to end while one Source (the 26th) is still
-# missing from the Brain. The choice of Agreement and Individual papers is
-# arbitrary but deterministic:
+# bootstrapped and exercised end to end until the final pairs and papers are
+# derived from the corpus-sampling clusters. The choice of Agreement and
+# Individual papers is arbitrary but deterministic:
 #
 #   training   the two agreed Training papers, resolved by title in the Brain
 #   agreement  the first six remaining Sources in ascending id order, two per pair
-#   individual the other seventeen in ascending id order, in consecutive blocks
-#              of three per evaluator, in the evaluator order below; the last
-#              evaluator (Alessandro) temporarily has two.
+#   individual the other eighteen in ascending id order, in consecutive blocks
+#              of three per evaluator, in the evaluator order below. The 26th
+#              Source (SRC-0026, ingested 2026-09-28) completed IND-6.
 #
-# When the 26th Source is in the Brain, add it to IND-6 (Alessandro), giving
-# every evaluator three Individual papers, then regenerate:
+# After any edit, regenerate the manifest:
 #
 #   python app/tools/build_assignments.py
 #
@@ -94,6 +93,7 @@ individual:
     sources:
       - {source: SRC-0024, title: "Automating the Administrative State? Caution and Humility in the Use of Generative AI in Rulemaking"}
       - {source: SRC-0025, title: "Contract Law Illusions and Delusions"}
+      - {source: SRC-0026, title: "Challenges for generative AI in legal reasoning"}
 
 # Generic reservations: preallocated storage for a decision not yet taken.
 # None are needed for this allocation.

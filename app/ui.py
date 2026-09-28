@@ -278,6 +278,7 @@ def _wiki_body(ctx: Ctx) -> None:
         st.markdown(f"### {source.get('title', object_id)}")
         _references(ctx, ctx.brain.source_body(object_id), object_id, f"src|{object_id}")
         st.markdown(wiki_markdown(ctx.brain.source_body(object_id)))
+        raw_markdown(ctx.brain.raw_page("source", object_id))
     elif kind == CONCEPT:
         concept = ctx.brain.concept(object_id)
         st.markdown(f"### {concept_label(object_id)}")
@@ -285,12 +286,14 @@ def _wiki_body(ctx: Ctx) -> None:
                    f"{family_label(concept.get('concept_type', ''))}")
         _references(ctx, ctx.brain.concept_body(object_id), object_id, f"cpt|{object_id}")
         st.markdown(wiki_markdown(ctx.brain.concept_body(object_id)))
+        raw_markdown(ctx.brain.raw_page("concept", object_id))
     elif kind == DATASET:
         dataset = ctx.brain.dataset(object_id)
         st.markdown(f"### {dataset.get('name', object_id)}")
         st.caption(object_id)
         _references(ctx, ctx.brain.dataset_body(object_id), object_id, f"dst|{object_id}")
         st.markdown(wiki_markdown(ctx.brain.dataset_body(object_id)))
+        raw_markdown(ctx.brain.raw_page("dataset", object_id))
     elif kind == CLAIM:
         st.caption("Claims have no wiki page; this view is generated from the Claim "
                    "record.")
@@ -378,11 +381,18 @@ def _esc(text: str) -> str:
     return html.escape(spec.plain(text))
 
 
-SCHEMA_DEFINITION = "Schema definition"
-CONCEPT_DEFINITION = "Concept definition"
-#: A UI message, never part of any definition: shown where the Concept wiki
-#: records no definition. No definition is generated in its place.
-NO_CONCEPT_DEFINITION = "Definition not available in the current Concept wiki."
+#: The one evaluator-facing label for closed guidance, whatever the frozen
+#: material comes from (a schema file or a skill).
+INSTRUCTIONS = "Instructions"
+RAW_MARKDOWN = "Raw Markdown"
+
+
+def _paragraphs_html(text: str) -> str:
+    """A verbatim passage with its paragraphs and line breaks kept."""
+    return "".join(
+        "<p style='margin:0 0 0.5rem'>"
+        + "<br>".join(_esc(line) for line in paragraph.split("\n")) + "</p>"
+        for paragraph in text.split("\n\n") if paragraph.strip())
 
 
 def definition_html(key: str) -> str:
@@ -417,8 +427,27 @@ def definition_html(key: str) -> str:
     return "".join(parts)
 
 
+def _render_passage(key: str) -> None:
+    """Render one frozen entry. Presentation only: the stored text is untouched.
+
+    * a skill passage with a stored ``verbatim`` block (Grounding) is shown as
+      that block, the skill's own list structure included;
+    * any other skill passage keeps its paragraphs and line breaks;
+    * a schema entry shows its text and its values with their meanings.
+
+    In every case the only transformation is dropping backtick code markup.
+    """
+    entry = spec.definition(key)
+    if entry.get("verbatim"):
+        st.markdown(spec.plain(entry["verbatim"]))
+    elif entry["source"].startswith(".claude/skills/"):
+        st.markdown(_paragraphs_html(entry["text"]), unsafe_allow_html=True)
+    else:
+        st.markdown(definition_html(key), unsafe_allow_html=True)
+
+
 def definitions(keys, headings: dict | None = None) -> None:
-    """The frozen definitions for a question, in a closed "Schema definition" expander.
+    """Frozen guidance for a question, in a closed "Instructions" expander.
 
     Each passage is preceded by a heading that is interface structure — the
     entry's label, or ``headings[key]`` — rendered as its own element and never
@@ -426,20 +455,25 @@ def definitions(keys, headings: dict | None = None) -> None:
     """
     if not keys:
         return
-    with st.expander(SCHEMA_DEFINITION, expanded=False):
+    with st.expander(INSTRUCTIONS, expanded=False):
         for key in keys:
             heading = (headings or {}).get(key) or spec.definition(key)["label"]
             st.markdown(f"**{html.escape(heading)}**")
-            st.markdown(definition_html(key), unsafe_allow_html=True)
+            _render_passage(key)
 
 
-def concept_definition(definition: str) -> None:
-    """A Concept's current definition, closed by default; a caption when none."""
-    if (definition or "").strip():
-        with st.expander(CONCEPT_DEFINITION, expanded=False):
-            st.markdown(html.escape(definition))
-    else:
-        st.caption(NO_CONCEPT_DEFINITION)
+def raw_markdown(text: str) -> None:
+    """The exact file text of a wiki page, read-only and copyable.
+
+    Shown as it is on disk — frontmatter included, nothing rebuilt from the
+    rendered page. Informational only: it reads nothing but the Brain file and
+    writes nothing.
+    """
+    # `st.code` drops exactly one leading and one trailing newline of its body;
+    # padding them back keeps the displayed and copied text identical to the file.
+    body = ("\n" if text.startswith("\n") else "") + text + ("\n" if text.endswith("\n") else "")
+    with st.expander(RAW_MARKDOWN, expanded=False):
+        st.code(body, language="markdown", wrap_lines=True)
 
 
 def value_line(label: str, value: str) -> None:

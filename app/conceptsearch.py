@@ -1,9 +1,11 @@
 """Local, deterministic Concept search for Question 14.
 
 The evaluator types free words; Concepts are ranked by how well their name, id
-and definition match. No query token is mandatory: a Concept that matches some
-of the words still appears, below those that match more or match in the name.
-The same query always gives the same order.
+and family match — the shared vocabulary itself. Generated Concept definitions
+are deliberately not read: they are neither search evidence nor ranking
+evidence. No query word is mandatory: a Concept matching some of the words
+still appears, below those that match more or match in the name. The same query
+always gives the same order.
 """
 from __future__ import annotations
 
@@ -13,10 +15,10 @@ import unicodedata
 STOPWORDS = frozenset({"a", "an", "and", "the", "of", "in", "on", "to", "for", "or",
                        "by", "with", "is", "are", "as", "at", "its"})
 
-# Weights: a word in the name counts far more than one in the definition.
+# Weights: a word in the name counts far more than one in the id or the family.
 NAME_WORD, NAME_PREFIX = 10, 6
 ID_WORD = 4
-DEFINITION_WORD, DEFINITION_PREFIX = 2, 1
+FAMILY_WORD = 2
 NAME_PHRASE, NAME_EXACT = 30, 100
 
 
@@ -31,14 +33,14 @@ def words(text: str) -> list[str]:
 
 
 def score(query: str, entry: dict) -> int:
-    """Relevance of one Concept (`label`, `id`, `definition`) to a query."""
+    """Relevance of one Concept (`label`, `id`, `family`) to a query."""
     q_words = words(query)
     if not q_words:
         return 0
     name = normalise(entry.get("label", ""))
     name_words = set(name.split())
     id_words = set(normalise(entry.get("id", "").removeprefix("CPT-")).split())
-    definition_words = set(normalise(entry.get("definition", "")).split())
+    family_words = set(normalise(entry.get("family", "")).split())
     total = 0
     phrase = " ".join(q_words)
     if name == normalise(query):
@@ -52,10 +54,8 @@ def score(query: str, entry: dict) -> int:
             total += NAME_PREFIX
         if word in id_words:
             total += ID_WORD
-        if word in definition_words:
-            total += DEFINITION_WORD
-        elif len(word) >= 4 and any(w.startswith(word) for w in definition_words):
-            total += DEFINITION_PREFIX
+        if word in family_words:
+            total += FAMILY_WORD
     return total
 
 

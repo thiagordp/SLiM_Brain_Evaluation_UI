@@ -132,6 +132,15 @@ DESCRIPTION_HELP = (
     "in the Source."
 )
 
+#: Explanatory interface text shown above the Grounding question. It is NOT a
+#: definition and does not replace the frozen create-edges rule, which stays
+#: available verbatim under Instructions.
+GROUNDING_QUICK_GUIDE = (
+    ("Extracted", "the two papers are linked by a citation on the specific point "
+                  "represented by this relation."),
+    ("Inferred", "there is no such citation grounding for this relation."),
+)
+
 MISSING_CLAIMS_HELP = (
     "Write each missing Claim as a short proposition and, where possible, "
     "indicate the page or section where the Source advances it."
@@ -154,13 +163,15 @@ QUESTIONS: tuple[Question, ...] = (
     _q(key="CLAIM_Q03_MODALITY", unit=UNIT_CLAIM, part=PART_CLAIM,
        title="Strength and modality",
        text="Does the Claim preserve the strength and modality of the source?",
-       options=BINARY, semantics=CORRECTNESS_BINARY, optional_comment_on=(NO,),
+       options=BINARY, semantics=CORRECTNESS_BINARY,
+       definitions=("skill.extract_claims.modality",), optional_comment_on=(NO,),
        comment_label=COMMENT_LABEL),
     _q(key="CLAIM_Q04_STANDALONE", unit=UNIT_CLAIM, part=PART_CLAIM,
        title="Understood on its own",
        text="Can this Claim be understood on its own, without missing context from "
             "the paper?",
-       options=BINARY, semantics=CORRECTNESS_BINARY, optional_comment_on=(NO,),
+       options=BINARY, semantics=CORRECTNESS_BINARY,
+       definitions=("skill.extract_claims.standalone",), optional_comment_on=(NO,),
        comment_label=COMMENT_LABEL),
     _q(key="CLAIM_Q05_GROUNDING", unit=UNIT_CLAIM, part=PART_CLAIM,
        title="Textual grounding",

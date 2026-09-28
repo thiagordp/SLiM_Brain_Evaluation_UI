@@ -50,6 +50,10 @@ The technical task of pulling structured elements — entities, statements, fact
 - In classifying CJEU decision paragraphs as containing Judicial Interpretative Formulas, a LinearSVC with TF-IDF features performs not much inferior to state-of-the-art Transformer models, suggesting that lexical cues play a crucial role in the task. — rests on factual basis (SRC-0009). [CLM-0009-010]
 - LEGAL-BERT may be considered the best model for Judicial Interpretative Formula extraction: it is the most stable and has the best macro F1 score and the best F1 score on the positive class, and its near-best recall on the positive class is particularly relevant for tools intended for legal practitioners, since the presence of additional JIFs is preferable to the absence of fundamental ones — users can easily discard a few irrelevant paragraphs, but cannot know if a crucial JIF is missing. — rests on factual basis (SRC-0009). [CLM-0009-011]
 
+**general**
+
+- A neuro-symbolic system is a feasible approach to resolving high-volume, low-complexity disputes such as consumer product-defect small claims: an LLM layer operates as an observation engine that reads unstructured inputs and proposes structured facts, while a symbolic layer performs the determinative legal reasoning by handling curated rules and decision tables, a division that delivers both coverage over unstructured inputs and transparent, auditable decisions aligned with core legal maxims. — rests on abstract considerations (SRC-0026). [CLM-0026-021]
+
 ### Prescriptive
 
 **general**
@@ -70,8 +74,9 @@ No extracted disagreement is recorded: every ATTACKS edge touching these claims 
 |---|---|---|---|---|---|
 | SRC-0009 | 2025 | 4 | 2 descriptive, 2 interpretative | 1 literature, 3 factual | EU |
 | SRC-0013 | 2025 | 4 | 4 descriptive | 2 literature, 1 abstract, 1 factual | general, undetermined |
-| SRC-0017 | 2024 | 6 | 5 descriptive, 1 prescriptive | 1 literature, 3 factual, 2 abstract | DE, general |
+| SRC-0017 | 2024 | 6 | 5 descriptive, 1 prescriptive | 1 literature, 3 factual, 2 abstract | general, DE |
 | SRC-0018 | 2024 | 1 | 1 descriptive | 1 factual | US |
+| SRC-0026 | 2026 | 1 | 1 interpretative | 1 abstract | general |
 
 ## Open questions
 

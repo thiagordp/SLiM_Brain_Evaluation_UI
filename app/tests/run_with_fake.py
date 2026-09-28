@@ -30,10 +30,13 @@ def main() -> None:
     with contextlib.redirect_stdout(io.StringIO()):
         assert bootstrap_round.main() == 0
     print("in-memory round ready · password 'preview' · admin 'preview-admin'")
+    from streamlit import config
     from streamlit.web import bootstrap
 
-    bootstrap.run(str(APP / "streamlit_app.py"), False, [],
-                  {"server_port": 8599, "server_headless": True})
+    # Set before the server starts: `bootstrap.run` does not apply flag options.
+    config.set_option("server.port", 8599)
+    config.set_option("server.headless", True)
+    bootstrap.run(str(APP / "streamlit_app.py"), False, [], {})
 
 
 if __name__ == "__main__":
