@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import contextlib
 import html
+import itertools
 import io
 import json
 import os
@@ -47,6 +48,39 @@ ROUND = manifest.round_id()
 BRAIN = brain_module.load_brain()
 FAILURES: list[str] = []
 CHECKS = 0
+
+
+# ------------------------------------------------ choices from the allocation
+#: Tests pick their evaluator and papers from the generated manifest, so a new
+#: allocation never needs the tests rewritten. Thiago is used because he is in
+#: every allocation so far and is the administrator.
+ASSIGNMENTS = manifest.load_manifest_file()["assignments"]
+EVALUATOR = "thiago"
+
+
+def _assigned(evaluator: str, phase: str) -> list[str]:
+    return sorted(a["source_id"] for a in ASSIGNMENTS
+                  if a["evaluator_id"] == evaluator and a["phase_id"] == phase)
+
+
+def _rich(source: str) -> bool:
+    """A paper exercising every Claim-page part: Datasets, several Concepts on
+    its first Claim, and a Relation starting from that Claim."""
+    first = BRAIN.claims_of(source)[0]["id"]
+    return (bool(BRAIN.dataset_ids_of(source)) and len(BRAIN.concepts_of_claim(first)) >= 2
+            and bool(BRAIN.relations_from_claim(first)))
+
+
+AGR_SOURCE = next(s for s in _assigned(EVALUATOR, "agreement") if _rich(s))
+AGR_PARTNER = next(a["evaluator_id"] for a in ASSIGNMENTS
+                   if a["phase_id"] == "agreement" and a["source_id"] == AGR_SOURCE
+                   and a["evaluator_id"] != EVALUATOR)
+IND_SOURCE = _assigned(EVALUATOR, "individual")[0]
+NO_DATASET_SOURCE = next(s for s in _assigned(EVALUATOR, "individual")
+                         + _assigned(EVALUATOR, "agreement")
+                         if not BRAIN.dataset_ids_of(s))
+NO_DATASET_PHASE = ("individual" if NO_DATASET_SOURCE in _assigned(EVALUATOR, "individual")
+                    else "agreement")
 
 
 def check(condition, message: str) -> None:
@@ -274,23 +308,32 @@ def dataclass_text(question):
 # ================================================================ allocation
 def test_allocation_rules():
     data = allocation.load(manifest.allocation_path())
-    check(allocation.validate(data, BRAIN) == [], "allocation: the dev file is valid")
+    check(allocation.validate(data, BRAIN) == [], "allocation: the allocation file is valid")
     evaluators, rows = allocation.expand(data, BRAIN)
     phases = {p: [r for r in rows if r["phase_id"] == p] for p in allocation.PHASES}
-    check(len(phases["training"]) == 12 and {r["source_id"] for r in phases["training"]}
-          == {"SRC-0006", "SRC-0009"}, "allocation: 2 Training papers for all six")
-    check(len(phases["agreement"]) == 12 and len({r["source_id"] for r in phases["agreement"]}) == 6,
-          "allocation: 6 Agreement papers, each for both members of a pair")
-    remaining = len(BRAIN.sources) - 2 - 6
+    training = {r["source_id"] for r in phases["training"]}
+    check(training == {"SRC-0006", "SRC-0009"}
+          and len(phases["training"]) == 2 * len(evaluators),
+          "allocation: the 2 agreed Training papers, for every evaluator")
+    groups = data["pairs"]
+    check(all(len(members) >= 2 for members in groups.values())
+          and sorted(m for ms in groups.values() for m in ms)
+          == sorted(e["evaluator_id"] for e in evaluators),
+          "allocation: every evaluator belongs to exactly one group of two or more")
+    for split, spec_ in data["agreement"].items():
+        size = len(groups[spec_["pair"]])
+        for entry in spec_["sources"]:
+            made = [r for r in phases["agreement"] if r["source_id"] == entry["source"]]
+            check(len(made) == size,
+                  f"allocation: {split} {entry['source']} is evaluated by every group member")
+    agreement_papers = {r["source_id"] for r in phases["agreement"]}
+    remaining = len(BRAIN.sources) - len(training) - len(agreement_papers)
     check(len(phases["individual"]) == remaining,
           f"allocation: the other {remaining} papers are Individual")
     per = sorted(sum(1 for r in phases["individual"] if r["evaluator_id"] == e["evaluator_id"])
                  for e in evaluators)
     check(per[-1] - per[0] <= 1 and sum(per) == remaining,
           "allocation: Individual papers as even as possible")
-    pairs = {e["evaluator_id"]: e["pair_id"] for e in evaluators}
-    check(pairs["thiago"] == pairs["francesca"] == "A" and pairs["giuseppe"] == "B"
-          and pairs["giovanni"] == pairs["alessandro"] == "C", "allocation: the three pairs")
 
     def broken(mutate):
         copy = json.loads(json.dumps(data))
@@ -298,13 +341,14 @@ def test_allocation_rules():
         return allocation.validate(copy, BRAIN)
 
     check(any("Training Source" in p for p in broken(
-        lambda d: d["agreement"]["AGR-A"]["sources"].append("SRC-0006"))),
+        lambda d: d["agreement"][next(iter(d["agreement"]))]["sources"].append("SRC-0006"))),
         "allocation: a Training Source used elsewhere is refused")
     check(any("more than once" in p for p in broken(
-        lambda d: d["individual"]["IND-1"]["sources"].append("SRC-0001"))),
+        lambda d: d["individual"][next(iter(d["individual"]))]["sources"].append(
+            d["agreement"][next(iter(d["agreement"]))]["sources"][0]["source"]))),
         "allocation: a Source placed twice is refused")
     check(any("not placed" in p for p in broken(
-        lambda d: d["individual"]["IND-6"]["sources"].pop())),
+        lambda d: d["individual"][next(iter(d["individual"]))]["sources"].pop())),
         "allocation: an unplaced Source is refused")
     check(any("not in the current Brain" in p for p in broken(
         lambda d: d["training"].append("SRC-0999"))),
@@ -312,11 +356,15 @@ def test_allocation_rules():
     check(any("is titled" in p for p in broken(
         lambda d: d["training"].__setitem__(0, {"source": "SRC-0006", "title": "Wrong"}))),
         "allocation: a title that does not match the Brain is refused")
-    check(any("exactly two" in p for p in broken(
-        lambda d: d["pairs"]["A"].append("giuseppe"))),
-        "allocation: a pair must have two evaluators")
+    check(any("at least two" in p for p in broken(
+        lambda d: d["pairs"].__setitem__(next(iter(d["pairs"])),
+                                         d["pairs"][next(iter(d["pairs"]))][:1]))),
+        "allocation: a group must have at least two evaluators")
+    check(not any("at least two" in p for p in broken(lambda d: None)),
+          "allocation: a group of three is accepted")
     check(any("evaluator" in p for p in broken(
-        lambda d: d["individual"]["IND-1"].__setitem__("evaluator", "nobody"))),
+        lambda d: d["individual"][next(iter(d["individual"]))].__setitem__(
+            "evaluator", "nobody"))),
         "allocation: an Individual split needs a listed evaluator")
 
 
@@ -380,7 +428,7 @@ def test_bootstrap():
     sys.argv = ["bootstrap_round.py"]
     with contextlib.redirect_stdout(io.StringIO()):
         check(bootstrap_round.main() == 1, "bootstrap: refuses a workbook holding a round")
-    start(rid("agreement", "thiago", "SRC-0001"))
+    start(rid("agreement", EVALUATOR, AGR_SOURCE))
     sys.argv = ["bootstrap_round.py", "--overwrite-round", ROUND]
     with contextlib.redirect_stdout(io.StringIO()):
         check(bootstrap_round.main() == 1,
@@ -400,17 +448,18 @@ def test_bootstrap():
 # ===================================================================== store
 def test_store_roundtrip_and_conflicts():
     book = fresh_round()
-    review = rid("individual", "thiago", "SRC-0008")
+    review = rid("individual", EVALUATOR, IND_SOURCE)
+    ind_claim = BRAIN.claims_of(IND_SOURCE)[0]["id"]
     start(review)
     store.get_review(review)            # the page has already read REVIEWS by now
     before = dict(book.requests)
     data = store.load_review(review)
     check(book.requests["read"] - before.get("read", 0) == 1,
           "store: a paper's answers load in one read request")
-    row = data.response(spec.Q1.key, "CLM-0008-001")
+    row = data.response(spec.Q1.key, ind_claim)
     stamp = store.write(sheets.RESPONSES, row["response_key"], {**row, "answer": "No"},
                         rid=review, expected_updated_at="")
-    check(store.load_review(review).response(spec.Q1.key, "CLM-0008-001")["answer"] == "No",
+    check(store.load_review(review).response(spec.Q1.key, ind_claim)["answer"] == "No",
           "store: an answer round-trips")
     try:
         store.write(sheets.RESPONSES, row["response_key"], {**row, "answer": "Yes"},
@@ -422,22 +471,22 @@ def test_store_roundtrip_and_conflicts():
                 rid=review, expected_updated_at="an older stamp", also_accept={stamp})
     check(True, "store: the session's own earlier stamp is not a conflict")
 
-    key = store.selection_key(review, "CLM-0008-001", "CPT-legal-drafting")
-    values = {"review_id": review, "source_id": "SRC-0008", "claim_id": "CLM-0008-001",
+    key = store.selection_key(review, ind_claim, "CPT-legal-drafting")
+    values = {"review_id": review, "source_id": IND_SOURCE, "claim_id": ind_claim,
               "concept_id": "CPT-legal-drafting", "active": store.TRUE}
     store.upsert_selection(sheets.MISSING_CONCEPTS, key, values, rid=review)
     store.upsert_selection(sheets.MISSING_CONCEPTS, key, values, rid=review)
     check(book.count(sheets.MISSING_CONCEPTS) == 1, "store: a repeated selection is one row")
     store.upsert_selection(sheets.MISSING_CONCEPTS, key, {**values, "active": store.FALSE},
                            rid=review)
-    check(store.load_review(review).active_missing("CLM-0008-001") == [],
+    check(store.load_review(review).active_missing(ind_claim) == [],
           "store: removal deactivates the same row")
     # Two sessions appending at the same instant: duplicated key in storage.
     book.append_rows(sheets.MISSING_CONCEPTS, [{**values, "selection_key": key,
                                                 "active": store.TRUE,
                                                 "updated_at": "9999-01-01"}])
     loaded = store.load_review(review)
-    check(len(loaded.missing) == 1 and len(loaded.active_missing("CLM-0008-001")) == 1,
+    check(len(loaded.missing) == 1 and len(loaded.active_missing(ind_claim)) == 1,
           "store: duplicate keys collapse to one effective selection")
     try:
         store.write(sheets.RESPONSES, "no such key", {}, rid=review)
@@ -458,8 +507,8 @@ def test_store_requires_a_workbook():
 # ================================================================== progress
 def test_progress_rules():
     fresh_round()
-    source = "SRC-0001"
-    review = rid("agreement", "thiago", source)
+    source = AGR_SOURCE
+    review = rid("agreement", EVALUATOR, source)
     start(review)
     answer_everything(review, source)
     data = store.load_review(review)
@@ -477,7 +526,7 @@ def test_progress_rules():
         with_response(spec.Q1.key, claim, answer="Yes")),
         "progress: Question 1 Yes requires the restated Claim")
     check(reasons(with_response(spec.Q1.key, claim, answer="Yes",
-                                related_claim_id="CLM-0001-002")) == [],
+                                related_claim_id=BRAIN.claims_of(source)[1]["id"])) == [],
           "progress: Question 1 Yes with a selected Claim is complete")
     check(reasons(with_response("CLAIM_Q02_CENTRAL_THESIS", claim, answer="No")) == [],
           "progress: an optional comment never blocks completion")
@@ -564,11 +613,13 @@ def test_agreement_metrics():
                                        ["No", "In part", "Yes"])
     check(weighted is not None and 0 < weighted < 1, "analysis: linear-weighted kappa")
     book = fresh_round()
-    for evaluator in ("thiago", "francesca"):
-        review = rid("agreement", evaluator, "SRC-0001")
+    group = sorted(a["evaluator_id"] for a in ASSIGNMENTS
+                   if a["phase_id"] == "agreement" and a["source_id"] == AGR_SOURCE)
+    for evaluator in group:
+        review = rid("agreement", evaluator, AGR_SOURCE)
         start(review)
-        answer_everything(review, "SRC-0001",
-                          recall=spec.RECALL_ALL if evaluator == "thiago" else spec.RECALL_MOST)
+        answer_everything(review, AGR_SOURCE,
+                          recall=spec.RECALL_ALL if evaluator == EVALUATOR else spec.RECALL_MOST)
     tables = analysis.export_tables()
     metrics = {m["question_key"]: m for m in tables["agreement_metrics"]}
     check(metrics["SOURCE_CLAIM_RECALL"]["metric"] == "linear_weighted_kappa"
@@ -580,6 +631,13 @@ def test_agreement_metrics():
     check(all(r["eval_spec_version"] == "4.0" and r["round_id"] == ROUND
               for r in tables["claim_judgments"]),
           "analysis: every exported judgment names its round and instrument")
+    unit_rows = [r for r in tables["agreement_pairs"]
+                 if r["question_key"] == "SOURCE_CLAIM_RECALL"]
+    expected_pairs = len(group) * (len(group) - 1) // 2
+    check(len(unit_rows) == expected_pairs
+          and {(r["evaluator_a"], r["evaluator_b"]) for r in unit_rows}
+          == set(itertools.combinations(group, 2)),
+          f"analysis: a group of {len(group)} yields every pair of its members per unit")
     check(len(tables["raw_responses"]) == book.count(sheets.RESPONSES),
           "analysis: the raw tabs are exported whole")
 
@@ -644,7 +702,7 @@ def test_ui_claim_flow():
     book = fresh_round()
     at = _app()
     _login(at)
-    _open(at, "agreement", "SRC-0001")
+    _open(at, "agreement", AGR_SOURCE)
     at.checkbox[0].check()
     at.run()
     [b for b in at.button if b.label == "Start evaluation"][0].click()
@@ -667,15 +725,15 @@ def test_ui_claim_flow():
     check("one per claim" in page, "ui: Question 2 shows the Statement definition")
     check("(this Claim)" in page and "From Claim" in page, "ui: Relation direction is shown")
 
-    first = BRAIN.claims_of("SRC-0001")[0]["id"]
-    base = f"w|{rid('agreement', 'thiago', 'SRC-0001')}"
+    first = BRAIN.claims_of(AGR_SOURCE)[0]["id"]
+    base = f"w|{rid('agreement', EVALUATOR, AGR_SOURCE)}"
     at.radio(key=f"{base}|{spec.Q1.key}|{first}|a").set_value("Yes")
     at.run()
     check(any(s.label == "Restatement of" for s in at.selectbox),
           "ui: Question 1 Yes asks which Claim is restated")
 
     # Question 14: search, add, clear search, add another; both persist.
-    search_key = f"q14search|{rid('agreement', 'thiago', 'SRC-0001')}|{first}"
+    search_key = f"q14search|{rid('agreement', EVALUATOR, AGR_SOURCE)}|{first}"
     at.text_input(key=search_key).input("machine learning")
     at.run()
     at.button(key=f"{base}|q14add|{first}|CPT-machine-learning").click()
@@ -717,7 +775,7 @@ def test_ui_claim_flow():
           and any(b.key and "|q14rmp|" in b.key for b in at.button),
           "ui: a proposed Concept appears as selected, with its ×")
     _flush(at)
-    stored = store.load_review(rid("agreement", "thiago", "SRC-0001"))
+    stored = store.load_review(rid("agreement", EVALUATOR, AGR_SOURCE))
     check(stored.response(spec.Q14.key, first)["answer"] == spec.Q14_MISSING
           and [r["concept_id"] for r in stored.active_missing(first)]
           == ["CPT-privacy-and-data-protection"]
@@ -732,13 +790,13 @@ def test_ui_claim_flow():
 
 def test_ui_no_datasets_and_completion():
     fresh_round()
-    source = "SRC-0010"
-    review = rid("individual", "thiago", source)
+    source = NO_DATASET_SOURCE
+    review = rid(NO_DATASET_PHASE, EVALUATOR, source)
     start(review)
     answer_everything(review, source)
     at = _app()
     _login(at)
-    _open(at, "individual", source)
+    _open(at, NO_DATASET_PHASE, source)
     at.button(key="nav|datasets").click()
     at.run()
     check(not _questions(at) and any("No Claim of this Source rests on a Dataset" in i.value
@@ -786,8 +844,8 @@ def test_ui_preflight_failure():
 
 def test_ui_datasets_and_concepts():
     fresh_round()
-    source = "SRC-0001"
-    review = rid("agreement", "thiago", source)
+    source = AGR_SOURCE
+    review = rid("agreement", EVALUATOR, source)
     start(review)
     at = _app()
     _login(at)
@@ -875,8 +933,8 @@ def _stored_rows(book) -> dict:
 
 def test_ui_instructions_and_guidance():
     book = fresh_round()
-    source = "SRC-0001"
-    review = rid("agreement", "thiago", source)
+    source = AGR_SOURCE
+    review = rid("agreement", EVALUATOR, source)
     start(review)
     at = _app()
     _login(at)
@@ -992,8 +1050,8 @@ def test_ui_instructions_and_guidance():
 
 def test_ui_raw_markdown():
     book = fresh_round()
-    source = "SRC-0001"
-    review = rid("agreement", "thiago", source)
+    source = AGR_SOURCE
+    review = rid("agreement", EVALUATOR, source)
     start(review)
     at = _app()
     _login(at)
@@ -1021,8 +1079,8 @@ def test_ui_raw_markdown():
 
 def test_ui_review_groups_missing_items():
     fresh_round()
-    source = "SRC-0001"
-    review = rid("agreement", "thiago", source)
+    source = AGR_SOURCE
+    review = rid("agreement", EVALUATOR, source)
     start(review)
     at = _app()
     _login(at)
@@ -1042,6 +1100,35 @@ def test_ui_review_groups_missing_items():
           "ui: no flat source-wide list of individual missing items")
     check(all(not e.proto.expanded for e in at.expander if "missing" in e.label),
           "ui: each group starts closed")
+
+
+def test_ui_group_of_three():
+    fresh_round()
+    sizes = {e: manifest.agreement_group_size(e) for e in ("thiago", "giovanni")}
+    check(sizes["thiago"] == 3 and sizes["giovanni"] == 2,
+          "ui: Agreement group sizes come from the assignment rows (3 and 2)")
+    at = _app()
+    _login(at)
+    at.sidebar.radio[0].set_value("Agreement")
+    at.run()
+    captions = " ".join(c.value for c in at.caption)
+    check("You and 2 other evaluators assess the same papers" in captions
+          and "one other evaluator" not in captions,
+          "ui: a member of a group of three is told there are two other evaluators")
+    check(not any(n in captions for n in ("Francesca", "Thibault")),
+          "ui: group-mates are not named")
+    at.sidebar.radio[0].set_value("Admin")
+    at.run()
+    at.text_input[0].input(os.environ["HE_ADMIN_SECRET"])
+    at.button[0].click()
+    at.run()
+    table = at.dataframe[0].value
+    check("group" in table.columns, "ui: Admin progress has a group column")
+    paper = sorted(a["source_id"] for a in ASSIGNMENTS
+                   if a["phase_id"] == "agreement" and a["evaluator_id"] == "thiago")[0]
+    members = table[(table["phase"] == "agreement") & (table["paper"] == paper)]
+    check(len(members) == 3 and set(members["group"]) == {"P1"},
+          "ui: Admin progress lists all three members of P1 for one Agreement paper")
 
 
 # ====================================================================== main

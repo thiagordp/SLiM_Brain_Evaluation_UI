@@ -77,6 +77,11 @@ has been bootstrapped.
 
 ### 2.3 The allocation
 
+The allocation file is generated from the corpus-sampling clusters by the
+separate `reviewer_allocation/` tool (`python reviewer_allocation/make_allocation.py`);
+see its README. Agreement groups may have two or more members.
+
+
 Edit `app/data/allocation/<round>.yaml` — the only place an allocation is
 written — then:
 

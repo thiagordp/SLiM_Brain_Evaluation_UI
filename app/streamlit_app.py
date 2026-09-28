@@ -175,12 +175,25 @@ def gate_identity() -> bool:
 PHASE_CAPTION = {
     manifest.TRAINING: "Optional practice on the same papers for every evaluator. "
                        "It does not gate anything.",
-    manifest.AGREEMENT: "You and one other evaluator assess the same papers "
-                        "independently. Do not discuss them until the agreement round "
-                        "is submitted.",
+    # Filled in per evaluator by `phase_caption`: an Agreement group has two or
+    # more members.
+    manifest.AGREEMENT: "{others} assess the same papers independently. Do not "
+                        "discuss them until the agreement round is submitted.",
     manifest.INDIVIDUAL: "These papers are yours alone.",
 }
 PAGE_TO_PHASE = {manifest.PHASE_LABEL[p]: p for p in manifest.PHASES}
+
+
+def phase_caption(phase_id: str, evaluator_id: str) -> str:
+    """The phase caption. For Agreement it counts the evaluator's group-mates
+    without naming them: evaluators see split ids, never group identities."""
+    caption = PHASE_CAPTION[phase_id]
+    if phase_id != manifest.AGREEMENT:
+        return caption
+    others = max(manifest.agreement_group_size(evaluator_id) - 1, 1)
+    who = ("You and one other evaluator" if others == 1
+           else f"You and {others} other evaluators")
+    return caption.format(others=who)
 PAPER_ACTION = {store.STATUS_NOT_STARTED: "Start", store.STATUS_IN_PROGRESS: "Continue",
                 store.STATUS_COMPLETE: "Review", store.STATUS_SUBMITTED: "View"}
 PAPER_STATUS = {store.STATUS_NOT_STARTED: "Not started",
@@ -215,7 +228,7 @@ def home(phase_id: str, evaluator_id: str) -> None:
     data = brain()
     sources = manifest.assigned_source_ids(evaluator_id, phase_id)
     st.title(manifest.PHASE_LABEL[phase_id])
-    st.caption(PHASE_CAPTION[phase_id])
+    st.caption(phase_caption(phase_id, evaluator_id))
     if not manifest.phase_open(phase_id):
         st.warning(f"The {phase_id} phase is not open.")
         return
@@ -419,18 +432,21 @@ def _admin_progress() -> None:
                "independent evaluation.")
     rows = []
     for review in store.all_reviews():
-        if review.get("status") == store.STATUS_NOT_STARTED:
-            rows.append({"evaluator": review["evaluator_name"],
-                         "phase": review["phase_id"], "split": review["split_id"],
-                         "paper": review["source_id"], "progress": "",
-                         "status": review["status"]})
-            continue
-        stats = progress.counts(data, review["source_id"],
-                                store.load_review(review["review_id"]))
-        rows.append({"evaluator": review["evaluator_name"], "phase": review["phase_id"],
-                     "split": review["split_id"], "paper": review["source_id"],
-                     "progress": f"{stats['done']}/{stats['items']}",
-                     "status": review["status"]})
+        row = {"phase": review["phase_id"],
+               # The Agreement group, so all members of a group (two or more)
+               # read together. Completion only, as everywhere on this page.
+               "group": review.get("pair_id", "") if review["phase_id"] == manifest.AGREEMENT
+               else "",
+               "evaluator": review["evaluator_name"], "split": review["split_id"],
+               "paper": review["source_id"], "progress": "", "status": review["status"]}
+        if review.get("status") != store.STATUS_NOT_STARTED:
+            stats = progress.counts(data, review["source_id"],
+                                    store.load_review(review["review_id"]))
+            row["progress"] = f"{stats['done']}/{stats['items']}"
+        rows.append(row)
+    phase_order = {p: n for n, p in enumerate(manifest.PHASES)}
+    rows.sort(key=lambda r: (phase_order.get(r["phase"], 9), r["group"], r["paper"],
+                             r["evaluator"]))
     st.dataframe(pd.DataFrame(rows), width="stretch", hide_index=True)
 
 

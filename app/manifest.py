@@ -12,7 +12,7 @@ rows, generated from the allocation file by `tools/build_assignments.py`.
 Three phases, all open from the start, none gating another:
 
     training     optional practice, the same papers for everyone
-    agreement    both evaluators of a pair over one shared set
+    agreement    every member of an Agreement group (two or more) over one shared set
     individual   one evaluator per paper
 
 Secrets never live here: the shared password and the admin secret come from
@@ -314,6 +314,15 @@ def evaluator(evaluator_id: str) -> dict | None:
 def pair_of(evaluator_id: str) -> str | None:
     """Internal only. Evaluators are shown split ids, never a pair letter."""
     return (evaluator(evaluator_id) or {}).get("pair_id")
+
+
+def agreement_group_size(evaluator_id: str) -> int:
+    """How many evaluators, this one included, share this evaluator's Agreement
+    papers. Read from the explicit assignment rows, never from a group name."""
+    mine = {row["source_id"] for row in assigned(evaluator_id, AGREEMENT)}
+    return len({row.get("evaluator_id") for row in assignments()
+                if row.get("phase_id") == AGREEMENT and state_of(row) == ASSIGNED
+                and row.get("source_id") in mine})
 
 
 def splits_of(evaluator_id: str) -> dict[str, str]:

@@ -14,10 +14,15 @@ Agreement is computed only where a metric is well defined for the unit:
 Question 14 sets, proposed Concepts, Question 1's restated-Claim targets and
 Missing Claims are exported raw; no comparison metric is invented for them.
 The restatement answer itself (Yes/No) is binary and is compared as such.
+
+Agreement groups may have more than two members. Every pair of members who both
+answered a unit is compared (one row per evaluator pair in `agreement_pairs`),
+and each question's kappa pools those pairwise comparisons.
 """
 from __future__ import annotations
 
 import collections
+import itertools
 
 import sheets
 import spec
@@ -170,16 +175,17 @@ def agreement(raw: dict[str, list[dict]]) -> tuple[list[dict], list[dict]]:
 
     paired, by_question = [], collections.defaultdict(list)
     for (pair_id, source_id, question_key, unit_id), answers in sorted(units.items()):
-        if len(answers) != 2:
-            continue
-        (ev_a, ans_a), (ev_b, ans_b) = sorted(answers.items())
-        paired.append({"pair_id": pair_id, "source_id": source_id,
-                       "question_key": question_key,
-                       "question": spec.BY_KEY[question_key].title,
-                       "unit_id": unit_id, "evaluator_a": ev_a, "answer_a": ans_a,
-                       "evaluator_b": ev_b, "answer_b": ans_b,
-                       "agree": ans_a == ans_b})
-        by_question[question_key].append((ans_a, ans_b))
+        # A group may have more than two members: every pair of evaluators who
+        # both answered the unit is compared, and kappa pools those pairs.
+        for (ev_a, ans_a), (ev_b, ans_b) in itertools.combinations(
+                sorted(answers.items()), 2):
+            paired.append({"pair_id": pair_id, "source_id": source_id,
+                           "question_key": question_key,
+                           "question": spec.BY_KEY[question_key].title,
+                           "unit_id": unit_id, "evaluator_a": ev_a, "answer_a": ans_a,
+                           "evaluator_b": ev_b, "answer_b": ans_b,
+                           "agree": ans_a == ans_b})
+            by_question[question_key].append((ans_a, ans_b))
 
     metrics = []
     for question_key, pairs in sorted(by_question.items()):

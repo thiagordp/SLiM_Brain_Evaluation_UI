@@ -17,11 +17,11 @@ File shape:
     status: development            # or: accepted
     evaluators:
       - {evaluator_id: thiago, name: Thiago, is_admin: true}
-    pairs:
+    pairs:                         # agreement groups, two or more members
       A: [thiago, francesca]
     training:                      # every evaluator gets these
       - {source: SRC-0006, title: "Pseudolaw and the illusion of legal meaning"}
-    agreement:                     # both members of the pair get every paper
+    agreement:                     # every member of the group gets every paper
       AGR-A: {pair: A, sources: [SRC-0001, ...]}
     individual:                    # exactly one evaluator per paper
       IND-1: {evaluator: thiago, sources: [SRC-0008, ...]}
@@ -111,8 +111,8 @@ def validate(data: dict, brain) -> list[str]:
     pairs = data.get("pairs") or {}
     for pair_id, members in pairs.items():
         members = list(members or [])
-        if len(members) != 2 or len(set(members)) != 2:
-            problems.append(f"pair {pair_id} must have exactly two distinct evaluators")
+        if len(members) < 2 or len(set(members)) != len(members):
+            problems.append(f"group {pair_id} must have at least two distinct evaluators")
         for member in members:
             if member not in evaluator_ids:
                 problems.append(f"pair {pair_id}: {member} is not a listed evaluator")
@@ -178,9 +178,10 @@ def validate(data: dict, brain) -> list[str]:
                 made = [r for r in rows if r["phase_id"] == AGREEMENT
                         and r["source_id"] == entry["source"]
                         and r["assignment_state"] == ASSIGNED]
-                if len(made) != 2:
+                expected = len(pairs.get((spec or {}).get("pair"), []))
+                if len(made) != expected:
                     problems.append(f"{split}: {entry['source']} yields {len(made)} "
-                                    f"assignments, not 2")
+                                    f"assignments, not {expected} (one per group member)")
         individual_rows = [r for r in rows if r["phase_id"] == INDIVIDUAL
                            and r["assignment_state"] == ASSIGNED]
         holders: dict[str, set] = {}

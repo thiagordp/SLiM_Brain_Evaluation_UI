@@ -5,10 +5,10 @@
 # the application never infers one from a pair or split name.
 round:
   round_id: ROUND-2026-01
-  allocation_id: DEV-2026-09-26
-  allocation_status: development
+  allocation_id: CLUSTER-2026-09-28
+  allocation_status: accepted
   allocation_file: allocation/ROUND-2026-01.yaml
-  allocation_sha256: 14e7ffa7de71de41
+  allocation_sha256: 1b2c38da62b9a12c
   brain_snapshot_id: ce68b5db7b29f4b68186424f86506e8cbc45ed2d4eeee31581c6aaee2fa18ee9
   eval_spec_version: '4.0'
   definitions_id: 5e893fd56651b365
@@ -17,42 +17,48 @@ config:
   agreement_open: 'true'
   individual_open: 'true'
 evaluators:
-- evaluator_id: thiago
-  name: Thiago
-  is_admin: true
-  pair_id: A
-  agreement_split: AGR-A
-  individual_split: IND-1
 - evaluator_id: francesca
   name: Francesca
   is_admin: false
-  pair_id: A
-  agreement_split: AGR-A
+  pair_id: P1
+  agreement_split: AGR-P1
+  individual_split: IND-1
+- evaluator_id: thibault
+  name: Thibault
+  is_admin: false
+  pair_id: P1
+  agreement_split: AGR-P1
   individual_split: IND-2
-- evaluator_id: giuseppe
-  name: Giuseppe
-  is_admin: false
-  pair_id: B
-  agreement_split: AGR-B
+- evaluator_id: thiago
+  name: Thiago
+  is_admin: true
+  pair_id: P1
+  agreement_split: AGR-P1
   individual_split: IND-3
-- evaluator_id: vaclav
-  name: Vaclav
-  is_admin: false
-  pair_id: B
-  agreement_split: AGR-B
-  individual_split: IND-4
-- evaluator_id: giovanni
-  name: Giovanni
-  is_admin: false
-  pair_id: C
-  agreement_split: AGR-C
-  individual_split: IND-5
 - evaluator_id: alessandro
   name: Alessandro
   is_admin: false
-  pair_id: C
-  agreement_split: AGR-C
+  pair_id: P2
+  agreement_split: AGR-P2
+  individual_split: IND-4
+- evaluator_id: giuseppe
+  name: Giuseppe
+  is_admin: false
+  pair_id: P2
+  agreement_split: AGR-P2
+  individual_split: IND-5
+- evaluator_id: giovanni
+  name: Giovanni
+  is_admin: false
+  pair_id: P3
+  agreement_split: AGR-P3
   individual_split: IND-6
+- evaluator_id: vaclav
+  name: Vaclav
+  is_admin: false
+  pair_id: P3
+  agreement_split: AGR-P3
+  individual_split: IND-7
 assignments:
 - assignment_key: training|alessandro|SRC-0006
   evaluator_id: alessandro
@@ -134,6 +140,22 @@ assignments:
   pdf_file: SRC-0067.pdf
   assignment_order: 2
   assignment_state: assigned
+- assignment_key: training|thibault|SRC-0006
+  evaluator_id: thibault
+  phase_id: training
+  split_id: TRAINING
+  source_id: SRC-0006
+  pdf_file: SRC-0058.pdf
+  assignment_order: 1
+  assignment_state: assigned
+- assignment_key: training|thibault|SRC-0009
+  evaluator_id: thibault
+  phase_id: training
+  split_id: TRAINING
+  source_id: SRC-0009
+  pdf_file: SRC-0067.pdf
+  assignment_order: 2
+  assignment_state: assigned
 - assignment_key: training|vaclav|SRC-0006
   evaluator_id: vaclav
   phase_id: training
@@ -150,243 +172,323 @@ assignments:
   pdf_file: SRC-0067.pdf
   assignment_order: 2
   assignment_state: assigned
-- assignment_key: agreement|alessandro|SRC-0005
+- assignment_key: agreement|alessandro|SRC-0022
   evaluator_id: alessandro
   phase_id: agreement
-  split_id: AGR-C
-  source_id: SRC-0005
-  pdf_file: SRC-0044.pdf
+  split_id: AGR-P2
+  source_id: SRC-0022
+  pdf_file: SRC-0156.pdf
   assignment_order: 1
   assignment_state: assigned
-- assignment_key: agreement|alessandro|SRC-0007
+- assignment_key: agreement|alessandro|SRC-0021
   evaluator_id: alessandro
   phase_id: agreement
-  split_id: AGR-C
-  source_id: SRC-0007
-  pdf_file: SRC-0061.pdf
+  split_id: AGR-P2
+  source_id: SRC-0021
+  pdf_file: SRC-0155.pdf
   assignment_order: 2
   assignment_state: assigned
-- assignment_key: agreement|francesca|SRC-0001
-  evaluator_id: francesca
+- assignment_key: agreement|alessandro|SRC-0002
+  evaluator_id: alessandro
   phase_id: agreement
-  split_id: AGR-A
-  source_id: SRC-0001
-  pdf_file: SRC-0002.pdf
-  assignment_order: 1
-  assignment_state: assigned
-- assignment_key: agreement|francesca|SRC-0002
-  evaluator_id: francesca
-  phase_id: agreement
-  split_id: AGR-A
+  split_id: AGR-P2
   source_id: SRC-0002
   pdf_file: SRC-0013.pdf
-  assignment_order: 2
-  assignment_state: assigned
-- assignment_key: agreement|giovanni|SRC-0005
-  evaluator_id: giovanni
-  phase_id: agreement
-  split_id: AGR-C
-  source_id: SRC-0005
-  pdf_file: SRC-0044.pdf
-  assignment_order: 1
-  assignment_state: assigned
-- assignment_key: agreement|giovanni|SRC-0007
-  evaluator_id: giovanni
-  phase_id: agreement
-  split_id: AGR-C
-  source_id: SRC-0007
-  pdf_file: SRC-0061.pdf
-  assignment_order: 2
-  assignment_state: assigned
-- assignment_key: agreement|giuseppe|SRC-0003
-  evaluator_id: giuseppe
-  phase_id: agreement
-  split_id: AGR-B
-  source_id: SRC-0003
-  pdf_file: SRC-0020.pdf
-  assignment_order: 1
-  assignment_state: assigned
-- assignment_key: agreement|giuseppe|SRC-0004
-  evaluator_id: giuseppe
-  phase_id: agreement
-  split_id: AGR-B
-  source_id: SRC-0004
-  pdf_file: SRC-0023.pdf
-  assignment_order: 2
-  assignment_state: assigned
-- assignment_key: agreement|thiago|SRC-0001
-  evaluator_id: thiago
-  phase_id: agreement
-  split_id: AGR-A
-  source_id: SRC-0001
-  pdf_file: SRC-0002.pdf
-  assignment_order: 1
-  assignment_state: assigned
-- assignment_key: agreement|thiago|SRC-0002
-  evaluator_id: thiago
-  phase_id: agreement
-  split_id: AGR-A
-  source_id: SRC-0002
-  pdf_file: SRC-0013.pdf
-  assignment_order: 2
-  assignment_state: assigned
-- assignment_key: agreement|vaclav|SRC-0003
-  evaluator_id: vaclav
-  phase_id: agreement
-  split_id: AGR-B
-  source_id: SRC-0003
-  pdf_file: SRC-0020.pdf
-  assignment_order: 1
-  assignment_state: assigned
-- assignment_key: agreement|vaclav|SRC-0004
-  evaluator_id: vaclav
-  phase_id: agreement
-  split_id: AGR-B
-  source_id: SRC-0004
-  pdf_file: SRC-0023.pdf
-  assignment_order: 2
-  assignment_state: assigned
-- assignment_key: individual|alessandro|SRC-0024
-  evaluator_id: alessandro
-  phase_id: individual
-  split_id: IND-6
-  source_id: SRC-0024
-  pdf_file: SRC-0184.pdf
-  assignment_order: 1
-  assignment_state: assigned
-- assignment_key: individual|alessandro|SRC-0025
-  evaluator_id: alessandro
-  phase_id: individual
-  split_id: IND-6
-  source_id: SRC-0025
-  pdf_file: SRC-0202.pdf
-  assignment_order: 2
-  assignment_state: assigned
-- assignment_key: individual|alessandro|SRC-0026
-  evaluator_id: alessandro
-  phase_id: individual
-  split_id: IND-6
-  source_id: SRC-0026
-  pdf_file: SRC-0005.pdf
   assignment_order: 3
   assignment_state: assigned
-- assignment_key: individual|francesca|SRC-0012
+- assignment_key: agreement|alessandro|SRC-0017
+  evaluator_id: alessandro
+  phase_id: agreement
+  split_id: AGR-P2
+  source_id: SRC-0017
+  pdf_file: SRC-0122.pdf
+  assignment_order: 4
+  assignment_state: assigned
+- assignment_key: agreement|francesca|SRC-0020
   evaluator_id: francesca
-  phase_id: individual
-  split_id: IND-2
-  source_id: SRC-0012
-  pdf_file: SRC-0095.pdf
+  phase_id: agreement
+  split_id: AGR-P1
+  source_id: SRC-0020
+  pdf_file: SRC-0142.pdf
   assignment_order: 1
   assignment_state: assigned
-- assignment_key: individual|francesca|SRC-0013
+- assignment_key: agreement|francesca|SRC-0008
   evaluator_id: francesca
-  phase_id: individual
-  split_id: IND-2
-  source_id: SRC-0013
-  pdf_file: SRC-0097.pdf
+  phase_id: agreement
+  split_id: AGR-P1
+  source_id: SRC-0008
+  pdf_file: SRC-0064.pdf
   assignment_order: 2
   assignment_state: assigned
-- assignment_key: individual|francesca|SRC-0014
+- assignment_key: agreement|francesca|SRC-0014
   evaluator_id: francesca
-  phase_id: individual
-  split_id: IND-2
+  phase_id: agreement
+  split_id: AGR-P1
   source_id: SRC-0014
   pdf_file: SRC-0107.pdf
   assignment_order: 3
   assignment_state: assigned
-- assignment_key: individual|giovanni|SRC-0021
+- assignment_key: agreement|francesca|SRC-0018
+  evaluator_id: francesca
+  phase_id: agreement
+  split_id: AGR-P1
+  source_id: SRC-0018
+  pdf_file: SRC-0123.pdf
+  assignment_order: 4
+  assignment_state: assigned
+- assignment_key: agreement|giovanni|SRC-0019
   evaluator_id: giovanni
-  phase_id: individual
-  split_id: IND-5
-  source_id: SRC-0021
-  pdf_file: SRC-0155.pdf
+  phase_id: agreement
+  split_id: AGR-P3
+  source_id: SRC-0019
+  pdf_file: SRC-0138.pdf
   assignment_order: 1
   assignment_state: assigned
-- assignment_key: individual|giovanni|SRC-0022
+- assignment_key: agreement|giovanni|SRC-0003
   evaluator_id: giovanni
-  phase_id: individual
-  split_id: IND-5
-  source_id: SRC-0022
-  pdf_file: SRC-0156.pdf
+  phase_id: agreement
+  split_id: AGR-P3
+  source_id: SRC-0003
+  pdf_file: SRC-0020.pdf
   assignment_order: 2
   assignment_state: assigned
-- assignment_key: individual|giovanni|SRC-0023
+- assignment_key: agreement|giovanni|SRC-0024
   evaluator_id: giovanni
+  phase_id: agreement
+  split_id: AGR-P3
+  source_id: SRC-0024
+  pdf_file: SRC-0184.pdf
+  assignment_order: 3
+  assignment_state: assigned
+- assignment_key: agreement|giovanni|SRC-0010
+  evaluator_id: giovanni
+  phase_id: agreement
+  split_id: AGR-P3
+  source_id: SRC-0010
+  pdf_file: SRC-0075.pdf
+  assignment_order: 4
+  assignment_state: assigned
+- assignment_key: agreement|giuseppe|SRC-0022
+  evaluator_id: giuseppe
+  phase_id: agreement
+  split_id: AGR-P2
+  source_id: SRC-0022
+  pdf_file: SRC-0156.pdf
+  assignment_order: 1
+  assignment_state: assigned
+- assignment_key: agreement|giuseppe|SRC-0021
+  evaluator_id: giuseppe
+  phase_id: agreement
+  split_id: AGR-P2
+  source_id: SRC-0021
+  pdf_file: SRC-0155.pdf
+  assignment_order: 2
+  assignment_state: assigned
+- assignment_key: agreement|giuseppe|SRC-0002
+  evaluator_id: giuseppe
+  phase_id: agreement
+  split_id: AGR-P2
+  source_id: SRC-0002
+  pdf_file: SRC-0013.pdf
+  assignment_order: 3
+  assignment_state: assigned
+- assignment_key: agreement|giuseppe|SRC-0017
+  evaluator_id: giuseppe
+  phase_id: agreement
+  split_id: AGR-P2
+  source_id: SRC-0017
+  pdf_file: SRC-0122.pdf
+  assignment_order: 4
+  assignment_state: assigned
+- assignment_key: agreement|thiago|SRC-0020
+  evaluator_id: thiago
+  phase_id: agreement
+  split_id: AGR-P1
+  source_id: SRC-0020
+  pdf_file: SRC-0142.pdf
+  assignment_order: 1
+  assignment_state: assigned
+- assignment_key: agreement|thiago|SRC-0008
+  evaluator_id: thiago
+  phase_id: agreement
+  split_id: AGR-P1
+  source_id: SRC-0008
+  pdf_file: SRC-0064.pdf
+  assignment_order: 2
+  assignment_state: assigned
+- assignment_key: agreement|thiago|SRC-0014
+  evaluator_id: thiago
+  phase_id: agreement
+  split_id: AGR-P1
+  source_id: SRC-0014
+  pdf_file: SRC-0107.pdf
+  assignment_order: 3
+  assignment_state: assigned
+- assignment_key: agreement|thiago|SRC-0018
+  evaluator_id: thiago
+  phase_id: agreement
+  split_id: AGR-P1
+  source_id: SRC-0018
+  pdf_file: SRC-0123.pdf
+  assignment_order: 4
+  assignment_state: assigned
+- assignment_key: agreement|thibault|SRC-0020
+  evaluator_id: thibault
+  phase_id: agreement
+  split_id: AGR-P1
+  source_id: SRC-0020
+  pdf_file: SRC-0142.pdf
+  assignment_order: 1
+  assignment_state: assigned
+- assignment_key: agreement|thibault|SRC-0008
+  evaluator_id: thibault
+  phase_id: agreement
+  split_id: AGR-P1
+  source_id: SRC-0008
+  pdf_file: SRC-0064.pdf
+  assignment_order: 2
+  assignment_state: assigned
+- assignment_key: agreement|thibault|SRC-0014
+  evaluator_id: thibault
+  phase_id: agreement
+  split_id: AGR-P1
+  source_id: SRC-0014
+  pdf_file: SRC-0107.pdf
+  assignment_order: 3
+  assignment_state: assigned
+- assignment_key: agreement|thibault|SRC-0018
+  evaluator_id: thibault
+  phase_id: agreement
+  split_id: AGR-P1
+  source_id: SRC-0018
+  pdf_file: SRC-0123.pdf
+  assignment_order: 4
+  assignment_state: assigned
+- assignment_key: agreement|vaclav|SRC-0019
+  evaluator_id: vaclav
+  phase_id: agreement
+  split_id: AGR-P3
+  source_id: SRC-0019
+  pdf_file: SRC-0138.pdf
+  assignment_order: 1
+  assignment_state: assigned
+- assignment_key: agreement|vaclav|SRC-0003
+  evaluator_id: vaclav
+  phase_id: agreement
+  split_id: AGR-P3
+  source_id: SRC-0003
+  pdf_file: SRC-0020.pdf
+  assignment_order: 2
+  assignment_state: assigned
+- assignment_key: agreement|vaclav|SRC-0024
+  evaluator_id: vaclav
+  phase_id: agreement
+  split_id: AGR-P3
+  source_id: SRC-0024
+  pdf_file: SRC-0184.pdf
+  assignment_order: 3
+  assignment_state: assigned
+- assignment_key: agreement|vaclav|SRC-0010
+  evaluator_id: vaclav
+  phase_id: agreement
+  split_id: AGR-P3
+  source_id: SRC-0010
+  pdf_file: SRC-0075.pdf
+  assignment_order: 4
+  assignment_state: assigned
+- assignment_key: individual|alessandro|SRC-0004
+  evaluator_id: alessandro
   phase_id: individual
-  split_id: IND-5
+  split_id: IND-4
+  source_id: SRC-0004
+  pdf_file: SRC-0023.pdf
+  assignment_order: 1
+  assignment_state: assigned
+- assignment_key: individual|francesca|SRC-0023
+  evaluator_id: francesca
+  phase_id: individual
+  split_id: IND-1
   source_id: SRC-0023
   pdf_file: SRC-0172.pdf
-  assignment_order: 3
+  assignment_order: 1
+  assignment_state: assigned
+- assignment_key: individual|francesca|SRC-0026
+  evaluator_id: francesca
+  phase_id: individual
+  split_id: IND-1
+  source_id: SRC-0026
+  pdf_file: SRC-0005.pdf
+  assignment_order: 2
+  assignment_state: assigned
+- assignment_key: individual|giovanni|SRC-0025
+  evaluator_id: giovanni
+  phase_id: individual
+  split_id: IND-6
+  source_id: SRC-0025
+  pdf_file: SRC-0202.pdf
+  assignment_order: 1
+  assignment_state: assigned
+- assignment_key: individual|giuseppe|SRC-0005
+  evaluator_id: giuseppe
+  phase_id: individual
+  split_id: IND-5
+  source_id: SRC-0005
+  pdf_file: SRC-0044.pdf
+  assignment_order: 1
   assignment_state: assigned
 - assignment_key: individual|giuseppe|SRC-0015
   evaluator_id: giuseppe
   phase_id: individual
-  split_id: IND-3
+  split_id: IND-5
   source_id: SRC-0015
   pdf_file: SRC-0108.pdf
+  assignment_order: 2
+  assignment_state: assigned
+- assignment_key: individual|thiago|SRC-0011
+  evaluator_id: thiago
+  phase_id: individual
+  split_id: IND-3
+  source_id: SRC-0011
+  pdf_file: SRC-0090.pdf
   assignment_order: 1
   assignment_state: assigned
-- assignment_key: individual|giuseppe|SRC-0016
-  evaluator_id: giuseppe
+- assignment_key: individual|thiago|SRC-0016
+  evaluator_id: thiago
   phase_id: individual
   split_id: IND-3
   source_id: SRC-0016
   pdf_file: SRC-0113.pdf
   assignment_order: 2
   assignment_state: assigned
-- assignment_key: individual|giuseppe|SRC-0017
-  evaluator_id: giuseppe
+- assignment_key: individual|thibault|SRC-0012
+  evaluator_id: thibault
   phase_id: individual
-  split_id: IND-3
-  source_id: SRC-0017
-  pdf_file: SRC-0122.pdf
-  assignment_order: 3
-  assignment_state: assigned
-- assignment_key: individual|thiago|SRC-0008
-  evaluator_id: thiago
-  phase_id: individual
-  split_id: IND-1
-  source_id: SRC-0008
-  pdf_file: SRC-0064.pdf
+  split_id: IND-2
+  source_id: SRC-0012
+  pdf_file: SRC-0095.pdf
   assignment_order: 1
   assignment_state: assigned
-- assignment_key: individual|thiago|SRC-0010
-  evaluator_id: thiago
+- assignment_key: individual|thibault|SRC-0013
+  evaluator_id: thibault
   phase_id: individual
-  split_id: IND-1
-  source_id: SRC-0010
-  pdf_file: SRC-0075.pdf
+  split_id: IND-2
+  source_id: SRC-0013
+  pdf_file: SRC-0097.pdf
   assignment_order: 2
   assignment_state: assigned
-- assignment_key: individual|thiago|SRC-0011
-  evaluator_id: thiago
-  phase_id: individual
-  split_id: IND-1
-  source_id: SRC-0011
-  pdf_file: SRC-0090.pdf
-  assignment_order: 3
-  assignment_state: assigned
-- assignment_key: individual|vaclav|SRC-0018
+- assignment_key: individual|vaclav|SRC-0001
   evaluator_id: vaclav
   phase_id: individual
-  split_id: IND-4
-  source_id: SRC-0018
-  pdf_file: SRC-0123.pdf
+  split_id: IND-7
+  source_id: SRC-0001
+  pdf_file: SRC-0002.pdf
   assignment_order: 1
   assignment_state: assigned
-- assignment_key: individual|vaclav|SRC-0019
+- assignment_key: individual|vaclav|SRC-0007
   evaluator_id: vaclav
   phase_id: individual
-  split_id: IND-4
-  source_id: SRC-0019
-  pdf_file: SRC-0138.pdf
+  split_id: IND-7
+  source_id: SRC-0007
+  pdf_file: SRC-0061.pdf
   assignment_order: 2
-  assignment_state: assigned
-- assignment_key: individual|vaclav|SRC-0020
-  evaluator_id: vaclav
-  phase_id: individual
-  split_id: IND-4
-  source_id: SRC-0020
-  pdf_file: SRC-0142.pdf
-  assignment_order: 3
   assignment_state: assigned

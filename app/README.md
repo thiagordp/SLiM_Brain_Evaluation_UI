@@ -190,14 +190,20 @@ warnings. No single schema version is inferred from run history.
 data/allocation/<round>.yaml  --build_assignments.py-->  data/manifest.yaml  --bootstrap_round.py-->  workbook
 ```
 
-The allocation file is the only place an allocation is written. The current one
-is a **development allocation**:
+The allocation file is the only place an allocation is written. The current one,
+**CLUSTER-2026-09-28**, is generated from the corpus-sampling clusters by the
+separate `reviewer_allocation/` tool (see its README), which shares nothing with
+this app except that file:
 
-- Training: SRC-0006 and SRC-0009, for all six evaluators;
-- Agreement: two papers per pair — A Thiago + Francesca, B Giuseppe + Vaclav,
-  C Giovanni + Alessandro;
-- Individual: 17 papers, three per evaluator, except Alessandro, who has two
-  until the 26th Source arrives.
+- Training: SRC-0006 and SRC-0009, for all seven evaluators;
+- Agreement: four papers per group, each from the group's cluster —
+  P1 Francesca + Thibault + Thiago (cluster 0), P2 Alessandro + Giuseppe
+  (cluster 1), P3 Giovanni + Vaclav (cluster 2);
+- Individual: the twelve remaining papers, one or two per evaluator (own-cluster
+  leftovers, then the shared compliance cluster 3 dealt at random).
+
+Agreement groups may have **two or more** members; every member evaluates every
+paper of the group's set, and agreement is computed over every pair of members.
 
 `reserved` rows remain a generic capability. The app never infers an assignment
 from a pair or split name.
@@ -213,6 +219,9 @@ Admin → Exports gives:
   - binary items: observed agreement and Cohen's κ;
   - Q5 and Dataset Description: observed agreement and linear-weighted κ;
   - Claim recall: linear-weighted κ.
+
+  In a group of three, every pair of its members is compared and the metric
+  pools those pairwise comparisons.
 
 Question 14 sets, proposals, Q1 targets and Missing Claims are exported raw.
 No metric is invented for them.
