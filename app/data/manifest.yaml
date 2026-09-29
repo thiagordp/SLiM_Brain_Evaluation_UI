@@ -10,8 +10,8 @@ round:
   allocation_file: allocation/ROUND-2026-01.yaml
   allocation_sha256: 1b2c38da62b9a12c
   brain_snapshot_id: ce68b5db7b29f4b68186424f86506e8cbc45ed2d4eeee31581c6aaee2fa18ee9
-  eval_spec_version: '4.0'
-  definitions_id: 5e893fd56651b365
+  eval_spec_version: '4.1'
+  definitions_id: 629aebacc9a701ee
 config:
   training_open: 'true'
   agreement_open: 'true'

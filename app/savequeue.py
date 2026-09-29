@@ -220,7 +220,14 @@ class SaveQueue:
                     superseded = (self._pending.get(key) not in (None, call))
                     if not superseded:
                         self._pending.pop(key, None)
-                    if refused:
+                    result = results[index] if index < len(results) else None
+                    if not error and self._fatal and isinstance(result, self._fatal):
+                        # This record alone was refused; the rest of the batch
+                        # was written.
+                        self._conflicts[key] = str(result)
+                        self._failed.pop(key, None)
+                        self._errors.pop(key, None)
+                    elif refused:
                         # Not retried, not retained: the stored value stands and
                         # the evaluator is told their edit was not applied.
                         self._conflicts[key] = error

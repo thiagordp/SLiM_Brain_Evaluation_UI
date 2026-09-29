@@ -225,6 +225,7 @@ def build(schema_dir: pathlib.Path, skills_dir: pathlib.Path) -> dict:
             [{"value": v, "text": ""} for v in pipe_values(dataset["availability"]["text"])]),
         "edge.relation_type": entry("Relation type", "schema/edge.md",
                                     edge["type"]["text"], edge_types(edge_md)),
+        "edge.from_to": entry("From and to", "schema/edge.md", edge["from"]["text"]),
         "edge.note": entry("Relation Note", "schema/edge.md", edge["note"]["text"]),
         "edge.grounding": entry(
             "Grounding", ".claude/skills/create-edges/SKILL.md", grounding["lead"],

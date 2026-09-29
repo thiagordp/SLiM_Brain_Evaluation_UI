@@ -24,6 +24,13 @@ MARK = {progress.COMPLETE: "✓", progress.INCOMPLETE: "●", progress.AVAILABLE
         progress.INFO: "·"}
 MARK_LEGEND = "○ not started · ● in progress · ✓ complete"
 
+#: Free-text limits. Google refuses a cell over 50,000 characters, and a write
+#: it refuses would be retried for ever; these keep every text well inside.
+COMMENT_MAX = 5000
+MISSING_CLAIMS_MAX = 20000
+PROPOSAL_NAME_MAX = 300
+PROPOSAL_WHY_MAX = 2000
+
 #: Interface headings for a question's definition passages, where the frozen
 #: entry's own label would not say which passage is which. Rendered apart from
 #: the passages, never joined into them.
@@ -73,12 +80,8 @@ def _live(ctx: Ctx) -> Ctx:
 
 # ------------------------------------------------------------ answer controls
 def _answer_changed(ctx: Ctx, question: spec.Question, object_id: str, key: str) -> None:
-    ctx = _live(ctx)
-    answer = st.session_state.get(key) or ""
-    changes = {"answer": answer}
-    if question.related_claim_on and answer not in question.related_claim_on:
-        changes["related_claim_id"] = ""
-    ui.save_response(ctx, question, object_id, **changes)
+    ui.save_response(_live(ctx), question, object_id,
+                     answer=st.session_state.get(key) or "")
 
 
 def _text_changed(ctx: Ctx, question: spec.Question, object_id: str, key: str,
@@ -113,6 +116,7 @@ def _comment_box(ctx: Ctx, question: spec.Question, answer: str, stored: str,
     required = spec.comment_required(question, answer)
     label = question.comment_label + ("" if required else f" ({spec.OPTIONAL.lower()[:-1]})")
     st.text_area(label, value=stored, key=key, height=80, disabled=ctx.locked,
+                 max_chars=COMMENT_MAX,
                  on_change=on_change, args=args,
                  help=question.comment_help or None)
     if question.comment_help:
@@ -127,8 +131,8 @@ def scalar_question(ctx: Ctx, question: spec.Question, object_id: str, *,
     record = ctx.data.response(question.key, object_id)
     if show_text:
         st.markdown(f"**{question.text}**")
-    if question.definitions and not question.field:
-        ui.definitions(question.definitions)
+    if (question.definitions or question.calibration) and not question.field:
+        ui.definitions(question.definitions, calibration=question.calibration)
     if before is not None:
         before()
     key = ui.wkey(ctx, question.key, object_id)
@@ -145,7 +149,8 @@ def field_question(ctx: Ctx, question: spec.Question, object_id: str,
     with st.container(border=True):
         st.markdown(f"##### {question.title}")
         ui.value_line("Assigned value", shown_value)
-        ui.definitions(question.definitions, headings=DEFINITION_HEADINGS.get(question.key))
+        ui.definitions(question.definitions, headings=DEFINITION_HEADINGS.get(question.key),
+                       calibration=question.calibration)
         scalar_question(ctx, question, object_id)
 
 
@@ -163,6 +168,9 @@ def source_section(ctx: Ctx) -> None:
             ("Paper file", brain.pdf_name(ctx.source_id))]
     with st.container(border=True):
         for label, value in rows:
+            if label == "DOI":
+                ui.doi_line(value)
+                continue
             if label == "Authors":
                 shown = "; ".join(value or []) or "None recorded"
             elif label in ("Venue type", "Language"):
@@ -217,7 +225,7 @@ def claims_section(ctx: Ctx) -> None:
     counts = {part: (done, total) for part, done, total, _ in parts}
 
     _part_heading(spec.PART_CLAIM, counts)
-    claim_evaluation(ctx, claim, claims)
+    claim_evaluation(ctx, claim)
     _part_heading(spec.PART_FIELDS, counts)
     schema_fields(ctx, claim)
     _part_heading(spec.PART_CONCEPTS, counts)
@@ -237,12 +245,11 @@ def claims_section(ctx: Ctx) -> None:
                        on_click=go_to_section, args=(ctx, "datasets"))
 
 
-def concept_caption(family: str, status: str) -> str:
-    """Family, and the status where it tells the evaluator something."""
+def concept_caption(family: str, candidate: bool = False) -> str:
+    """The Concept family. Status is not shown (instrument 4.1), except that
+    Question 13, which is about candidates, says so."""
     caption = family_label(family) if family else ""
-    if status and status != "anchor":
-        caption += f" · {spec.value_label(status)}"
-    return caption
+    return caption + (" · Candidate" if candidate else "")
 
 
 def grounding_quick_guide() -> None:
@@ -303,40 +310,13 @@ def _part_heading(part: str, counts: dict) -> None:
         st.caption(f"{done} of {total} complete")
 
 
-def claim_evaluation(ctx: Ctx, claim: dict, claims: list[dict]) -> None:
+def claim_evaluation(ctx: Ctx, claim: dict) -> None:
     cid = claim["id"]
     anchors = claim.get("anchors") or []
-
-    with st.container(border=True):
-        q1 = spec.Q1
-        answer = scalar_question(ctx, q1, cid)
-        if answer in q1.related_claim_on:
-            record = ctx.data.response(q1.key, cid)
-            stored = record.get("related_claim_id", "")
-            options = progress.evaluated_claims(ctx.brain, ctx.source_id, ctx.data,
-                                                exclude=cid)
-            if stored and stored not in options:
-                options.append(stored)
-            by_id = {c["id"]: c for c in claims}
-            key = ui.wkey(ctx, q1.key, cid, "related")
-            st.selectbox(
-                "Restatement of", options,
-                index=options.index(stored) if stored in options else None,
-                placeholder="Select the Claim this one restates",
-                format_func=lambda c: f"{c} — {by_id.get(c, {}).get('statement', '')[:110]}",
-                key=key, disabled=ctx.locked, on_change=_text_changed,
-                args=(ctx, q1, cid, key, "related_claim_id"))
-            if not options:
-                st.caption("No other Claim of this Source has been evaluated yet. "
-                           "Evaluate the restated Claim first, then return here.")
-            elif not stored:
-                st.warning("Select the Claim this one restates.")
-
-    for question in spec.claim_scalar_questions(spec.PART_CLAIM)[1:]:
+    ui.definitions((), calibration=("claim.general",))
+    for question in spec.claim_scalar_questions(spec.PART_CLAIM):
         with st.container(border=True):
-            if question.key == "CLAIM_Q03_MODALITY":
-                scalar_question(ctx, question, cid, before=lambda: _anchors(anchors))
-            elif question.key == "CLAIM_Q05_GROUNDING":
+            if question.key in ("CLAIM_Q03_MODALITY", "CLAIM_Q05_GROUNDING"):
                 scalar_question(ctx, question, cid, before=lambda: _anchors(anchors))
             else:
                 scalar_question(ctx, question, cid)
@@ -389,7 +369,8 @@ def _concept_judgment(ctx: Ctx, question: spec.Question, cid: str, concept_id: s
     concept = ctx.brain.concept(concept_id)
     record = ctx.data.concept(question.key, cid, concept_id)
     st.markdown(f"**{concept_label(concept_id)}**")
-    st.caption(concept_caption(concept.get("concept_type", ""), concept.get("status", "")))
+    st.caption(concept_caption(concept.get("concept_type", ""),
+                               candidate=question is spec.Q13))
     key = ui.wkey(ctx, question.key, cid, concept_id)
     answer = _radio(ctx, question.options, record.get("answer", ""), key + "|a",
                     _concept_changed,
@@ -525,22 +506,25 @@ def missing_concepts(ctx: Ctx, claim: dict) -> None:
                 text, action = st.columns([7, 1], vertical_alignment="center")
                 with text:
                     st.markdown(f"**{html.escape(entry['label'])}**")
-                    st.caption(concept_caption(entry["family"], entry["status"]))
+                    st.caption(concept_caption(entry["family"]))
                 with action:
                     st.button("Add", key=ui.wkey(ctx, "q14add", cid, entry["id"]),
                               disabled=ctx.locked, on_click=_select_concept,
                               args=(ctx, cid, entry, True))
 
+    st.caption(spec.PROPOSAL_HINT)
     with st.expander("Propose new Concept"):
         name_key = ui.wkey(ctx, "q14name", cid)
         family_key = ui.wkey(ctx, "q14family", cid)
         why_key = ui.wkey(ctx, "q14why", cid)
-        st.text_input("Proposed Concept name", key=name_key, disabled=ctx.locked)
+        st.text_input("Proposed Concept name", key=name_key, disabled=ctx.locked,
+                      max_chars=PROPOSAL_NAME_MAX)
         st.selectbox("Concept family", list(CONCEPT_FAMILIES), index=None,
                      format_func=family_label, key=family_key, disabled=ctx.locked,
                      placeholder="Select a family")
         st.text_area("Why the existing vocabulary is insufficient (optional)",
-                     key=why_key, height=70, disabled=ctx.locked)
+                     key=why_key, height=70, disabled=ctx.locked,
+                     max_chars=PROPOSAL_WHY_MAX)
         st.button("Add proposal", key=ui.wkey(ctx, "q14propose", cid),
                   disabled=ctx.locked, on_click=_propose,
                   args=(ctx, cid, name_key, family_key, why_key))
@@ -563,11 +547,16 @@ def relations_part(ctx: Ctx, claim: dict) -> None:
         with st.container(border=True):
             _relation_card(ctx, relation, cid, n)
             record = ctx.data.relation(relation["key"])
-            for question in spec.relation_questions():
+            # Independent judgments: none disables, answers or clears another.
+            for question in spec.relation_questions(relation):
                 st.markdown(f"##### {question.title}")
-                ui.value_line("Assigned value",
-                              spec.value_label(relation.get(question.field, "")))
-                ui.definitions(question.definitions)
+                if question is spec.DIRECTION:
+                    ui.value_line("Assigned direction",
+                                  f"{relation['from']} → {relation['to']}")
+                else:
+                    ui.value_line("Assigned value",
+                                  spec.value_label(relation.get(question.field, "")))
+                ui.definitions(question.definitions, calibration=question.calibration)
                 if question.key == "REL_GROUNDING":
                     grounding_quick_guide()
                 st.markdown(f"**{question.text}**")
@@ -724,11 +713,109 @@ def recall_section(ctx: Ctx) -> None:
             st.caption(child.comment_help)
             key = ui.wkey(ctx, child.key, ctx.source_id)
             st.text_area("Missing Claims", value=stored, key=key, height=160,
+                         max_chars=MISSING_CLAIMS_MAX,
                          label_visibility="collapsed", disabled=ctx.locked,
                          on_change=_text_changed,
                          args=(ctx, child, ctx.source_id, key, "answer"))
             if not (st.session_state.get(key, stored) or "").strip():
                 st.warning("Required for this answer.")
+
+    with st.container(border=True):
+        restatements(ctx, claims)
+
+
+# ------------------------------------------------------------ Restatements
+RESTATEMENTS_NO_LOCKED = "Remove the restatement groups to answer No."
+
+
+def _restatements_changed(ctx: Ctx, key: str) -> None:
+    ctx = _live(ctx)
+    answer = st.session_state.get(key) or ""
+    if answer == spec.RESTATEMENTS_NONE and ctx.data.active_restatement_groups():
+        return                           # never silently drop groups
+    ui.save_response(ctx, spec.RESTATEMENTS, ctx.source_id, answer=answer)
+
+
+def _add_group(ctx: Ctx, key: str) -> None:
+    ctx = _live(ctx)
+    problem = ui.save_restatement_group(ctx, st.session_state.get(key) or [], True)
+    if problem:
+        st.session_state[f"{key}|error"] = problem
+        return
+    st.session_state.pop(f"{key}|error", None)
+    st.session_state[key] = []
+    if ctx.data.response(spec.RESTATEMENTS.key, ctx.source_id).get("answer") != \
+            spec.RESTATEMENTS_PRESENT:
+        ui.save_response(ctx, spec.RESTATEMENTS, ctx.source_id,
+                         answer=spec.RESTATEMENTS_PRESENT)
+
+
+def _remove_group(ctx: Ctx, members: list[str], pick: str) -> None:
+    st.session_state.pop(f"{pick}|error", None)
+    ui.save_restatement_group(_live(ctx), members, False)
+
+
+def _clear_refusal(pick: str) -> None:
+    """A refusal describes one attempted group; it goes when the choice changes."""
+    st.session_state.pop(f"{pick}|error", None)
+
+
+def restatements(ctx: Ctx, claims: list[dict]) -> None:
+    """Source-level restatement groups. A group has no first or canonical member."""
+    question = spec.RESTATEMENTS
+    st.markdown("#### Restatements")
+    st.markdown(f"**{question.text}**")
+    stored = ctx.data.response(question.key, ctx.source_id).get("answer", "")
+    groups = ctx.data.active_restatement_groups()
+    key = ui.wkey(ctx, question.key, ctx.source_id) + "|a"
+    locked_yes = bool(groups)
+    options = list(question.options)
+    index = options.index(stored) if stored in options else None
+    if locked_yes:
+        # Existing groups hold the answer at Yes until they are removed; the
+        # value is set through session state, so no default is passed as well.
+        st.session_state[key] = spec.RESTATEMENTS_PRESENT
+        index = None
+    answer = st.radio("Restatements", options, index=index,
+                      format_func=lambda code: spec.RESTATEMENT_LABEL[code],
+                      key=key, horizontal=True, label_visibility="collapsed",
+                      disabled=ctx.locked or locked_yes,
+                      on_change=_restatements_changed, args=(ctx, key))
+    if locked_yes and not ctx.locked:
+        st.caption(RESTATEMENTS_NO_LOCKED)
+    if answer != spec.RESTATEMENTS_PRESENT and not groups:
+        return
+
+    by_id = {c["id"]: c for c in claims}
+    pick = ui.wkey(ctx, "rg_pick", ctx.source_id)
+    ordered = sorted(groups.values())               # by smallest member id
+    for n, members in enumerate(ordered, 1):
+        with st.container(border=True):
+            head, action = st.columns([6, 1], vertical_alignment="center")
+            head.markdown(f"**Group {n}**")
+            action.button("Remove group", key=ui.wkey(ctx, "rg_rm", *members),
+                          disabled=ctx.locked, on_click=_remove_group,
+                          args=(ctx, members, pick))
+            for cid in members:
+                st.markdown(f"{cid} — "
+                            f"{html.escape(by_id.get(cid, {}).get('statement', '')[:140])}")
+
+    taken = {cid for members in groups.values() for cid in members}
+    st.markdown("Select the Claims that express the same proposition.")
+    chosen = st.multiselect(
+        "Claims", [c["id"] for c in claims], key=pick, disabled=ctx.locked,
+        on_change=_clear_refusal, args=(pick,),
+        label_visibility="collapsed", placeholder="Choose two or more Claims",
+        format_func=lambda cid: (f"{cid} — {by_id[cid].get('statement', '')[:90]}…"
+                                 + (" (in a group)" if cid in taken else "")))
+    st.button("Add restatement group", key=ui.wkey(ctx, "rg_add", ctx.source_id),
+              disabled=ctx.locked or len(set(chosen)) < 2, on_click=_add_group,
+              args=(ctx, pick))
+    error = st.session_state.get(f"{pick}|error")
+    if error:
+        st.warning(error)
+    elif not groups:
+        st.warning("Add at least one restatement group, or answer No.")
 
 
 # ------------------------------------------------------------------ Review
@@ -853,8 +940,6 @@ def _review_claims(ctx: Ctx) -> None:
                     continue
                 record = data.response(question.key, cid)
                 text = _shown(question, record.get("answer", ""))
-                if record.get("related_claim_id"):
-                    text += f" · restates {record['related_claim_id']}"
                 st.markdown(f"{question.title}: " + _with_comment(text, record.get("comment", "")))
             for question, ids in ((spec.Q12, brain.concepts_of_claim(cid)),
                                   (spec.Q13, brain.candidates_of_claim(cid))):
@@ -878,7 +963,7 @@ def _review_claims(ctx: Ctx) -> None:
                 record = data.relation(relation["key"])
                 label = (f"{spec.value_label(relation['type'])} → {relation['to']} "
                          f"({spec.value_label(relation.get('grounding', ''))})")
-                for question in spec.relation_questions():
+                for question in spec.relation_questions(relation):
                     st.markdown(
                         f"{question.title} · {label}: " + _with_comment(
                             _shown(question, record.get(f"{question.column}_answer", "")),
@@ -907,6 +992,23 @@ def _review_recall(ctx: Ctx) -> None:
             text = ctx.data.response(spec.MISSING_CLAIMS.key, ctx.source_id).get("answer", "")
             st.markdown(f"{spec.MISSING_CLAIMS.title}:")
             st.markdown(html.escape(text) if text.strip() else "_Not answered_")
+        stored = ctx.data.response(spec.RESTATEMENTS.key, ctx.source_id).get("answer", "")
+        groups = sorted(ctx.data.active_restatement_groups().values())
+        line, go = st.columns([6, 1], vertical_alignment="center")
+        line.markdown(f"{spec.RESTATEMENTS.title} — {restatements_status(stored, groups)}")
+        go.button("Go", key="review_restatements_go", on_click=go_to_section,
+                  args=(ctx, "recall"))
+        for n, members in enumerate(groups, 1):
+            st.markdown(f"- Group {n}: {', '.join(members)}")
+
+
+def restatements_status(answer: str, groups) -> str:
+    if answer == spec.RESTATEMENTS_NONE:
+        return "none"
+    if answer == spec.RESTATEMENTS_PRESENT:
+        count = len(groups)
+        return f"{count} group{'s' if count != 1 else ''}" if count else "Yes, no group added"
+    return "unanswered"
 
 
 def _completion(ctx: Ctx, missing) -> None:

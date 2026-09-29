@@ -7,13 +7,17 @@ question each row answers.
 Agreement is computed only where a metric is well defined for the unit:
 
     binary correctness items      observed agreement, Cohen's kappa
+      (Relation Direction included)
     ordered ternary items         observed agreement, linear-weighted kappa
       (Q5, Dataset Description)
     Claim recall (None…All)       observed agreement, linear-weighted kappa
 
-Question 14 sets, proposed Concepts, Question 1's restated-Claim targets and
-Missing Claims are exported raw; no comparison metric is invented for them.
-The restatement answer itself (Yes/No) is binary and is compared as such.
+Question 14 sets, proposed Concepts, restatement groups (and the Restatements
+state) and Missing Claims are exported raw; no comparison metric is invented
+for them.
+
+Direction is asked only for SUPPORTS and ATTACKS, so a SAME_AS relation has no
+Direction row in `relation_judgments` and no Direction unit in agreement.
 
 Agreement groups may have more than two members. Every pair of members who both
 answered a unit is compared (one row per evaluator pair in `agreement_pairs`),
@@ -22,6 +26,7 @@ and each question's kappa pools those pairwise comparisons.
 from __future__ import annotations
 
 import collections
+import io
 import itertools
 
 import sheets
@@ -79,21 +84,29 @@ def normalised(raw: dict[str, list[dict]]) -> dict[str, list[dict]]:
         concept_rows.append({**_with_review(row, reviews, meta),
                              **question_columns(question, row.get("answer", ""))})
 
+    judgment_columns = tuple(f"{q.column}_" for q in spec.relation_questions())
     relation_rows = []
     for row in raw[sheets.RELATION_RESPONSES]:
-        for question in spec.relation_questions():
+        for question in spec.relation_questions({"type": row.get("relation_type")}):
             answer = row.get(f"{question.column}_answer", "")
             relation_rows.append({
                 **_with_review({k: v for k, v in row.items()
-                                if not k.startswith(("grounding_", "type_"))},
+                                if not k.startswith(judgment_columns)},
                                reviews, meta),
-                **question_columns(question, answer),
+                **question_columns(question, answer), "question_key": question.key,
                 "answer": answer, "comment": row.get(f"{question.column}_comment", "")})
 
     missing = [_with_review(r, reviews, meta) for r in
                store.effective(raw[sheets.MISSING_CONCEPTS], "selection_key").values()]
     proposed = [_with_review(r, reviews, meta) for r in
                 store.effective(raw[sheets.PROPOSED_CONCEPTS], "proposal_key").values()]
+    # One row per Claim membership of an active group, groups and members in a
+    # fixed order. Inactive (removed) rows stay in raw_restatements.
+    restatements = sorted(
+        (_with_review(r, reviews, meta) for r in
+         store.effective(raw[sheets.RESTATEMENTS], "restatement_key").values()
+         if r.get("active") == store.TRUE),
+        key=lambda r: (r.get("review_id", ""), r.get("group_id", ""), r.get("claim_id", "")))
     return {
         "claim_judgments": claim_rows,
         "concept_judgments": concept_rows,
@@ -103,6 +116,7 @@ def normalised(raw: dict[str, list[dict]]) -> dict[str, list[dict]]:
         "relation_judgments": relation_rows,
         "dataset_judgments": dataset_rows,
         "claim_recall": recall_rows,
+        "restatement_groups": restatements,
     }
 
 
@@ -139,7 +153,7 @@ def weighted_kappa(pairs: list[tuple[str, str]], categories,
 
 
 def _metric_for(question: spec.Question):
-    if question.semantics in (spec.CORRECTNESS_BINARY, spec.RESTATEMENT_FLAG):
+    if question.semantics == spec.CORRECTNESS_BINARY:
         return "cohen_kappa", list(question.options), False
     if question.semantics == spec.CORRECTNESS_TERNARY:
         return "linear_weighted_kappa", [spec.NO, spec.IN_PART, spec.YES], True
@@ -169,7 +183,7 @@ def agreement(raw: dict[str, list[dict]]) -> tuple[list[dict], list[dict]]:
         add(row["review_id"], row["question_key"],
             f"{row['claim_id']}|{row['concept_id']}", row.get("answer", ""))
     for row in raw[sheets.RELATION_RESPONSES]:
-        for question in spec.relation_questions():
+        for question in spec.relation_questions({"type": row.get("relation_type")}):
             add(row["review_id"], question.key, row["relation_key"],
                 row.get(f"{question.column}_answer", ""))
 
@@ -202,6 +216,54 @@ def agreement(raw: dict[str, list[dict]]) -> tuple[list[dict], list[dict]]:
             "metric": name, "value": "" if value is None else round(value, 4),
         })
     return paired, metrics
+
+
+def sheet_names(names) -> dict[str, str]:
+    """table name -> XLSX tab name: the table name itself, cut to Excel's 31
+    characters and made unique should two names share their first 31."""
+    out, used = {}, set()
+    for name in names:
+        candidate, n = name[:31], 1
+        while candidate.lower() in used:
+            n += 1
+            suffix = f"~{n}"
+            candidate = name[:31 - len(suffix)] + suffix
+        used.add(candidate.lower())
+        out[name] = candidate
+    return out
+
+
+#: Excel's limit on the text in one cell.
+XLSX_CELL_LIMIT = 32767
+
+
+def _xlsx_value(value):
+    """A value as Excel can store it: the characters it rejects removed and the
+    text cut at its cell limit. Nothing else changes; the CSVs keep everything."""
+    if not isinstance(value, str):
+        return value
+    from openpyxl.cell.cell import ILLEGAL_CHARACTERS_RE
+
+    return ILLEGAL_CHARACTERS_RE.sub("", value)[:XLSX_CELL_LIMIT]
+
+
+def export_xlsx(tables: dict[str, list[dict]]) -> bytes:
+    """Every table in one workbook, one tab per table, named after the table.
+
+    An empty table still has its tab (with its header, where the columns are
+    known), so the file always shows the complete set of tables.
+    """
+    import pandas as pd
+
+    headers = {f"raw_{tab.lower()}": list(columns) for tab, columns in sheets.COLUMNS.items()}
+    names = sheet_names(tables)
+    buffer = io.BytesIO()
+    with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
+        for name, rows in tables.items():
+            frame = pd.DataFrame(rows, columns=None if rows else headers.get(name))
+            frame = frame.map(_xlsx_value) if not frame.empty else frame
+            frame.to_excel(writer, index=False, sheet_name=names[name])
+    return buffer.getvalue()
 
 
 def export_tables() -> dict[str, list[dict]]:

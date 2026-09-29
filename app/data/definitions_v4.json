@@ -64,7 +64,7 @@
       "CPT-neuro-symbolic-hybrid"
     ]
   },
-  "definitions_id": "5e893fd56651b365",
+  "definitions_id": "629aebacc9a701ee",
   "entries": {
     "claim.anchors": {
       "items": [
@@ -297,6 +297,11 @@
       "label": "Dataset",
       "source": "schema/dataset.md",
       "text": "One node per dataset, benchmark, or corpus a claim rests on. A dataset a paper merely mentions gets no node: if no claim rests on it, the graph has nothing to say about it."
+    },
+    "edge.from_to": {
+      "label": "From and to",
+      "source": "schema/edge.md",
+      "text": "the ids the relation runs between, in the direction the type's row gives."
     },
     "edge.grounding": {
       "items": [

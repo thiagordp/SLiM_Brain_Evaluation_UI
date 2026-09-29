@@ -6,8 +6,8 @@
 * narrow updates only — never rewrite a tab;
 * ``updated_at`` is compared before overwriting, so the same evaluator in two
   tabs gets a conflict instead of a silent clobber;
-* the two variable-length tabs (missing and proposed Concepts) grow by
-  idempotent upserts, and duplicate keys are collapsed on load.
+* the variable-length tabs (missing and proposed Concepts, restatement
+  groups) grow by idempotent upserts, and duplicate keys are collapsed on load.
 
 The UI never talks to the workbook directly; everything goes through here.
 """
@@ -17,6 +17,7 @@ import collections
 import dataclasses
 import datetime as dt
 import functools
+import hashlib
 import time
 
 import sheets
@@ -146,6 +147,19 @@ def selection_key(rid: str, claim_id: str, concept_id: str) -> str:
 
 def proposal_key(rid: str, claim_id: str, proposal_id: str) -> str:
     return f"{rid}|{claim_id}|{proposal_id}"
+
+
+def restatement_group_id(claim_ids) -> str:
+    """The same set of Claims always names the same group, whatever the order.
+
+    Derived from the sorted, distinct ids, so no member is first or canonical.
+    """
+    ids = sorted({str(c).strip() for c in claim_ids if str(c).strip()})
+    return "RG-" + hashlib.sha256("|".join(ids).encode("utf-8")).hexdigest()[:12]
+
+
+def restatement_key(rid: str, group_id: str, claim_id: str) -> str:
+    return f"{rid}|{group_id}|{claim_id}"
 
 
 def response_lookup(question_key: str, object_id: str) -> str:
@@ -326,12 +340,14 @@ class ReviewData:
     relations  relation_key                   -> RELATION_RESPONSES row
     missing    "claim_id|concept_id"          -> effective MISSING_CONCEPTS row
     proposals  "claim_id|proposal_id"         -> effective PROPOSED_CONCEPTS row
+    restatements "group_id|claim_id"          -> effective RESTATEMENTS row
     """
     responses: dict = dataclasses.field(default_factory=dict)
     concepts: dict = dataclasses.field(default_factory=dict)
     relations: dict = dataclasses.field(default_factory=dict)
     missing: dict = dataclasses.field(default_factory=dict)
     proposals: dict = dataclasses.field(default_factory=dict)
+    restatements: dict = dataclasses.field(default_factory=dict)
 
     def response(self, question_key: str, object_id: str) -> dict:
         return self.responses.get(response_lookup(question_key, object_id), {})
@@ -351,6 +367,15 @@ class ReviewData:
         return sorted((r for r in self.proposals.values()
                        if r.get("claim_id") == claim_id and r.get("active") == TRUE),
                       key=lambda r: r.get("name", "").lower())
+
+    def active_restatement_groups(self) -> dict[str, list[str]]:
+        """group_id -> its active member Claims, sorted. As stored: not validated
+        (see `progress.restatement_groups` for what counts)."""
+        groups: dict[str, list[str]] = {}
+        for row in self.restatements.values():
+            if row.get("active") == TRUE and row.get("group_id") and row.get("claim_id"):
+                groups.setdefault(row["group_id"], []).append(row["claim_id"])
+        return {gid: sorted(set(ids)) for gid, ids in groups.items()}
 
     def copy(self) -> "ReviewData":
         return ReviewData(*(
@@ -388,7 +413,7 @@ def load_review(rid: str) -> ReviewData:
     """Every stored answer for one review, in ONE request.
 
     The three preallocated blocks come back by their recorded row ranges, and
-    the two small selection tabs whole; the batch read is a single
+    the small selection tabs whole; the batch read is a single
     `values.batchGet`.
     """
     review = get_review(rid)
@@ -405,12 +430,25 @@ def load_review(rid: str) -> ReviewData:
         where.append((tab, 2))
     results = workbook().read_ranges(requests)
 
-    data = ReviewData()
+    rows_by_tab = {}
     for (tab, first), rows in zip(where, results):
         if tab in sheets.SELECTION_TABS:
             _ROW_INDEX[tab] = sheets.row_index(rows, tab)
         else:
             _remember_rows(tab, first, rows)
+        rows_by_tab[tab] = rows
+    return review_data(rid, rows_by_tab)
+
+
+def review_data(rid: str, rows_by_tab: dict[str, list[dict]]) -> ReviewData:
+    """One review's stored answers from raw tab rows, keyed as `ReviewData` is.
+
+    The single definition of how stored rows become the evaluation state: the
+    app's `load_review` and the integrity audit both use it. Rows of other
+    reviews are ignored; selection tabs are collapsed to their effective rows.
+    """
+    data = ReviewData()
+    for tab, rows in rows_by_tab.items():
         mine = [r for r in rows if r.get("review_id") == rid]
         if tab == sheets.RESPONSES:
             data.responses = {response_lookup(r["question_key"], r["object_id"]): r
@@ -426,37 +464,60 @@ def load_review(rid: str) -> ReviewData:
         elif tab == sheets.PROPOSED_CONCEPTS:
             data.proposals = {pair_lookup(r["claim_id"], r["proposal_id"]): r
                               for r in effective(mine, "proposal_key").values()}
+        elif tab == sheets.RESTATEMENTS:
+            data.restatements = {pair_lookup(r["group_id"], r["claim_id"]): r
+                                 for r in effective(mine, "restatement_key").values()}
     return data
 
 
 # ------------------------------------------------------------------ writes
 def write(tab: str, key: str, values: dict, *, rid: str,
           expected_updated_at: str | None = None, also_accept=()) -> str:
-    """One row of a preallocated tab. Same path as a batch of one."""
-    return save_many([{"tab": tab, "key": key, "values": values, "rid": rid,
-                       "expected_updated_at": expected_updated_at,
-                       "also_accept": also_accept}])[0]
+    """One row of a preallocated tab. Same path as a batch of one; a conflict
+    is raised here rather than returned."""
+    result = save_many([{"tab": tab, "key": key, "values": values, "rid": rid,
+                         "expected_updated_at": expected_updated_at,
+                         "also_accept": also_accept}])[0]
+    if isinstance(result, SaveConflict):
+        raise result
+    return result
 
 
-def save_many(records: list[dict]) -> list[str]:
-    """Several row writes, one request per tab plus one conflict read per tab.
+def _same_content(stored: dict, values: dict, tab: str) -> bool:
+    """Whether a stored row already holds exactly these values (the stamp aside).
+
+    Stored cells come back as text, so both sides are compared as text.
+    """
+    return all(str(stored.get(column) or "") == str(values.get(column) or "")
+               for column in sheets.COLUMNS[tab] if column != "updated_at")
+
+
+def save_many(records: list[dict]) -> list:
+    """Several row writes: one conflict read and one write request per tab.
 
     Each record: tab, key, values (the complete row), rid, expected_updated_at,
     and optionally ``also_accept`` — the stamps this session itself has written
     to that row. An edit queued while the session's previous write to the same
     row was still in flight carries the older stamp; the row having moved on to
-    a stamp this session wrote is not a conflict. The rows of one tab all lie
-    inside one review's block, so their stored stamps come back in a single
-    range read whatever the batch's size.
+    a stamp this session wrote is not a conflict.
+
+    Returns one result per record, in order: the new stamp, or a `SaveConflict`
+    for a record whose row was changed elsewhere. **Conflicts are per record**:
+    the other records of the batch are still written. Every tab's conflicts are
+    determined before anything is written.
+
+    A row that already holds exactly the values being written is never a
+    conflict, whatever its stamp. That is a retry whose first attempt reached
+    the workbook although its response was lost (a timeout, a quota error), and
+    refusing it would report a stored answer as not applied.
     """
     if not records:
         return []
     book = workbook()
-    stamps = []
+    results: list = [None] * len(records)
     by_tab: dict[str, list] = collections.defaultdict(list)
-    for record in records:
+    for index, record in enumerate(records):
         stamp = now()
-        stamps.append(stamp)
         tab, key = record["tab"], record["key"]
         number = row_number(tab, key)
         if number is None:
@@ -468,46 +529,66 @@ def save_many(records: list[dict]) -> list[str]:
         accepted = set(record.get("also_accept") or ())
         if record.get("expected_updated_at"):
             accepted.add(record["expected_updated_at"])
-        by_tab[tab].append((number, values, key, accepted))
+        by_tab[tab].append((index, number, values, key, accepted))
 
+    writes = {}
     for tab, updates in by_tab.items():
-        expectations = {key: accepted for _, _, key, accepted in updates if accepted}
-        if expectations:
-            numbers = [number for number, *_ in updates]
-            rows = book.read_range(tab, min(numbers), max(numbers))
-            stored = {row.get(sheets.KEY_COLUMN[tab]): row.get("updated_at") or ""
-                      for row in rows}
-            conflicted = [k for k, accepted in expectations.items()
-                          if stored.get(k) and stored[k] not in accepted]
-            if conflicted:
-                raise SaveConflict(", ".join(sorted(conflicted)))
-        book.update_rows(tab, [(number, values) for number, values, *_ in updates])
+        stored = {}
+        if any(accepted for *_, accepted in updates):
+            numbers = [number for _, number, *_ in updates]
+            stored = {row.get(sheets.KEY_COLUMN[tab]): row
+                      for row in book.read_range(tab, min(numbers), max(numbers))}
+        keep = []
+        for index, number, values, key, accepted in updates:
+            row = stored.get(key) or {}
+            stamp = row.get("updated_at") or ""
+            if (accepted and stamp and stamp not in accepted
+                    and not _same_content(row, values, tab)):
+                results[index] = SaveConflict(key)
+                continue
+            keep.append((number, values))
+            results[index] = values["updated_at"]
+        writes[tab] = keep
 
+    for tab, rows in writes.items():
+        book.update_rows(tab, rows)
     for rid in {record["rid"] for record in records}:
         record_activity(rid)
-    return stamps
+    return results
 
 
 def upsert_selection(tab: str, key: str, values: dict, *, rid: str) -> str:
-    """Write one MISSING_CONCEPTS or PROPOSED_CONCEPTS row, idempotently.
+    """Write one row of a selection tab, idempotently."""
+    return upsert_selections(tab, {key: values}, rid=rid)
+
+
+def upsert_selections(tab: str, rows: dict[str, dict], *, rid: str) -> str:
+    """Write rows of MISSING_CONCEPTS, PROPOSED_CONCEPTS or RESTATEMENTS.
 
     The key column is re-read first, so a row that already exists — from an
     earlier selection, or from another session — is updated in place instead of
     appended again. Removal is `active = FALSE` on the same row, so re-selecting
-    reactivates it and row positions never move.
+    reactivates it and row positions never move. Several rows (the members of
+    one restatement group) cost one re-read, one update and one append.
     """
     if tab not in sheets.SELECTION_TABS:
         raise ValueError(f"{tab} is not a selection tab")
     book = workbook()
     stamp = now()
-    row = {**values, sheets.KEY_COLUMN[tab]: key, "updated_at": stamp}
     _reindex(tab)
-    number = _ROW_INDEX[tab].get(key)
-    if number is None:
-        book.append_rows(tab, [row])
+    updates, appends = [], []
+    for key, values in rows.items():
+        row = {**values, sheets.KEY_COLUMN[tab]: key, "updated_at": stamp}
+        number = _ROW_INDEX[tab].get(key)
+        if number is None:
+            appends.append(row)
+        else:
+            updates.append((number, row))
+    if updates:
+        book.update_rows(tab, updates)
+    if appends:
+        book.append_rows(tab, appends)
         _reindex(tab)
-    else:
-        book.update_rows(tab, [(number, row)])
     record_activity(rid)
     return stamp
 

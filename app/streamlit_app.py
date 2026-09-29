@@ -1,4 +1,4 @@
-"""SLiM Brain — human evaluation, instrument 4.0.
+"""SLiM Brain — human evaluation, instrument 4.1.
 
     storage, round and preflight checks -> shared password -> evaluator
         -> Training | Agreement | Individual -> paper list -> paper
@@ -13,7 +13,6 @@ Run:  streamlit run app/streamlit_app.py
 from __future__ import annotations
 
 import datetime as dt
-import io
 import pathlib
 import sys
 
@@ -23,6 +22,7 @@ import pandas as pd
 import streamlit as st
 
 import analysis
+import integrity
 import manifest
 import preflight
 import progress
@@ -494,27 +494,41 @@ def _admin_control() -> None:
             st.rerun()
 
 
+EXPORTS = "_admin_exports"
+
+
+def _prepare_exports() -> None:
+    """Read the workbook once and build every download from that one read."""
+    tables = analysis.export_tables()
+    st.session_state[EXPORTS] = {
+        "xlsx": analysis.export_xlsx(tables),
+        "csv": {name: (len(rows), pd.DataFrame(rows).to_csv(index=False).encode("utf-8"))
+                for name, rows in tables.items()},
+    }
+
+
 def _admin_exports() -> None:
     st.caption("Raw tabs exactly as stored, normalised tables joined with review "
                "provenance, and agreement for the agreement phase. Every table "
                "carries the round and the evaluation specification version.")
-    if not st.button("Prepare exports"):
+    prepared = st.session_state.get(EXPORTS)
+    st.button("Refresh exports" if prepared else "Prepare exports",
+              on_click=_prepare_exports, key="prepare_exports")
+    if not prepared:
         return
-    tables = analysis.export_tables()
-    frames = {name: pd.DataFrame(rows) for name, rows in tables.items()}
-    for name, frame in frames.items():
-        st.download_button(f"{name}.csv — {len(frame)} rows",
-                           frame.to_csv(index=False).encode("utf-8"),
-                           file_name=f"{manifest.round_id()}_{name}.csv",
-                           mime="text/csv", key=f"dl|{name}")
-    buffer = io.BytesIO()
-    with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
-        for name, frame in frames.items():
-            frame.to_excel(writer, index=False, sheet_name=name[:31])
-    st.download_button("All tables (XLSX)", buffer.getvalue(),
-                       file_name=f"{manifest.round_id()}_evaluation_export.xlsx",
+    round_id = manifest.round_id()
+    st.download_button("Download all tables (.xlsx)", prepared["xlsx"],
+                       file_name=f"{round_id}_evaluation_export.xlsx",
                        mime="application/vnd.openxmlformats-officedocument."
-                            "spreadsheetml.sheet")
+                            "spreadsheetml.sheet",
+                       type="primary", key="dl_xlsx")
+    st.caption(f"{len(prepared['csv'])} tables in one workbook, one tab per table, "
+               f"named after the table.")
+    with st.expander("Individual tables (CSV)", expanded=False):
+        for name, (count, data) in prepared["csv"].items():
+            st.download_button(f"{name}.csv — {count} rows", data,
+                               file_name=f"{round_id}_{name}.csv",
+                               mime="text/csv", key=f"dl|{name}")
 
 
 def _admin_system() -> None:
@@ -538,6 +552,25 @@ def _admin_system() -> None:
             st.warning(problem)
     else:
         st.success("Configuration is consistent.")
+    st.markdown("**Stored data**")
+    st.caption("Checks everything the workbook holds against the instrument, the "
+               "Brain and the round layout. Read-only: nothing is written or "
+               "repaired.")
+    if st.button("Check data integrity", key="integrity_check"):
+        problems = integrity.run(data, store.workbook(), manifest.round_id())
+        errors = [p for p in problems if p.level == integrity.ERROR]
+        warnings = [p for p in problems if p.level == integrity.WARNING]
+        if errors:
+            st.error(f"{len(errors)} error(s), {len(warnings)} warning(s).")
+        elif warnings:
+            st.warning(f"No errors, {len(warnings)} warning(s).")
+        else:
+            st.success("No errors and no warnings.")
+        for problem in errors + warnings:
+            st.caption(f"• {problem}")
+        for problem in problems:
+            if problem.level == integrity.INFO:
+                st.caption(f"{problem.where}: {problem.what}")
 
 
 def admin_page() -> None:

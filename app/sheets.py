@@ -18,11 +18,12 @@ Tabs, in three groups:
     round metadata   ROUND, DEFINITIONS            written once by bootstrap
     configuration    CONFIG, EVALUATORS, ASSIGNMENTS
     evaluation       REVIEWS, RESPONSES, CONCEPT_RESPONSES, RELATION_RESPONSES,
-                     MISSING_CONCEPTS, PROPOSED_CONCEPTS, SUBMISSIONS
+                     MISSING_CONCEPTS, PROPOSED_CONCEPTS, RESTATEMENTS,
+                     SUBMISSIONS
 
 REVIEWS, RESPONSES, CONCEPT_RESPONSES and RELATION_RESPONSES are preallocated
-by bootstrap, one contiguous block per review. MISSING_CONCEPTS and
-PROPOSED_CONCEPTS hold a variable number of rows per Claim and grow by
+by bootstrap, one contiguous block per review. MISSING_CONCEPTS,
+PROPOSED_CONCEPTS and RESTATEMENTS hold a variable number of rows and grow by
 idempotent upserts.
 """
 from __future__ import annotations
@@ -140,6 +141,8 @@ CONCEPT_RESPONSES = "CONCEPT_RESPONSES"
 RELATION_RESPONSES = "RELATION_RESPONSES"
 MISSING_CONCEPTS = "MISSING_CONCEPTS"
 PROPOSED_CONCEPTS = "PROPOSED_CONCEPTS"
+#: One row per Claim membership in a restatement group of one review.
+RESTATEMENTS = "RESTATEMENTS"
 #: A phase is finally submitted for an evaluator only when a row exists here.
 #: Sheets has no transaction across the review rows a submission touches, so the
 #: marker is written last and retrying a half-finished submission is safe.
@@ -148,7 +151,7 @@ SUBMISSIONS = "SUBMISSIONS"
 METADATA_TABS = (ROUND, DEFINITIONS)
 CONFIG_TABS = (CONFIG, EVALUATORS, ASSIGNMENTS)
 BLOCK_TABS = (RESPONSES, CONCEPT_RESPONSES, RELATION_RESPONSES)
-SELECTION_TABS = (MISSING_CONCEPTS, PROPOSED_CONCEPTS)
+SELECTION_TABS = (MISSING_CONCEPTS, PROPOSED_CONCEPTS, RESTATEMENTS)
 EVALUATION_TABS = (REVIEWS, *BLOCK_TABS, *SELECTION_TABS, SUBMISSIONS)
 ALL_TABS = METADATA_TABS + CONFIG_TABS + EVALUATION_TABS
 
@@ -178,7 +181,7 @@ COLUMNS: dict[str, tuple[str, ...]] = {
     ),
     RESPONSES: (
         "response_key", "review_id", "source_id", "object_type", "object_id",
-        "claim_id", "question_key", "answer", "related_claim_id", "comment",
+        "claim_id", "question_key", "answer", "comment",
         "updated_at",
     ),
     CONCEPT_RESPONSES: (
@@ -190,7 +193,9 @@ COLUMNS: dict[str, tuple[str, ...]] = {
         "response_key", "review_id", "source_id", "relation_key",
         "relation_type", "from_claim", "to_claim", "from_source", "to_source",
         "grounding", "note",
-        "grounding_answer", "grounding_comment", "type_answer", "type_comment",
+        "grounding_answer", "grounding_comment",
+        "direction_answer", "direction_comment",
+        "type_answer", "type_comment",
         "updated_at",
     ),
     MISSING_CONCEPTS: (
@@ -200,6 +205,10 @@ COLUMNS: dict[str, tuple[str, ...]] = {
     PROPOSED_CONCEPTS: (
         "proposal_key", "review_id", "source_id", "claim_id", "proposal_id",
         "name", "family", "explanation", "active", "updated_at",
+    ),
+    RESTATEMENTS: (
+        "restatement_key", "review_id", "source_id", "group_id", "claim_id",
+        "active", "updated_at",
     ),
     SUBMISSIONS: (
         "submission_key", "round_id", "evaluator_id", "phase_id",
@@ -443,19 +452,26 @@ class GoogleSheetsWorkbook:
         return out
 
     def append_rows(self, tab: str, rows: list[dict[str, Any]]) -> int:
+        import gspread
+
         if not rows:
             return 0
         worksheet = self._worksheet(tab)
         payload = [ordered(tab, row) for row in rows]
         for start in range(0, len(payload), WRITE_CHUNK):
-            worksheet.append_rows(payload[start:start + WRITE_CHUNK],
-                                  value_input_option="RAW",
-                                  insert_data_option="INSERT_ROWS",
-                                  table_range="A1")
+            try:
+                worksheet.append_rows(payload[start:start + WRITE_CHUNK],
+                                      value_input_option="RAW",
+                                      insert_data_option="INSERT_ROWS",
+                                      table_range="A1")
+            except gspread.exceptions.APIError as error:
+                raise _api_error(f"Could not add rows to {tab}", error) from error
         return len(payload)
 
     def update_rows(self, tab: str, updates) -> None:
         """Several rows in one request, each still a targeted range."""
+        import gspread
+
         updates = list(updates)
         if not updates:
             return
@@ -465,8 +481,11 @@ class GoogleSheetsWorkbook:
                     "values": [ordered(tab, values)]}
                    for number, values in updates]
         for start in range(0, len(payload), WRITE_CHUNK):
-            worksheet.batch_update(payload[start:start + WRITE_CHUNK],
-                                   value_input_option="RAW")
+            try:
+                worksheet.batch_update(payload[start:start + WRITE_CHUNK],
+                                       value_input_option="RAW")
+            except gspread.exceptions.APIError as error:
+                raise _api_error(f"Could not save to {tab}", error) from error
 
 
 def workbook_from_env() -> GoogleSheetsWorkbook:

@@ -59,7 +59,7 @@ python app/tools/preflight.py
 ```
 
 It must report `0 error(s)`. The preflight checks every Claim, Concept, Dataset
-and Relation against the structure instrument 4.0 needs, and the snapshot's
+and Relation against the structure the instrument needs, and the snapshot's
 schema files against the frozen definitions.
 
 ### 2.2 The definitions
@@ -116,6 +116,11 @@ Brain, add it to `IND-6` as the file's header explains and rerun the tool.
 
 ## 4. Create and bootstrap the round workbook
 
+**Instrument 4.1 needs a fresh workbook.** It adds the RESTATEMENTS tab and the
+Relation `direction_*` columns, drops `related_claim_id`, and changes the
+definitions id. A workbook bootstrapped for 4.0 is refused at startup ("does not
+have the headers this version expects"); there is no migration.
+
 1. Create a new spreadsheet at <https://sheets.new>, named after the round, e.g.
    *SLiM Brain evaluation — ROUND-2026-01*.
 2. **Share** it with the service account's address as **Editor**.
@@ -141,6 +146,7 @@ the round's self-description:
 | CONFIG, EVALUATORS, ASSIGNMENTS | phase switches and the explicit assignments |
 | REVIEWS, RESPONSES, CONCEPT_RESPONSES, RELATION_RESPONSES | one preallocated block per review |
 | MISSING_CONCEPTS, PROPOSED_CONCEPTS | Question 14 selections and proposals |
+| RESTATEMENTS | restatement-group memberships (Claim recall) |
 | SUBMISSIONS | final phase submissions |
 
 Finally it reads back the first and last row of every block and fails loudly if
@@ -198,7 +204,21 @@ Any failure stops the app on a screen saying what is wrong.
    row changed in the workbook.
 2. Admin → System: the round metadata, 0 preflight errors, a consistent
    configuration.
-3. `python app/tools/snapshot_config.py` and commit the snapshot.
+3. `python app/tools/audit_workbook.py` — must report 0 errors. Run it again at
+   any time during the round (read-only); Admin → System → *Check data
+   integrity* shows the same report.
+4. `python app/tools/snapshot_config.py` and commit the snapshot.
+
+**Quota.** Every evaluator's saves go through the one service account, whose
+Sheets quota is about 60 read and 60 write requests per minute. Answers are
+batched, and a refused request is retried and retained, never dropped; at a
+busy moment saving is slower, and the status line says "Saving…" until
+everything is stored.
+
+**Real-Google check.** `HE_LIVE_SHEET_OK=1 python app/tests/live_sheets.py`
+exercises the storage against a *disposable* workbook (it re-bootstraps it):
+round trips, a stale write, a mixed batch, Direction, restatement groups, and
+finally the integrity audit. Never point it at a round in use.
 
 ---
 
@@ -229,10 +249,14 @@ Admin → Exports produces, per round:
 
 - `raw_*` — every tab exactly as stored;
 - `claim_judgments`, `concept_judgments`, `missing_concepts_state`,
-  `missing_concepts`, `proposed_concepts`, `relation_judgments`,
-  `dataset_judgments`, `claim_recall` — joined with review provenance. Each row
+  `missing_concepts`, `proposed_concepts`, `relation_judgments` (Grounding,
+  Direction, Type), `dataset_judgments`, `claim_recall`, `restatement_groups` —
+  joined with review provenance. Each row
   carries `round_id` and `eval_spec_version`;
 - `agreement_pairs`, `agreement_metrics` — the agreement phase only.
+
+**Download all tables (.xlsx)** puts all of them in one file, one tab per table;
+each table is also available as a CSV under "Individual tables (CSV)".
 
 The v3 evaluation data stays in its own workbook, unchanged; nothing in this
 version reads or rewrites it.

@@ -111,7 +111,7 @@ def _queue_row(ctx: Ctx, tab: str, key: str, row: dict) -> None:
 
 def save_response(ctx: Ctx, question: spec.Question, object_id: str,
                   **changes) -> None:
-    """RESPONSES: change answer / comment / related_claim_id of one row."""
+    """RESPONSES: change the answer and/or comment of one row."""
     lookup = store.response_lookup(question.key, object_id)
     row = ctx.data.responses.get(lookup)
     if row is None:
@@ -151,6 +151,39 @@ def save_selection(ctx: Ctx, tab: str, key: str, lookup: str, row: dict) -> None
     target = ctx.data.missing if tab == sheets.MISSING_CONCEPTS else ctx.data.proposals
     target[lookup] = row
     queue().submit(key, store.upsert_selection, tab, key, dict(row), rid=ctx.review_id)
+
+
+def save_restatement_group(ctx: Ctx, claim_ids, active: bool) -> str | None:
+    """Add (``active``) or remove one restatement group. Returns why it was
+    refused, or None when it was queued.
+
+    Adding is validated at this boundary whatever control asked for it (see
+    `progress.validate_restatement_group`); a refused group writes nothing.
+    Removing marks the group's own rows inactive. All member rows travel in one
+    queued upsert, keyed by the group, so a later add or remove of the same
+    group supersedes an earlier one still pending.
+    """
+    import progress
+
+    if active:
+        ids, problem = progress.validate_restatement_group(
+            ctx.brain, ctx.source_id, ctx.data, claim_ids)
+        if problem:
+            return problem
+    else:
+        ids = sorted({str(c) for c in claim_ids})
+    gid = store.restatement_group_id(ids)
+    rows = {}
+    for cid in ids:
+        key = store.restatement_key(ctx.review_id, gid, cid)
+        row = {"restatement_key": key, "review_id": ctx.review_id,
+               "source_id": ctx.source_id, "group_id": gid, "claim_id": cid,
+               "active": store.TRUE if active else store.FALSE}
+        ctx.data.restatements[store.pair_lookup(gid, cid)] = row
+        rows[key] = dict(row)
+    queue().submit(f"{ctx.review_id}|{gid}", store.upsert_selections,
+                   sheets.RESTATEMENTS, rows, rid=ctx.review_id)
+    return None
 
 
 # --------------------------------------------------------------- scrolling
@@ -446,20 +479,43 @@ def _render_passage(key: str) -> None:
         st.markdown(definition_html(key), unsafe_allow_html=True)
 
 
-def definitions(keys, headings: dict | None = None) -> None:
-    """Frozen guidance for a question, in a closed "Instructions" expander.
+SCHEMA_SKILL = "Schema / skill"
+CALIBRATION = "Calibration"
 
-    Each passage is preceded by a heading that is interface structure — the
-    entry's label, or ``headings[key]`` — rendered as its own element and never
-    joined into the passage.
+
+def _section_heading(text: str) -> None:
+    st.markdown(f"<div style='font-size:0.8rem;letter-spacing:0.04em;"
+                f"text-transform:uppercase;opacity:0.7;margin:0.3rem 0 0.2rem'>"
+                f"{html.escape(text)}</div>", unsafe_allow_html=True)
+
+
+def definitions(keys, headings: dict | None = None, calibration=()) -> None:
+    """Guidance for a question, in a closed "Instructions" expander.
+
+    Each frozen passage is preceded by a heading that is interface structure —
+    the entry's label, or ``headings[key]`` — rendered as its own element and
+    never joined into the passage.
+
+    ``calibration`` names `spec.CALIBRATION` entries. When there are any, the
+    frozen passages go under a "Schema / skill" heading and the calibration
+    lines under a separate "Calibration" heading, so meeting decisions are
+    never presented as schema text. Without calibration the block is unchanged.
     """
-    if not keys:
+    if not keys and not calibration:
         return
     with st.expander(INSTRUCTIONS, expanded=False):
+        if keys and calibration:
+            _section_heading(SCHEMA_SKILL)
         for key in keys:
             heading = (headings or {}).get(key) or spec.definition(key)["label"]
             st.markdown(f"**{html.escape(heading)}**")
             _render_passage(key)
+        if calibration:
+            _section_heading(CALIBRATION)
+            st.markdown("".join(
+                f"<p style='margin:0 0 0.5rem'>{html.escape(line)}</p>"
+                for name in calibration for line in spec.CALIBRATION[name]),
+                unsafe_allow_html=True)
 
 
 def raw_markdown(text: str) -> None:
@@ -474,6 +530,39 @@ def raw_markdown(text: str) -> None:
     body = ("\n" if text.startswith("\n") else "") + text + ("\n" if text.endswith("\n") else "")
     with st.expander(RAW_MARKDOWN, expanded=False):
         st.code(body, language="markdown", wrap_lines=True)
+
+
+_DOI_PREFIX = re.compile(r"^(?:https?://(?:dx\.)?doi\.org/|doi:\s*)", re.I)
+EXTERNAL_ICON = (
+    "<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' "
+    "fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' "
+    "stroke-linejoin='round' aria-hidden='true' style='vertical-align:-2px'>"
+    "<path d='M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6'/>"
+    "<polyline points='15 3 21 3 21 9'/><line x1='10' y1='14' x2='21' y2='3'/></svg>")
+
+
+def doi_url(value) -> str:
+    """https://doi.org/<doi> for a recorded DOI, or "" when there is none.
+
+    Accepts a bare `10.x/...`, `doi:...` or an http(s) doi.org URL.
+    """
+    text = _DOI_PREFIX.sub("", str(value or "").strip()).strip()
+    if not re.match(r"^10\.\d{4,9}/\S+$", text):
+        return ""
+    return "https://doi.org/" + text
+
+
+def doi_line(value) -> None:
+    """The DOI as text, with a small external-link icon that opens it in a new
+    tab. A plain link: no callback, no state, nothing written."""
+    url = doi_url(value)
+    shown = str(value).strip() if value not in (None, "") else "None recorded"
+    link = (f" <a href='{html.escape(url, quote=True)}' target='_blank' "
+            f"rel='noopener noreferrer' title='Open the DOI in a new tab' "
+            f"aria-label='Open the DOI in a new tab' "
+            f"style='text-decoration:none;color:inherit;opacity:0.75'>{EXTERNAL_ICON}</a>"
+            if url else "")
+    st.markdown(f"**DOI:** {html.escape(shown)}{link}", unsafe_allow_html=True)
 
 
 def value_line(label: str, value: str) -> None:
@@ -531,6 +620,7 @@ def render_save_status() -> None:
                    f"tab. The stored answers were kept. Reload to see them.")
         if st.button("Reload this paper", key="reload_after_conflict"):
             queue().clear_conflicts()
+            settle()                    # store what is pending before re-reading
             forget_review()
             st.rerun()
     if state == SAVE_FAILED:

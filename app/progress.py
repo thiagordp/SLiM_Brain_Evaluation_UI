@@ -2,20 +2,21 @@
 
 Items are generated from the Brain record, never from a fixed count:
 
-    per Claim     Questions 1–11, one Question 12 per assigned Concept, one
+    per Claim     Questions 2–11, one Question 12 per assigned Concept, one
                   Question 13 per assigned candidate Concept, one Question 14,
-                  and two judgments per Relation whose From Claim this is
+                  and per Relation whose From Claim this is: Grounding, Direction
+                  (SUPPORTS and ATTACKS only) and Relation type
     per Dataset   six questions, for the Datasets the Source's Claims rest on
-    per Source    Claim recall, and Missing Claims when recall is not "All"
+    per Source    Claim recall, Missing Claims when recall is not "All", and
+                  Restatements
 
 There is no Source evaluation, no CITES, no Dataset recall and no Source-level
 Concept completeness. A Source with no Datasets asks no Dataset question; a
 Source with no Claims still asks Claim recall.
 
 Completion is criterion-specific (see `item_problem`). Required follow-up data —
-the restated Claim on Question 1, the Question 14 selection, the Description
-comment, the Missing Claims text — blocks completion; an optional comment never
-does.
+the Question 14 selection, the Description comment, the Missing Claims text,
+the restatement groups — blocks completion; an optional comment never does.
 
 Two page-state models, as before:
 
@@ -49,6 +50,8 @@ class Item:
     source_id: str
     object_id: str            # claim, dataset or source id; concept id; relation key
     claim_id: str = ""
+    #: Restatements only: the Source's Claim ids, against which groups are checked.
+    source_claims: tuple[str, ...] = ()
 
     @property
     def section(self) -> str:
@@ -75,7 +78,7 @@ def claim_items(brain, source_id: str, claim_id: str) -> list[Item]:
     items.append(Item(spec.Q14, source_id, claim_id, claim_id))
     for relation in brain.relations_from_claim(claim_id):
         items += [Item(q, source_id, relation["key"], claim_id)
-                  for q in spec.relation_questions()]
+                  for q in spec.relation_questions(relation)]
     return items
 
 
@@ -89,6 +92,8 @@ def recall_items(brain, source_id: str, data=None, everything: bool = False) -> 
     if everything or (data is not None and spec.child_visible(
             spec.MISSING_CLAIMS, answer_of(items[0], data))):
         items.append(Item(spec.MISSING_CLAIMS, source_id, source_id))
+    items.append(Item(spec.RESTATEMENTS, source_id, source_id,
+                      source_claims=tuple(c["id"] for c in brain.claims_of(source_id))))
     return items
 
 
@@ -129,10 +134,83 @@ def q14_selection(data, claim_id: str) -> tuple[list[dict], list[dict]]:
     return data.active_missing(claim_id), data.active_proposals(claim_id)
 
 
+# ------------------------------------------------------------ restatements
+def validate_restatement_group(brain, source_id: str, data, claim_ids,
+                               replacing: str = "") -> tuple[list[str], str | None]:
+    """(normalised member ids, why the group may not be written or None).
+
+    The rule at the data boundary, whatever control proposed the group: members
+    are this Source's Claims, duplicates are dropped, at least two distinct
+    Claims remain, and none is already in another active group of this review.
+    ``replacing`` names a group being rewritten, whose own members do not count
+    as taken.
+    """
+    ids = sorted({str(c).strip() for c in claim_ids or () if str(c).strip()})
+    mine = {c["id"] for c in brain.claims_of(source_id)}
+    if not mine:
+        return ids, f"{source_id} has no Claims."
+    foreign = [c for c in ids if c not in mine]
+    if foreign:
+        return ids, f"{', '.join(foreign)} is not a Claim of {source_id}."
+    if len(ids) < 2:
+        return ids, "A restatement group needs at least two different Claims."
+    taken = {cid: gid for gid, members in data.active_restatement_groups().items()
+             if gid != replacing for cid in members}
+    for cid in ids:
+        if cid in taken and taken[cid] != store.restatement_group_id(ids):
+            return ids, f"{cid} is already assigned to another restatement group."
+        if cid in taken:
+            return ids, "These Claims already form a restatement group."
+    return ids, None
+
+
+def restatement_groups(source_claims, data) -> tuple[dict[str, list[str]], list[str]]:
+    """(valid active groups, problems with the rest), as loaded.
+
+    A stored group counts only if its members are two or more distinct Claims of
+    this Source, its id is the one those members derive, and no member is also
+    in another active group. Anything else is left out and reported.
+    """
+    stored = data.active_restatement_groups()
+    mine = set(source_claims)
+    seen: dict[str, list[str]] = {}
+    for gid, members in stored.items():
+        for cid in members:
+            seen.setdefault(cid, []).append(gid)
+    valid, problems = {}, []
+    for gid, members in sorted(stored.items(), key=lambda kv: kv[1]):
+        if len(members) < 2:
+            problems.append(f"group {', '.join(members)} has fewer than two Claims")
+        elif any(c not in mine for c in members):
+            problems.append(f"group {', '.join(members)} names a Claim of another Source")
+        elif store.restatement_group_id(members) != gid:
+            problems.append(f"group {', '.join(members)} is incomplete")
+        elif any(len(seen[c]) > 1 for c in members):
+            problems.append(f"group {', '.join(members)} shares a Claim with another group")
+        else:
+            valid[gid] = members
+    return valid, problems
+
+
+def _restatements_problem(item: Item, data) -> str | None:
+    answer = answer_of(item, data)
+    groups, problems = restatement_groups(item.source_claims, data)
+    stored = data.active_restatement_groups()
+    if answer == spec.RESTATEMENTS_NONE:
+        return "answered No, but restatement groups exist" if stored else None
+    if answer == spec.RESTATEMENTS_PRESENT:
+        if problems:
+            return "invalid restatement group: " + "; ".join(problems)
+        return None if groups else "answered Yes, no restatement group added"
+    return "unanswered"
+
+
 def item_problem(item: Item, data) -> str | None:
     """Why this item is not complete, or None. Criterion-specific."""
     question = item.question
     answer = answer_of(item, data)
+    if question is spec.RESTATEMENTS:
+        return _restatements_problem(item, data)
     if question is spec.Q14:
         if answer == spec.Q14_NONE_MISSING:
             return None
@@ -144,9 +222,6 @@ def item_problem(item: Item, data) -> str | None:
         return None if answer.strip() else "text required"
     if not answer:
         return "unanswered"
-    if answer in question.related_claim_on and not (
-            record_of(item, data).get("related_claim_id") or "").strip():
-        return "restated Claim not selected"
     if spec.comment_required(question, answer) and not comment_of(item, data).strip():
         return f"answered {answer}, comment required"
     return None
@@ -157,6 +232,8 @@ def item_complete(item: Item, data) -> bool:
 
 
 def item_started(item: Item, data) -> bool:
+    if item.question is spec.RESTATEMENTS:
+        return bool(answer_of(item, data) or data.active_restatement_groups())
     if item.question is spec.Q14:
         existing, proposed = q14_selection(data, item.claim_id)
         return bool(answer_of(item, data) or existing or proposed)
@@ -205,20 +282,6 @@ def claim_states(brain, source_id: str, data) -> dict[str, str]:
 def claims_done(brain, source_id: str, data) -> int:
     return sum(1 for state in claim_states(brain, source_id, data).values()
                if state == COMPLETE)
-
-
-def evaluated_claims(brain, source_id: str, data, exclude: str = "") -> list[str]:
-    """Claims of this Source that already carry at least one answer.
-
-    The candidates for Question 1's "restatement of" selector.
-    """
-    out = []
-    for claim in brain.claims_of(source_id):
-        if claim["id"] == exclude:
-            continue
-        if any(item_started(i, data) for i in claim_items(brain, source_id, claim["id"])):
-            out.append(claim["id"])
-    return out
 
 
 # ---------------------------------------------------------------- sections

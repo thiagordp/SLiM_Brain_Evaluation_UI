@@ -1,4 +1,4 @@
-"""Checks for the evaluation application, instrument 4.0.
+"""Checks for the evaluation application, instrument 4.1.
 
     python app/tests/test_app.py            # everything
     python app/tests/test_app.py adapter    # only tests whose name contains "adapter"
@@ -124,8 +124,8 @@ def answer_everything(review_id: str, source_id: str, *, recall=spec.RECALL_ALL)
             answer = recall
         elif question is spec.MISSING_CLAIMS:
             answer = "" if recall == spec.RECALL_ALL else "A missing thesis (p. 3)."
-        elif question is spec.Q1:
-            answer = spec.NO
+        elif question is spec.RESTATEMENTS:
+            answer = spec.RESTATEMENTS_NONE
         else:
             answer = spec.YES
         records.append({"tab": sheets.RESPONSES, "key": row["response_key"],
@@ -134,8 +134,10 @@ def answer_everything(review_id: str, source_id: str, *, recall=spec.RECALL_ALL)
         records.append({"tab": sheets.CONCEPT_RESPONSES, "key": row["response_key"],
                         "values": {**row, "answer": spec.YES}, "rid": review_id})
     for row in data.relations.values():
+        directed = spec.DIRECTION.applies_to({"type": row["relation_type"]})
         records.append({"tab": sheets.RELATION_RESPONSES, "key": row["response_key"],
                         "values": {**row, "grounding_answer": spec.YES,
+                                   "direction_answer": spec.YES if directed else "",
                                    "type_answer": spec.YES}, "rid": review_id})
     store.save_many(records)
 
@@ -229,8 +231,6 @@ def test_definitions_are_frozen_verbatim():
 
 # ====================================================================== spec
 AGREED = {
-    "CLAIM_Q01_RESTATEMENT": "Is this Claim a restatement of another Claim already "
-                             "extracted from this Source?",
     "CLAIM_Q02_CENTRAL_THESIS": "Does this statement represent a central thesis or "
                                 "hypothesis that the paper advances as part of its "
                                 "contribution?",
@@ -256,6 +256,7 @@ AGREED = {
     "CLAIM_Q14_MISSING_CONCEPTS": "Are any mapping-relevant Concepts missing from this Claim?",
     "REL_GROUNDING": "Is the Grounding value correctly assigned according to the schema "
                      "definition?",
+    "REL_DIRECTION": "Is the direction of this relation correct?",
     "REL_TYPE": "Is the Relation type correct for the relationship between these two Claims?",
     "DATASET_NODE": "Does this record represent a dataset, benchmark or corpus that a "
                     "Claim in this Source actually rests on?",
@@ -272,6 +273,7 @@ AGREED = {
                            "represent the central theses or hypotheses that this Source "
                            "advances as part of its contribution?",
     "SOURCE_MISSING_CLAIMS": "Which central Claims are missing from the extracted set?",
+    "SOURCE_RESTATEMENTS": "Are any extracted Claims restatements of the same proposition?",
 }
 
 
@@ -279,9 +281,37 @@ def test_spec_wording_and_semantics():
     check(set(AGREED) == set(spec.BY_KEY), "spec: exactly the agreed questions exist")
     for key, text in AGREED.items():
         check(spec.BY_KEY[key].text == text, f"spec: {key} uses the agreed wording")
-    check(spec.Q1.options == (spec.YES, spec.NO) and spec.problem(spec.Q1, spec.YES)
-          and not spec.problem(spec.Q1, spec.NO),
-          "spec: Question 1 Yes flags a restatement")
+    check(spec.EVAL_SPEC_VERSION == "4.1", "spec: the instrument is version 4.1")
+    check("CLAIM_Q01_RESTATEMENT" not in spec.BY_KEY
+          and not any(k.startswith("CLAIM_Q01") for k in spec.BY_KEY),
+          "spec: the per-Claim restatement question is gone")
+    check([q.key for q in spec.claim_scalar_questions(spec.PART_CLAIM)]
+          == ["CLAIM_Q02_CENTRAL_THESIS", "CLAIM_Q03_MODALITY", "CLAIM_Q04_STANDALONE",
+              "CLAIM_Q05_GROUNDING"], "spec: Q2–Q5 keep their keys")
+    check(spec.RESTATEMENTS.options == (spec.RESTATEMENTS_NONE, spec.RESTATEMENTS_PRESENT)
+          and spec.RESTATEMENT_LABEL == {"none": "No", "present": "Yes"}
+          and spec.problem(spec.RESTATEMENTS, "present")
+          and not spec.problem(spec.RESTATEMENTS, "none"),
+          "spec: Restatements are stored as none / present and shown as No / Yes")
+    check([q.key for q in spec.relation_questions()]
+          == ["REL_GROUNDING", "REL_DIRECTION", "REL_TYPE"],
+          "spec: Relations ask Grounding, Direction, Relation type in that order")
+    check([q.key for q in spec.relation_questions({"type": "SAME_AS"})]
+          == ["REL_GROUNDING", "REL_TYPE"]
+          and len(spec.relation_questions({"type": "SUPPORTS"})) == 3
+          and len(spec.relation_questions({"type": "ATTACKS"})) == 3,
+          "spec: Direction is asked for SUPPORTS and ATTACKS, never SAME_AS")
+    check(spec.DIRECTION.options == spec.BINARY
+          and spec.DIRECTION.optional_comment_on == (spec.NO,),
+          "spec: Direction is Yes / No with an optional comment on No")
+    frozen = json.dumps(spec.definitions(), ensure_ascii=False)
+    check(not any(line in frozen for lines in spec.CALIBRATION.values() for line in lines),
+          "spec: calibration text is not in the frozen definitions")
+    check(spec.CALIBRATION["claim.general"] == (
+        "Evaluate this Claim from its statement and anchors.",
+        "Judge the Claim fields from what the anchors support.",
+        "Restatements are assessed in Claim recall."),
+        "spec: the Claim-level calibration has exactly the three agreed lines")
     q6 = spec.BY_KEY["CLAIM_Q06_CLAIM_OBJECT"]
     check(not spec.problem(q6, spec.YES) and spec.problem(q6, spec.NO),
           "spec: Questions 6–11 Yes means correct")
@@ -406,15 +436,37 @@ def test_preflight():
 def test_bootstrap():
     book = fresh_round()
     meta = store.round_metadata()
-    check(meta["round_id"] == ROUND and meta["eval_spec_version"] == "4.0"
+    check(meta["round_id"] == ROUND and meta["eval_spec_version"] == "4.1"
           and meta["definitions_id"] == spec.definitions_id()
           and meta["brain_snapshot_id"] == BRAIN.snapshot_id
           and meta["brain_canonical_schema_version"] == "0.1.0",
           "bootstrap: ROUND records round, instrument, definitions and snapshot")
     check("RUN-2026-09-25-01" in meta["brain_runs"],
           "bootstrap: the runs and their schema versions are recorded")
-    check(book.count(sheets.DEFINITIONS) == len(spec.definitions()["entries"]),
-          "bootstrap: DEFINITIONS holds every definition shown to evaluators")
+    check(book.count(sheets.DEFINITIONS)
+          == len(spec.definitions()["entries"]) + len(spec.CALIBRATION),
+          "bootstrap: DEFINITIONS holds every definition and calibration shown")
+    calibration = [r for r in book.read_tab(sheets.DEFINITIONS)
+                   if r["key"].startswith("calibration.")]
+    check(len(calibration) == len(spec.CALIBRATION)
+          and all(r["source_file"] == "calibration meeting (spec 4.1)" for r in calibration)
+          and not any(r["source_file"].startswith("calibration")
+                      for r in book.read_tab(sheets.DEFINITIONS)
+                      if not r["key"].startswith("calibration.")),
+          "bootstrap: calibration rows keep their own provenance")
+    check(sheets.RESTATEMENTS in book.tab_titles()
+          and book.headers([sheets.RESTATEMENTS])[sheets.RESTATEMENTS]
+          == ["restatement_key", "review_id", "source_id", "group_id", "claim_id",
+              "active", "updated_at"],
+          "bootstrap: a fresh round has the RESTATEMENTS tab")
+    relation_header = book.headers([sheets.RELATION_RESPONSES])[sheets.RELATION_RESPONSES]
+    check({"direction_answer", "direction_comment"} <= set(relation_header)
+          and "related_claim_id" not in book.headers([sheets.RESPONSES])[sheets.RESPONSES],
+          "bootstrap: Relations have Direction columns; RESPONSES has no related Claim")
+    restatement_rows = [r for r in book.read_tab(sheets.RESPONSES)
+                        if r["question_key"] == "SOURCE_RESTATEMENTS"]
+    check(len(restatement_rows) == book.count(sheets.REVIEWS),
+          "bootstrap: every review has its Restatements row")
     assignments = len(manifest.load_manifest_file()["assignments"])
     check(book.count(sheets.REVIEWS) == assignments
           and book.count(sheets.ASSIGNMENTS) == assignments,
@@ -456,10 +508,11 @@ def test_store_roundtrip_and_conflicts():
     data = store.load_review(review)
     check(book.requests["read"] - before.get("read", 0) == 1,
           "store: a paper's answers load in one read request")
-    row = data.response(spec.Q1.key, ind_claim)
+    q2 = "CLAIM_Q02_CENTRAL_THESIS"
+    row = data.response(q2, ind_claim)
     stamp = store.write(sheets.RESPONSES, row["response_key"], {**row, "answer": "No"},
                         rid=review, expected_updated_at="")
-    check(store.load_review(review).response(spec.Q1.key, ind_claim)["answer"] == "No",
+    check(store.load_review(review).response(q2, ind_claim)["answer"] == "No",
           "store: an answer round-trips")
     try:
         store.write(sheets.RESPONSES, row["response_key"], {**row, "answer": "Yes"},
@@ -502,6 +555,9 @@ def test_store_requires_a_workbook():
         check(False, "store: without a workbook nothing is stored")
     except sheets.StorageNotConfigured:
         check(True, "store: without a workbook nothing is stored")
+    live = [f for f in APP.rglob("*.py") if "archive" not in f.parts and "tests" not in f.parts]
+    check(not any(re.search(r"^\s*(import|from)\s+sqlite3", f.read_text(encoding="utf-8"), re.M)
+                  for f in live), "store: no application module uses SQLite")
 
 
 # ================================================================== progress
@@ -522,12 +578,6 @@ def test_progress_rules():
         return copy
 
     reasons = lambda d: [m.reason for m in progress.missing_items(BRAIN, source, d)]
-    check("restated Claim not selected" in reasons(
-        with_response(spec.Q1.key, claim, answer="Yes")),
-        "progress: Question 1 Yes requires the restated Claim")
-    check(reasons(with_response(spec.Q1.key, claim, answer="Yes",
-                                related_claim_id=BRAIN.claims_of(source)[1]["id"])) == [],
-          "progress: Question 1 Yes with a selected Claim is complete")
     check(reasons(with_response("CLAIM_Q02_CENTRAL_THESIS", claim, answer="No")) == [],
           "progress: an optional comment never blocks completion")
     check(reasons(with_response("CLAIM_Q05_GROUNDING", claim, answer="In part")) == [],
@@ -553,8 +603,20 @@ def test_progress_rules():
     check(sum(1 for i in items if i.question is spec.Q13)
           == len(BRAIN.candidates_of_claim(claim)), "progress: one Q13 per candidate only")
     check(sum(1 for i in items if i.question.unit == spec.UNIT_RELATION)
-          == 2 * len(BRAIN.relations_from_claim(claim)),
-          "progress: two judgments per Relation starting from this Claim")
+          == sum(3 if r["type"] in ("SUPPORTS", "ATTACKS") else 2
+                 for r in BRAIN.relations_from_claim(claim)),
+          "progress: three judgments per SUPPORTS/ATTACKS Relation, two per SAME_AS")
+    check(not any(i.question.key == "CLAIM_Q01_RESTATEMENT" for i in items),
+          "progress: no per-Claim restatement item")
+    same_as = [r for s in BRAIN.sources for r in BRAIN.relations_hosted(s)
+               if r["type"] == "SAME_AS"]
+    if same_as:
+        relation = same_as[0]
+        keys = [i.question.key for i in progress.claim_items(
+            BRAIN, relation["from_source"], relation["from"])
+                if i.object_id == relation["key"]]
+        check(keys == ["REL_GROUNDING", "REL_TYPE"],
+              "progress: a SAME_AS relation has no Direction item")
     check(progress.dataset_items(BRAIN, "SRC-0003") == [],
           "progress: no Dataset question for a Source without Datasets")
     empty = store.ReviewData()
@@ -578,7 +640,7 @@ def test_zero_claim_source():
         edges.write_text("\n".join(json.dumps(e) for e in kept) + "\n")
         copy = brain_module.load_brain_from(root)
         items = progress.all_items(copy, "SRC-0010", store.ReviewData())
-        check([i.question.key for i in items] == [spec.RECALL.key],
+        check([i.question.key for i in items] == [spec.RECALL.key, spec.RESTATEMENTS.key],
               "progress: a Source with no Claims is still evaluable by Claim recall")
     finally:
         shutil.rmtree(root, ignore_errors=True)
@@ -628,7 +690,10 @@ def test_agreement_metrics():
           "analysis: the metric follows the question's scale")
     check("CLAIM_Q14_MISSING_CONCEPTS" not in metrics and "SOURCE_MISSING_CLAIMS" not in metrics,
           "analysis: structured and qualitative responses get no invented metric")
-    check(all(r["eval_spec_version"] == "4.0" and r["round_id"] == ROUND
+    check(metrics["REL_DIRECTION"]["metric"] == "cohen_kappa"
+          and "SOURCE_RESTATEMENTS" not in metrics,
+          "analysis: Direction is a binary judgment; restatements get no metric")
+    check(all(r["eval_spec_version"] == "4.1" and r["round_id"] == ROUND
               for r in tables["claim_judgments"]),
           "analysis: every exported judgment names its round and instrument")
     unit_rows = [r for r in tables["agreement_pairs"]
@@ -727,10 +792,10 @@ def test_ui_claim_flow():
 
     first = BRAIN.claims_of(AGR_SOURCE)[0]["id"]
     base = f"w|{rid('agreement', EVALUATOR, AGR_SOURCE)}"
-    at.radio(key=f"{base}|{spec.Q1.key}|{first}|a").set_value("Yes")
-    at.run()
-    check(any(s.label == "Restatement of" for s in at.selectbox),
-          "ui: Question 1 Yes asks which Claim is restated")
+    check("restatement of another Claim" not in page
+          and not any(s.label == "Restatement of" for s in at.selectbox)
+          and not any(r.key and "CLAIM_Q01" in r.key for r in at.radio),
+          "ui: the Claim page has no restatement question or selector")
 
     # Question 14: search, add, clear search, add another; both persist.
     search_key = f"q14search|{rid('agreement', EVALUATOR, AGR_SOURCE)}|{first}"
@@ -1010,11 +1075,19 @@ def test_ui_instructions_and_guidance():
     concept_captions = [c.value for c in at.caption]
     for concept_id in BRAIN.concepts_of_claim(claim["id"]):
         concept = BRAIN.concept(concept_id)
-        expected = brain_module.family_label(concept["concept_type"]) + (
-            "" if concept["status"] == "anchor"
-            else f" · {spec.value_label(concept['status'])}")
-        check(expected in concept_captions,
-              f"ui: {concept_id} shows its family and, where relevant, its status")
+        check(brain_module.family_label(concept["concept_type"]) in concept_captions,
+              f"ui: {concept_id} shows its family")
+    statuses = (" · Anchor", " · Candidate", " · Emergent")
+    q12 = [c for c in concept_captions
+           if c in {brain_module.family_label(f) for f in brain_module.CONCEPT_FAMILIES}
+           or any(c.endswith(s) for s in statuses)]
+    candidates = BRAIN.candidates_of_claim(claim["id"])
+    check(sum(1 for c in q12 if any(c.endswith(s) for s in statuses)) == len(candidates)
+          and all(c.endswith(" · Candidate") for c in q12
+                  if any(c.endswith(s) for s in statuses)),
+          "ui: Q12 and the Q14 browser show no status; only Q13 says Candidate")
+    check(spec.PROPOSAL_HINT in concept_captions,
+          "ui: the new-Concept hint is visible above the proposal form")
 
     panel = [m.value for m in at.markdown if "Claim under review" in m.value]
     check(panel and claim["id"] in panel[0] and html.escape(claim["statement"]) in panel[0],
@@ -1129,6 +1202,605 @@ def test_ui_group_of_three():
     members = table[(table["phase"] == "agreement") & (table["paper"] == paper)]
     check(len(members) == 3 and set(members["group"]) == {"P1"},
           "ui: Admin progress lists all three members of P1 for one Agreement paper")
+
+
+# ================================================================ 4.1: store
+def test_restatement_storage_and_rules():
+    book = fresh_round()
+    source = AGR_SOURCE
+    review = rid("agreement", EVALUATOR, source)
+    start(review)
+    claims = [c["id"] for c in BRAIN.claims_of(source)]
+    a, b, c, d = claims[:4]
+    check(store.restatement_group_id([c, a, b]) == store.restatement_group_id([b, c, a, a])
+          and store.restatement_group_id([a, b]) != store.restatement_group_id([a, c])
+          and store.restatement_group_id([a, b]).startswith("RG-"),
+          "restatements: the group id depends only on the set of Claims")
+
+    data = store.load_review(review)
+    item = next(i for i in progress.recall_items(BRAIN, source, data)
+                if i.question is spec.RESTATEMENTS)
+    problem = lambda d: progress.item_problem(item, d)
+    check(problem(data) == "unanswered", "restatements: required, unanswered at first")
+
+    def respond(d, answer):
+        d = d.copy()
+        d.responses[store.response_lookup(spec.RESTATEMENTS.key, source)]["answer"] = answer
+        return d
+
+    def with_group(d, ids, active=True):
+        d = d.copy()
+        gid = store.restatement_group_id(ids)
+        for cid in ids:
+            d.restatements[store.pair_lookup(gid, cid)] = {
+                "group_id": gid, "claim_id": cid,
+                "active": store.TRUE if active else store.FALSE}
+        return d
+
+    check(problem(respond(data, "none")) is None, "restatements: No with no group completes")
+    check(problem(respond(data, "present")) is not None,
+          "restatements: Yes without a group is not complete")
+    one = with_group(respond(data, "present"), [a, b])
+    check(problem(one) is None, "restatements: Yes with one valid group completes")
+    two = with_group(one, [c, d])
+    check(problem(two) is None and len(two.active_restatement_groups()) == 2,
+          "restatements: several groups can coexist")
+    check(problem(with_group(respond(data, "none"), [a, b])) is not None,
+          "restatements: No with an active group is not complete")
+    check(problem(with_group(respond(data, "none"), [a, b], active=False)) is None,
+          "restatements: removed groups do not count")
+    check(progress.item_problem(item, with_group(data, [a, b])) == "unanswered",
+          "restatements: groups never imply the answer Yes")
+
+    # data-boundary validation
+    ok = lambda ids, d=data: progress.validate_restatement_group(BRAIN, source, d, ids)
+    check(ok([b, a, a]) == (sorted([a, b]), None), "restatements: duplicates are dropped")
+    check(ok([a, a])[1] is not None, "restatements: one Claim twice is not a group")
+    check(ok([a])[1] is not None, "restatements: a group needs two Claims")
+    other = next(x["id"] for s in BRAIN.sources if s != source for x in BRAIN.claims_of(s))
+    check(ok([a, other])[1] is not None,
+          "restatements: a Claim of another Source is refused")
+    check("already assigned to another restatement group" in (ok([a, c], one)[1] or ""),
+          "restatements: a Claim cannot join a second active group")
+
+    # malformed stored groups are ignored for completion and reported
+    bad = respond(data, "present")
+    bad.restatements["x|" + a] = {"group_id": store.restatement_group_id([a, b]),
+                                  "claim_id": a, "active": store.TRUE}
+    check(problem(bad) is not None and "invalid" in problem(bad),
+          "restatements: a one-member stored group is flagged")
+    overlap = with_group(with_group(respond(data, "present"), [a, b]), [a, c])
+    check(problem(overlap) is not None,
+          "restatements: a Claim in two stored groups is flagged")
+    foreign = respond(data, "present")
+    gid = store.restatement_group_id([a, other])
+    for cid in (a, other):
+        foreign.restatements[store.pair_lookup(gid, cid)] = {
+            "group_id": gid, "claim_id": cid, "active": store.TRUE}
+    check(problem(foreign) is not None,
+          "restatements: a stored group with another Source's Claim is flagged")
+
+    # storage round trip, idempotence, removal, reactivation
+    gid = store.restatement_group_id([a, b])
+    rows = {store.restatement_key(review, gid, cid): {
+        "review_id": review, "source_id": source, "group_id": gid, "claim_id": cid,
+        "active": store.TRUE} for cid in (a, b)}
+    store.upsert_selections(sheets.RESTATEMENTS, rows, rid=review)
+    store.upsert_selections(sheets.RESTATEMENTS, rows, rid=review)
+    check(book.count(sheets.RESTATEMENTS) == 2,
+          "restatements: a group of two is two membership rows, written once")
+    check(store.load_review(review).active_restatement_groups() == {gid: sorted([a, b])},
+          "restatements: groups survive a reload")
+    store.upsert_selections(sheets.RESTATEMENTS, {k: {**v, "active": store.FALSE}
+                                                   for k, v in rows.items()}, rid=review)
+    check(store.load_review(review).active_restatement_groups() == {}
+          and book.count(sheets.RESTATEMENTS) == 2
+          and all(r["active"] == store.FALSE for r in book.read_tab(sheets.RESTATEMENTS)),
+          "restatements: removal marks the same rows inactive")
+    store.upsert_selections(sheets.RESTATEMENTS, rows, rid=review)
+    check(book.count(sheets.RESTATEMENTS) == 2
+          and store.load_review(review).active_restatement_groups() == {gid: sorted([a, b])},
+          "restatements: re-adding the same set reactivates the same rows")
+    tables = analysis.export_tables()
+    check([(r["group_id"], r["claim_id"]) for r in tables["restatement_groups"]]
+          == [(gid, a), (gid, b)] and tables["restatement_groups"][0]["round_id"] == ROUND
+          and len(tables["raw_restatements"]) == 2,
+          "restatements: exported as one row per Claim membership, with provenance")
+    check(analysis.sheet_names(tables) == {n: n for n in tables}
+          and len(set(analysis.sheet_names(["x" * 40, "x" * 35]).values())) == 2,
+          "exports: XLSX tabs are named after their tables, unique within 31 characters")
+
+
+def test_export_xlsx():
+    import openpyxl
+
+    fresh_round()
+    review = rid("agreement", EVALUATOR, AGR_SOURCE)
+    start(review)
+    answer_everything(review, AGR_SOURCE)
+    row = store.load_review(review).response("CLAIM_Q02_CENTRAL_THESIS",
+                                              BRAIN.claims_of(AGR_SOURCE)[0]["id"])
+    store.write(sheets.RESPONSES, row["response_key"],
+                {**row, "answer": "No", "comment": "pasted\x0btext\x01 here"}, rid=review)
+    tables = analysis.export_tables()
+    tables["restatement_groups"] = []
+    book = openpyxl.load_workbook(io.BytesIO(analysis.export_xlsx(tables)))
+    check(book.sheetnames == list(tables),
+          "exports: the XLSX has one tab per table, named after it, in order")
+    check(all(book[name].max_row - 1 == len(rows) for name, rows in tables.items() if rows),
+          "exports: every tab holds all of its table's rows")
+    comments = [cell.value for r in book["claim_judgments"].iter_rows() for cell in r]
+    check("pastedtext here" in comments,
+          "exports: characters Excel cannot store are dropped, the rest kept")
+    check("restatement_groups" in book.sheetnames
+          and book["restatement_groups"].max_row <= 1,
+          "exports: an empty table still has its tab")
+    raw = book["raw_restatements"]
+    check([c.value for c in raw[1]] == list(sheets.COLUMNS[sheets.RESTATEMENTS]),
+          "exports: an empty raw tab keeps its header")
+
+
+def test_ui_admin_exports():
+    book = fresh_round()
+    at = _app()
+    _login(at)
+    at.sidebar.radio[0].set_value("Admin")
+    at.run()
+    at.text_input[0].input(os.environ["HE_ADMIN_SECRET"])
+    at.button[0].click()
+    at.run()
+    before = _stored_rows(book)
+    at.button(key="prepare_exports").click()
+    at.run()
+    downloads = at.get("download_button")
+    labels = [d.proto.label for d in downloads]
+    check(labels and labels[0] == "Download all tables (.xlsx)",
+          "ui: Exports offers the single XLSX first")
+    csv = [e for e in at.expander if e.label == "Individual tables (CSV)"]
+    check(csv and not csv[0].proto.expanded
+          and len(csv[0].get("download_button")) == len(analysis.export_tables()),
+          "ui: the per-table CSVs are in a closed expander")
+    check(_stored_rows(book) == before, "ui: preparing exports writes nothing")
+
+
+# ============================================================ save semantics
+def test_save_conflicts_are_per_record():
+    import savequeue
+
+    book = fresh_round()
+    review = rid("individual", EVALUATOR, IND_SOURCE)
+    start(review)
+    rows = list(store.load_review(review).responses.values())[:3]
+    stale = store.write(sheets.RESPONSES, rows[0]["response_key"],
+                        {**rows[0], "answer": "No"}, rid=review)
+    records = [{"tab": sheets.RESPONSES, "key": r["response_key"],
+                "values": {**r, "answer": "Yes"}, "rid": review,
+                "expected_updated_at": "an older stamp" if i == 0 else ""}
+               for i, r in enumerate(rows)]
+    results = store.save_many(records)
+    stored = store.load_review(review)
+    answer = lambda r: stored.response(r["question_key"], r["object_id"])["answer"]
+    check(isinstance(results[0], store.SaveConflict) and answer(rows[0]) == "No",
+          "save: a stale record is refused and the stored value stands")
+    check(all(isinstance(x, str) for x in results[1:])
+          and [answer(r) for r in rows[1:]] == ["Yes", "Yes"],
+          "save: the other records of the same batch are still written")
+
+    queue = savequeue.SaveQueue()
+    queue.set_batch_writer(lambda f, a, k: {"tab": a[0], "key": a[1], "values": a[2], **k}
+                           if f is store.write else None, store.save_many)
+    queue.set_fatal(store.SaveConflict)
+    fresh = store.load_review(review)
+    current = [fresh.responses[store.response_lookup(r["question_key"], r["object_id"])]
+               for r in rows]
+    with queue._lock:                   # both queued before the worker takes any
+        for i, row in enumerate(current):
+            queue._pending[row["response_key"]] = (
+                store.write, (sheets.RESPONSES, row["response_key"],
+                              {**row, "answer": "In part" if i == 0 else "No"}),
+                {"rid": review, "expected_updated_at": "stale" if i == 0 else
+                 row["updated_at"], "also_accept": set()}, None)
+    queue._ensure_worker()
+    queue.flush(10)
+    stored = store.load_review(review)
+    check(list(queue.conflicts) == [current[0]["response_key"]]
+          and [answer(r) for r in rows[1:]] == ["No", "No"],
+          "save queue: only the conflicting answer is reported; the others are stored")
+
+
+def test_save_retry_after_lost_response():
+    import savequeue
+
+    book = fresh_round()
+    review = rid("individual", EVALUATOR, IND_SOURCE)
+    start(review)
+    row = next(iter(store.load_review(review).responses.values()))
+    first = store.write(sheets.RESPONSES, row["response_key"], {**row, "answer": "Yes"},
+                        rid=review)
+    real, calls = book.update_rows, {"n": 0}
+
+    def lands_then_times_out(tab, updates):
+        real(tab, updates)
+        if tab == sheets.RESPONSES:
+            calls["n"] += 1
+            if calls["n"] == 1:
+                raise sheets.StorageError("the response was lost after the write landed")
+
+    book.update_rows = lands_then_times_out
+    old_delay, savequeue.RETRY_SECONDS = savequeue.RETRY_SECONDS, 0.01
+    try:
+        queue = savequeue.SaveQueue()
+        queue.set_fatal(store.SaveConflict)
+        queue.submit("k", store.write, sheets.RESPONSES, row["response_key"],
+                     {**row, "answer": "No", "updated_at": first}, rid=review,
+                     expected_updated_at=first, also_accept={first})
+        queue.flush(10)
+    finally:
+        savequeue.RETRY_SECONDS = old_delay
+        book.update_rows = real
+    stored = store.load_review(review).response(row["question_key"], row["object_id"])
+    check(not queue.conflicts and not queue.failures and stored["answer"] == "No",
+          "save: a retry whose first attempt landed is not a conflict")
+    elsewhere = store.write(sheets.RESPONSES, row["response_key"],
+                            {**stored, "answer": "Yes", "comment": "other tab"}, rid=review)
+    try:
+        store.write(sheets.RESPONSES, row["response_key"], {**stored, "answer": "No"},
+                    rid=review, expected_updated_at=stored["updated_at"])
+        check(False, "save: a real concurrent edit is still refused")
+    except store.SaveConflict:
+        check(elsewhere and True, "save: a real concurrent edit is still refused")
+
+
+# ================================================================ integrity
+def _audit(book):
+    import integrity
+
+    return integrity.run(BRAIN, book, ROUND)
+
+
+def test_integrity_audit():
+    import integrity
+
+    book = fresh_round()
+    levels = lambda ps, level: [p for p in ps if p.level == level]
+    check(not levels(_audit(book), integrity.ERROR)
+          and not levels(_audit(book), integrity.WARNING),
+          "integrity: a freshly bootstrapped round is clean")
+    review = rid("agreement", EVALUATOR, AGR_SOURCE)
+    start(review)
+    answer_everything(review, AGR_SOURCE)
+    store.mark_complete(review)
+    check(not levels(_audit(book), integrity.ERROR),
+          "integrity: a completed, fully answered paper is clean")
+
+    def row_of(tab, predicate):
+        header = list(sheets.COLUMNS[tab])
+        for raw in book.tabs[tab][1:]:
+            record = dict(zip(header, raw))
+            if predicate(record):
+                return raw, header
+        raise AssertionError(tab)
+
+    def reported(fragment):
+        return any(fragment in p.what for p in levels(_audit(book), integrity.ERROR))
+
+    claim = BRAIN.claims_of(AGR_SOURCE)[0]["id"]
+    raw, header = row_of(sheets.RESPONSES, lambda r: r["review_id"] == review
+                         and r["question_key"] == "CLAIM_Q02_CENTRAL_THESIS"
+                         and r["object_id"] == claim)
+    raw[header.index("answer")] = "Maybe"
+    check(reported("is not one of its options"), "integrity: an invalid answer is an error")
+    raw[header.index("answer")] = ""
+    check(reported("marked complete but"),
+          "integrity: a complete paper with an item missing is an error")
+    raw[header.index("answer")] = "Yes"
+
+    raw, header = row_of(sheets.RESPONSES, lambda r: r["review_id"] == review
+                         and r["question_key"] == spec.Q14.key and r["object_id"] == claim)
+    raw[header.index("answer")] = spec.Q14_MISSING
+    check(any("none is selected" in p.what for p in _audit(book)),
+          "integrity: Question 14 'missing' without a selection is reported")
+    raw[header.index("answer")] = spec.Q14_NONE_MISSING
+
+    raw, header = row_of(sheets.RESPONSES, lambda r: r["review_id"] == review
+                         and r["question_key"] == spec.RESTATEMENTS.key)
+    raw[header.index("answer")] = spec.RESTATEMENTS_PRESENT
+    gid = store.restatement_group_id([claim])
+    book.append_rows(sheets.RESTATEMENTS, [{
+        "restatement_key": store.restatement_key(review, gid, claim),
+        "review_id": review, "source_id": AGR_SOURCE, "group_id": gid,
+        "claim_id": claim, "active": store.TRUE, "updated_at": "x"}])
+    check(reported("fewer than two Claims"),
+          "integrity: a one-member restatement group is an error")
+    book.tabs[sheets.RESTATEMENTS] = book.tabs[sheets.RESTATEMENTS][:1]
+    raw[header.index("answer")] = spec.RESTATEMENTS_NONE
+
+    same_as = [r for r in book.read_tab(sheets.RELATION_RESPONSES)
+               if r["relation_type"] == "SAME_AS"]
+    if same_as:
+        raw, header = row_of(sheets.RELATION_RESPONSES,
+                             lambda r: r["response_key"] == same_as[0]["response_key"])
+        raw[header.index("direction_answer")] = "Yes"
+        check(reported("does not ask it"),
+              "integrity: a Direction answer on SAME_AS is an error")
+        raw[header.index("direction_answer")] = ""
+
+    raw, header = row_of(sheets.REVIEWS, lambda r: r["review_id"] == review)
+    raw[header.index("status")] = store.STATUS_SUBMITTED
+    check(reported("no submission marker"),
+          "integrity: a submitted paper without its phase marker is an error")
+    raw[header.index("status")] = store.STATUS_COMPLETE
+    first = raw[header.index("responses_first_row")]
+    raw[header.index("responses_first_row")] = str(int(first) + 1)
+    check(reported("are not all this review's") or reported("its block has"),
+          "integrity: a shifted block range is an error")
+    raw[header.index("responses_first_row")] = first
+    check(not levels(_audit(book), integrity.ERROR),
+          "integrity: undoing each corruption leaves the round clean")
+
+
+# ================================================================ 4.1: UI
+def _hosting(types) -> tuple[str, str, int, dict] | None:
+    """(phase, source, claim index, relation) for Thiago's first relation of a type."""
+    for phase in ("training", "agreement", "individual"):
+        for source in _assigned(EVALUATOR, phase):
+            for index, claim in enumerate(BRAIN.claims_of(source)):
+                for relation in BRAIN.relations_from_claim(claim["id"]):
+                    if relation["type"] in types:
+                        return phase, source, index, relation
+    return None
+
+
+def _open_claim(at, phase, source, index):
+    _open(at, phase, source)
+    at.session_state[f"claim_idx|{rid(phase, EVALUATOR, source)}"] = index
+    at.button(key="nav|claims").click()
+    at.run()
+
+
+def test_ui_relation_direction():
+    for types, label in ((("SUPPORTS",), "SUPPORTS"), (("ATTACKS",), "ATTACKS")):
+        found = _hosting(types)
+        check(found is not None, f"ui: an assigned {label} relation exists for the check")
+        if not found:
+            continue
+        phase, source, index, relation = found
+        book = fresh_round()
+        review = rid(phase, EVALUATOR, source)
+        start(review)
+        at = _app()
+        _login(at)
+        _open_claim(at, phase, source, index)
+        base = f"w|{review}"
+        keys = {q: f"{base}|{q}|{relation['key']}|a"
+                for q in ("REL_GROUNDING", "REL_DIRECTION", "REL_TYPE")}
+        radios = {r.key: r for r in at.radio}
+        check(all(k in radios for k in keys.values()),
+              f"ui: {label} shows Grounding, Direction and Relation type")
+        check(radios[keys["REL_DIRECTION"]].options == ["Yes", "No"],
+              f"ui: {label} Direction is Yes / No")
+        page = _markdown(at)
+        check(f"{relation['from']} → {relation['to']}" in page
+              and spec.DIRECTION.text in page, f"ui: {label} shows the arrow and the question")
+        direction = [_inside(e) for e in _expanders(at, "Instructions")
+                     if spec.CALIBRATION["relation.direction"][0] in _inside(e)]
+        check(direction and "Schema / skill" in direction[0] and "Calibration" in direction[0]
+              and html.escape(spec.plain(spec.definition("edge.from_to")["text"]))
+              in direction[0],
+              f"ui: {label} Direction Instructions hold from/to and the calibration apart")
+        at.radio(key=keys["REL_DIRECTION"]).set_value("No")
+        at.run()
+        type_radio = at.radio(key=keys["REL_TYPE"])
+        check(not type_radio.disabled and type_radio.value is None
+              and at.radio(key=keys["REL_GROUNDING"]).value is None,
+              f"ui: {label} Direction No leaves Grounding and Type open and unanswered")
+        check(any(t.label.startswith("Correction or comment") for t in at.text_area),
+              f"ui: {label} Direction No offers an optional comment")
+        at.radio(key=keys["REL_TYPE"]).set_value("Yes")
+        at.run()
+        _flush(at)
+        stored = store.load_review(review).relation(relation["key"])
+        check(stored["direction_answer"] == "No" and stored["type_answer"] == "Yes"
+              and stored["grounding_answer"] == "",
+              f"ui: {label} judgments are stored independently")
+        at.button(key="nav|review").click()
+        at.run()
+        page = _markdown(at)
+        check("Direction · " in page and "Relation type · " in page and "Grounding · " in page,
+              f"ui: Review lists {label} Grounding, Direction and Type separately")
+        tables = analysis.export_tables()
+        check(any(r["question_key"] == "REL_DIRECTION" and r["relation_key"] == relation["key"]
+                  and r["answer"] == "No" for r in tables["relation_judgments"]),
+              f"ui: the {label} Direction judgment is exported")
+
+    found = _hosting(("SAME_AS",))
+    check(found is not None, "ui: an assigned SAME_AS relation exists for the check")
+    if found:
+        phase, source, index, relation = found
+        fresh_round()
+        review = rid(phase, EVALUATOR, source)
+        start(review)
+        at = _app()
+        _login(at)
+        _open_claim(at, phase, source, index)
+        keys = {r.key for r in at.radio}
+        base = f"w|{review}"
+        check(f"{base}|REL_GROUNDING|{relation['key']}|a" in keys
+              and f"{base}|REL_TYPE|{relation['key']}|a" in keys
+              and f"{base}|REL_DIRECTION|{relation['key']}|a" not in keys,
+              "ui: SAME_AS keeps Grounding and Type and asks no Direction")
+        tables = analysis.export_tables()
+        check(not any(r["relation_key"] == relation["key"] and r["question_key"] == "REL_DIRECTION"
+                      for r in tables["relation_judgments"]),
+              "ui: no Direction row is exported for SAME_AS")
+
+
+def test_ui_restatements():
+    book = fresh_round()
+    source = AGR_SOURCE
+    review = rid("agreement", EVALUATOR, source)
+    start(review)
+    at = _app()
+    _login(at)
+    _open(at, "agreement", source)
+    at.button(key="nav|recall").click()
+    at.run()
+    base = f"w|{review}"
+    answer = f"{base}|SOURCE_RESTATEMENTS|{source}|a"
+    pick = f"{base}|rg_pick|{source}"
+    add = f"{base}|rg_add|{source}"
+    page = _markdown(at)
+    order = [page.find(t) for t in ("Extracted Claims", spec.RECALL.text,
+                                    "#### Restatements")]
+    check(all(i >= 0 for i in order) and order == sorted(order),
+          "ui: Claim recall shows Extracted Claims, completeness, then Restatements")
+    radio = at.radio(key=answer)
+    check(radio.options == ["No", "Yes"] and radio.value is None and not radio.disabled,
+          "ui: Restatements is an unanswered No / Yes")
+    radio.set_value("none")
+    at.run()
+    _flush(at)
+    check(store.load_review(review).response("SOURCE_RESTATEMENTS", source)["answer"] == "none",
+          "ui: No is stored as none")
+    at.radio(key=answer).set_value("present")
+    at.run()
+    check(any(m.key == pick for m in at.multiselect) and at.button(key=add).disabled,
+          "ui: Yes offers the Claim selector; Add needs two Claims")
+    claims = [c["id"] for c in BRAIN.claims_of(source)]
+    a, b, c, d = claims[:4]
+    at.multiselect(key=pick).select(b)
+    at.run()
+    check(at.button(key=add).disabled, "ui: one Claim cannot make a group")
+    at.multiselect(key=pick).select(a)
+    at.run()
+    at.button(key=add).click()
+    at.run()
+    check(at.radio(key=answer).disabled
+          and any("Remove the restatement groups to answer No." in x.value for x in at.caption),
+          "ui: with a group, No is unavailable and the reason is given")
+    at.multiselect(key=pick).select(a)
+    at.multiselect(key=pick).select(c)
+    at.run()
+    at.button(key=add).click()
+    at.run()
+    check(any("already assigned to another restatement group" in w.value for w in at.warning),
+          "ui: a Claim already in a group is refused, with the reason")
+    at.multiselect(key=pick).set_value([d, c])
+    at.run()
+    check(not any("already assigned" in w.value for w in at.warning),
+          "ui: the refusal message goes once the selection changes")
+    at.button(key=add).click()
+    at.run()
+    _flush(at)
+    stored = store.load_review(review)
+    groups = stored.active_restatement_groups()
+    check(sorted(groups.values()) == sorted([sorted([a, b]), sorted([c, d])])
+          and stored.response("SOURCE_RESTATEMENTS", source)["answer"] == "present",
+          "ui: two groups are stored; the answer is present")
+    check(book.count(sheets.RESTATEMENTS) == 4,
+          "ui: nothing was written for the refused group")
+    page = _markdown(at)
+    check("**Group 1**" in page and "**Group 2**" in page
+          and not any(w in page.lower() for w in ("canonical", "primary")),
+          "ui: groups are listed with no canonical member")
+    at.button(key="nav|review").click()
+    at.run()
+    page = _markdown(at)
+    check("Restatements — 2 groups" in page, "ui: Review shows the number of groups")
+    at.button(key="nav|recall").click()
+    at.run()
+    for key in [x.key for x in at.button if x.key and "|rg_rm|" in x.key]:
+        at.button(key=key).click()
+        at.run()
+    _flush(at)
+    check(store.load_review(review).active_restatement_groups() == {}
+          and all(r["active"] == store.FALSE for r in book.read_tab(sheets.RESTATEMENTS)),
+          "ui: removing groups marks their rows inactive")
+    check(not at.radio(key=answer).disabled,
+          "ui: No is available again once every group is removed")
+    at.radio(key=answer).set_value("none")
+    at.run()
+    _flush(at)
+    item = next(i for i in progress.recall_items(BRAIN, source, store.load_review(review))
+                if i.question is spec.RESTATEMENTS)
+    check(progress.item_problem(item, store.load_review(review)) is None,
+          "ui: No after removing the groups completes Restatements")
+    at.button(key="nav|review").click()
+    at.run()
+    check("Restatements — none" in _markdown(at), "ui: Review shows Restatements none")
+
+
+def test_ui_calibration_and_doi():
+    book = fresh_round()
+    with_doi = next(s for s in _assigned(EVALUATOR, "training") if ui_doi(s))
+    without = next((s for p in ("training", "agreement", "individual")
+                    for s in _assigned(EVALUATOR, p) if not ui_doi(s)), None)
+    phase = "training"
+    review = rid(phase, EVALUATOR, with_doi)
+    start(review)
+    at = _app()
+    _login(at)
+    before = _stored_rows(book)
+    _open(at, phase, with_doi)
+    doi = str(BRAIN.source(with_doi)["doi"]).strip()
+    line = [m.value for m in at.markdown if m.value.startswith("**DOI:**")]
+    check(line and f"href='https://doi.org/{doi}'" in line[0]
+          and "target='_blank'" in line[0] and "noopener" in line[0]
+          and html.escape(doi) in line[0].split("<a")[0],
+          "ui: the DOI stays visible, with an icon link to doi.org in a new tab")
+    check(_stored_rows(book) == before, "ui: the DOI link writes nothing")
+    import ui as ui_module
+    target = "https://doi.org/10.1145/3696630.3728530"
+    check(all(ui_module.doi_url(form) == target
+              for form in ("10.1145/3696630.3728530", "https://doi.org/10.1145/3696630.3728530",
+                           "http://doi.org/10.1145/3696630.3728530",
+                           "doi:10.1145/3696630.3728530"))
+          and ui_module.doi_url("unknown") == "" and ui_module.doi_url(None) == "",
+          "ui: DOI forms normalise to https://doi.org/<doi>; none gives no link")
+    if without:
+        phase2 = next(p for p in ("training", "agreement", "individual")
+                      if without in _assigned(EVALUATOR, p))
+        start(rid(phase2, EVALUATOR, without))
+        _open(at, phase2, without)
+        line = [m.value for m in at.markdown if m.value.startswith("**DOI:**")]
+        check(line and "<a" not in line[0], "ui: no DOI, no link icon")
+
+    _open(at, phase, with_doi)
+    at.button(key="nav|claims").click()
+    at.run()
+    instructions = [_inside(e) for e in _expanders(at, "Instructions")]
+    general = [t for t in instructions if spec.CALIBRATION["claim.general"][0] in t]
+    check(general and all(line in general[0] for line in spec.CALIBRATION["claim.general"])
+          and "Schema / skill" not in general[0]
+          and "This instruction applies" not in general[0],
+          "ui: the Claim-level Instructions hold the three calibration lines only")
+    check(all(not e.proto.expanded for e in _expanders(at, "Instructions")),
+          "ui: calibration Instructions start closed")
+    for field, key in (("basis", "claim.basis"),
+                       ("claim_jurisdiction", "claim.claim_jurisdiction")):
+        block = next((t for t in instructions
+                      if html.escape(spec.plain(spec.definition(key)["text"])) in t), "")
+        schema_at, calibration_at = block.find("Schema / skill"), block.find("Calibration")
+        check(0 <= schema_at < calibration_at
+              and all(html.escape(line) in block[calibration_at:]
+                      for line in spec.CALIBRATION[field])
+              and html.escape(spec.plain(spec.definition(key)["text"]))
+              in block[schema_at:calibration_at],
+              f"ui: {field} Instructions hold the schema text, then a separate Calibration")
+    claim_object = next((t for t in instructions
+                         if html.escape(spec.plain(spec.definition("claim.claim_object")["text"]))
+                         in t), "")
+    check(claim_object and "Calibration" not in claim_object
+          and "Schema / skill" not in claim_object, "ui: Claim object is unchanged")
+    q2 = next((t for t in instructions
+               if html.escape(spec.plain(spec.definition("claim.node")["text"])) in t), "")
+    check(q2 and "Calibration" not in q2, "ui: Question 2's Instructions are unchanged")
+
+
+def ui_doi(source: str) -> bool:
+    import ui as ui_module
+
+    return bool(ui_module.doi_url(BRAIN.source(source).get("doi")))
 
 
 # ====================================================================== main

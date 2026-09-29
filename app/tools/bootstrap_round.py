@@ -136,6 +136,12 @@ def definition_rows() -> list[dict]:
         out.append({"key": key, "label": entry["label"], "source_file": entry["source"],
                     "text": entry.get("text", ""),
                     "items_json": json.dumps(entry.get("items", []), ensure_ascii=False)})
+    # Calibration guidance is recorded too, so the workbook describes everything
+    # evaluators were shown — under its own keys and source, never as schema text.
+    for key, lines in sorted(spec.CALIBRATION.items()):
+        out.append({"key": f"calibration.{key}", "label": "Calibration",
+                    "source_file": spec.CALIBRATION_SOURCE, "text": "\n\n".join(lines),
+                    "items_json": "[]"})
     return out
 
 
