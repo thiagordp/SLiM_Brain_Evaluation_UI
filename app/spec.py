@@ -178,15 +178,17 @@ CALIBRATION: dict[str, tuple[str, ...]] = {
     "basis": (
         "Abstract means abstract or conceptual considerations. It does not mean the "
         "Abstract section of the paper.",
+        "Literature means that the Claim and its anchors present the point as coming "
+        "from prior literature.",
         "Judge the Basis from the anchors attached to this Claim.",
     ),
     "claim_jurisdiction": (
-        "General: the Claim is presented as jurisdiction-independent.",
-        "Undetermined: the jurisdiction matters to the Claim or to the data it rests "
-        "on, but the Source does not settle which jurisdiction it is.",
-        "For technology Claims, a general feature of the technology can be General. "
-        "A result tied to a specific legal task or legal dataset can be Undetermined "
-        "when its jurisdiction is not identified.",
+        "General: the Claim is explicitly jurisdiction-independent or concerns law in "
+        "general.",
+        "Undetermined: the jurisdiction is not stated and the context does not settle "
+        "it.",
+        "Do not choose General only because a technology Claim sounds broadly "
+        "applicable.",
     ),
     "relation.direction": (
         "Judge whether the arrow runs from the Claim doing the supporting or "

@@ -624,6 +624,10 @@ two provenance fields: `eval_spec_version` 4.1, and `definitions_id`
     lines.
   - Bootstrap writes the texts into DEFINITIONS as `calibration.*`, with source
     "calibration meeting (spec 4.1)".
+- **Calibration revised after the meeting.** Basis gained a Literature line.
+  Claim jurisdiction's calibration was replaced by three lines, dropping the
+  technology-specific example. The spec version stays 4.1: calibration is not
+  frozen material, and no question or option changed.
 - **Concepts.** Status is no longer shown in Q12 or the Q14 browser. Q13 shows
   "family · Candidate". A one-line hint sits above the proposal form.
 - **DOI.** The Source page keeps the DOI text and adds a small external-link

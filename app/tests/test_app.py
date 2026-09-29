@@ -1787,6 +1787,32 @@ def test_ui_calibration_and_doi():
               and html.escape(spec.plain(spec.definition(key)["text"]))
               in block[schema_at:calibration_at],
               f"ui: {field} Instructions hold the schema text, then a separate Calibration")
+    expected = {
+        "claim.basis": (
+            "Abstract means abstract or conceptual considerations. It does not mean the "
+            "Abstract section of the paper.",
+            "Literature means that the Claim and its anchors present the point as "
+            "coming from prior literature.",
+            "Judge the Basis from the anchors attached to this Claim."),
+        "claim.claim_jurisdiction": (
+            "General: the Claim is explicitly jurisdiction-independent or concerns law "
+            "in general.",
+            "Undetermined: the jurisdiction is not stated and the context does not "
+            "settle it.",
+            "Do not choose General only because a technology Claim sounds broadly "
+            "applicable."),
+    }
+    for key, lines in expected.items():
+        block = next((t for t in instructions
+                      if html.escape(spec.plain(spec.definition(key)["text"])) in t), "")
+        calibration = block[block.find("Calibration"):]
+        shown = re.findall(r"<p[^>]*>(.*?)</p>", calibration)
+        check(shown == [html.escape(line) for line in lines],
+              f"ui: {key} Calibration is exactly the agreed lines")
+    page_text = _markdown(at)
+    check("a general feature of the technology can be General" not in page_text
+          and "presented as jurisdiction-independent" not in page_text,
+          "ui: the previous technology-specific jurisdiction example is gone")
     claim_object = next((t for t in instructions
                          if html.escape(spec.plain(spec.definition("claim.claim_object")["text"]))
                          in t), "")
