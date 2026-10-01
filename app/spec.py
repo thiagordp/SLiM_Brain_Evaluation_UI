@@ -182,9 +182,9 @@ CALIBRATION: dict[str, tuple[str, ...]] = {
         "practice.",
         "Technology: the Claim is about a technology, system or model. This includes "
         "how a technology behaves when applied to a legal task.",
-        "Other: the Claim is substantively about both Law and Technology, or about Law "
-        "or Technology together with another object that prevents either category from "
-        "describing the Claim on its own.",
+        "Other: the Claim is substantively about both Law and Technology, or about "
+        "either Law or Technology together with another substantive object, so neither "
+        "category describes the Claim on its own.",
     ),
     "basis": (
         "Abstract means abstract or conceptual considerations. It does not mean the "

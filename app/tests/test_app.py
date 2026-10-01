@@ -1796,8 +1796,8 @@ def test_ui_calibration_and_doi():
             "Technology: the Claim is about a technology, system or model. This "
             "includes how a technology behaves when applied to a legal task.",
             "Other: the Claim is substantively about both Law and Technology, or about "
-            "Law or Technology together with another object that prevents either "
-            "category from describing the Claim on its own."),
+            "either Law or Technology together with another substantive object, so "
+            "neither category describes the Claim on its own."),
         "claim.basis": (
             "Abstract means abstract or conceptual considerations. It does not mean the "
             "Abstract section of the paper.",
@@ -1820,6 +1820,8 @@ def test_ui_calibration_and_doi():
         check(shown == [html.escape(line) for line in lines],
               f"ui: {key} Calibration is exactly the agreed lines")
     page_text = _markdown(at)
+    check("prevents either category" not in page_text,
+          "ui: the previous Claim object Other wording is gone")
     check("a general feature of the technology can be General" not in page_text
           and "presented as jurisdiction-independent" not in page_text,
           "ui: the previous technology-specific jurisdiction example is gone")
