@@ -175,6 +175,17 @@ CALIBRATION: dict[str, tuple[str, ...]] = {
         "Judge the Claim fields from what the anchors support.",
         "Restatements are assessed in Claim recall.",
     ),
+    "claim_object": (
+        "Classify what the Claim asserts, not what it merely mentions.",
+        "Law: the Claim is about law or legal/regulatory practice. This includes law "
+        "regulating technology and the impact of technology on legal or regulatory "
+        "practice.",
+        "Technology: the Claim is about a technology, system or model. This includes "
+        "how a technology behaves when applied to a legal task.",
+        "Other: the Claim is substantively about both Law and Technology, or about Law "
+        "or Technology together with another object that prevents either category from "
+        "describing the Claim on its own.",
+    ),
     "basis": (
         "Abstract means abstract or conceptual considerations. It does not mean the "
         "Abstract section of the paper.",

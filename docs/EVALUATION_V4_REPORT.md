@@ -626,8 +626,10 @@ two provenance fields: `eval_spec_version` 4.1, and `definitions_id`
     "calibration meeting (spec 4.1)".
 - **Calibration revised after the meeting.** Basis gained a Literature line.
   Claim jurisdiction's calibration was replaced by three lines, dropping the
-  technology-specific example. The spec version stays 4.1: calibration is not
-  frozen material, and no question or option changed.
+  technology-specific example. Claim object gained a Calibration section (four
+  paragraphs: classify what the Claim asserts, then Law, Technology and Other).
+  The spec version stays 4.1: calibration is not frozen material, and no
+  question, option or frozen text changed.
 - **Concepts.** Status is no longer shown in Q12 or the Q14 browser. Q13 shows
   "family · Candidate". A one-line hint sits above the proposal form.
 - **DOI.** The Source page keeps the DOI text and adds a small external-link

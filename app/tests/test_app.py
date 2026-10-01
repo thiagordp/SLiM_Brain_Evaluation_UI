@@ -1788,6 +1788,16 @@ def test_ui_calibration_and_doi():
               in block[schema_at:calibration_at],
               f"ui: {field} Instructions hold the schema text, then a separate Calibration")
     expected = {
+        "claim.claim_object": (
+            "Classify what the Claim asserts, not what it merely mentions.",
+            "Law: the Claim is about law or legal/regulatory practice. This includes "
+            "law regulating technology and the impact of technology on legal or "
+            "regulatory practice.",
+            "Technology: the Claim is about a technology, system or model. This "
+            "includes how a technology behaves when applied to a legal task.",
+            "Other: the Claim is substantively about both Law and Technology, or about "
+            "Law or Technology together with another object that prevents either "
+            "category from describing the Claim on its own."),
         "claim.basis": (
             "Abstract means abstract or conceptual considerations. It does not mean the "
             "Abstract section of the paper.",
@@ -1816,8 +1826,20 @@ def test_ui_calibration_and_doi():
     claim_object = next((t for t in instructions
                          if html.escape(spec.plain(spec.definition("claim.claim_object")["text"]))
                          in t), "")
-    check(claim_object and "Calibration" not in claim_object
-          and "Schema / skill" not in claim_object, "ui: Claim object is unchanged")
+    schema_at, calibration_at = (claim_object.find("Schema / skill"),
+                                 claim_object.find("Calibration"))
+    frozen = claim_object[schema_at:calibration_at]
+    check(0 <= schema_at < calibration_at
+          and html.escape(spec.plain(spec.definition("claim.claim_object")["text"])) in frozen
+          and all(html.escape(spec.plain(i["text"])) in frozen
+                  for i in spec.definition("claim.claim_object")["items"])
+          and all(v in frozen for v in ("Law", "Technology", "Other")),
+          "ui: Claim object keeps its frozen definition, every category and meaning, "
+          "under Schema / skill, before its Calibration")
+    q6 = spec.BY_KEY["CLAIM_Q06_CLAIM_OBJECT"]
+    check(q6.text == AGREED["CLAIM_Q06_CLAIM_OBJECT"] and q6.options == ("Yes", "No")
+          and q6.field == "claim_object" and q6.calibration == ("claim_object",),
+          "ui: the Claim object question, options and field are unchanged")
     q2 = next((t for t in instructions
                if html.escape(spec.plain(spec.definition("claim.node")["text"])) in t), "")
     check(q2 and "Calibration" not in q2, "ui: Question 2's Instructions are unchanged")
