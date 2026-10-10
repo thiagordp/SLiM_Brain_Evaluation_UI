@@ -424,6 +424,22 @@ def proposal_id(name: str, family: str) -> str:
     return f"{re.sub(r'[^a-z0-9]+', '-', conceptsearch.normalise(name)).strip('-')}--{family}"
 
 
+def _save_proposal(ctx: Ctx, cid: str, name: str, family: str, explanation: str) -> None:
+    pid = proposal_id(name, family)
+    key = store.proposal_key(ctx.review_id, cid, pid)
+    ui.save_selection(ctx, sheets.PROPOSED_CONCEPTS, key, store.pair_lookup(cid, pid), {
+        "proposal_key": key, "review_id": ctx.review_id, "source_id": ctx.source_id,
+        "claim_id": cid, "proposal_id": pid, "name": name, "family": family,
+        "explanation": explanation, "active": store.TRUE})
+    _q14_state(ctx, cid)
+
+
+def _reuse_proposal(ctx: Ctx, cid: str, row: dict) -> None:
+    """A proposal made on another Claim, proposed again for this one. The
+    optional explanation was written for that Claim, so it is not copied."""
+    _save_proposal(_live(ctx), cid, row["name"], row["family"], "")
+
+
 def _propose(ctx: Ctx, cid: str, name_key: str, family_key: str, why_key: str) -> None:
     ctx = _live(ctx)
     name = (st.session_state.get(name_key) or "").strip()
@@ -431,18 +447,57 @@ def _propose(ctx: Ctx, cid: str, name_key: str, family_key: str, why_key: str) -
     if not name or not family:
         st.session_state[f"{name_key}|error"] = "Give a name and a Concept family."
         return
-    pid = proposal_id(name, family)
-    key = store.proposal_key(ctx.review_id, cid, pid)
-    ui.save_selection(ctx, sheets.PROPOSED_CONCEPTS, key, store.pair_lookup(cid, pid), {
-        "proposal_key": key, "review_id": ctx.review_id, "source_id": ctx.source_id,
-        "claim_id": cid, "proposal_id": pid, "name": name, "family": family,
-        "explanation": (st.session_state.get(why_key) or "").strip(),
-        "active": store.TRUE})
-    _q14_state(ctx, cid)
+    _save_proposal(ctx, cid, name, family, (st.session_state.get(why_key) or "").strip())
     for k in (name_key, why_key):
         st.session_state[k] = ""
     st.session_state[family_key] = None
     st.session_state.pop(f"{name_key}|error", None)
+
+
+def _chip(name: str, below: str) -> str:
+    """A shortcut label: the name, and under it the family (or "New proposal")
+    in gray."""
+    return f"{name}  \n:gray[{below}]" if below else name
+
+
+def _used_in_paper(ctx: Ctx, cid: str, vocabulary, selected_ids: set,
+                   proposed_ids: set) -> bool:
+    """One-click shortcuts to the Concepts used elsewhere in this paper.
+
+    Another way to use the controls below, nothing more: a click goes through
+    the same calls as "Add" and "Add proposal". What this Claim already has
+    stays listed but disabled. Shows family, not status (instrument 4.1).
+    Returns whether anything was shown.
+    """
+    by_brain, by_you = progress.paper_concepts(ctx.brain, ctx.source_id, ctx.data,
+                                               cid, vocabulary)
+    if not by_brain and not by_you:
+        return False
+    with st.expander("Concepts used in this paper", expanded=True):
+        for heading, entries in (("Assigned by Brain", by_brain),
+                                 ("Previously added by you", by_you)):
+            if not entries:
+                continue
+            st.caption(heading)
+            with st.container(horizontal=True, gap="small"):
+                for entry in entries:
+                    row = entry.get("proposal")
+                    if row is not None:
+                        taken = entry["id"] in proposed_ids
+                        st.button(_chip(entry["label"], "New proposal"),
+                                  key=ui.wkey(ctx, "q14usep", cid, entry["id"]),
+                                  disabled=ctx.locked or taken,
+                                  help="Already proposed for this Claim" if taken else None,
+                                  on_click=_reuse_proposal, args=(ctx, cid, row))
+                        continue
+                    taken = entry["id"] in selected_ids
+                    st.button(_chip(entry["label"], family_label(entry["family"])
+                                    if entry["family"] else ""),
+                              key=ui.wkey(ctx, "q14use", cid, entry["id"]),
+                              disabled=ctx.locked or taken,
+                              help="Already selected for this Claim" if taken else None,
+                              on_click=_select_concept, args=(ctx, cid, entry, True))
+    return True
 
 
 def missing_concepts(ctx: Ctx, claim: dict) -> None:
@@ -484,6 +539,11 @@ def missing_concepts(ctx: Ctx, claim: dict) -> None:
         st.checkbox("No additional Concepts are missing", key=none_key,
                     disabled=ctx.locked or bool(existing or proposed),
                     on_change=_none_missing, args=(ctx, cid, none_key))
+
+    # ---- shortcuts: Concepts used elsewhere in this paper
+    if _used_in_paper(ctx, cid, vocabulary, selected_ids,
+                      {r["proposal_id"] for r in proposed}):
+        st.markdown("**All available concepts**")
 
     # ---- search and browse: independent of the selection
     query = st.text_input("Search Concepts", key=f"q14search|{ctx.review_id}|{cid}",

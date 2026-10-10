@@ -853,6 +853,153 @@ def test_ui_claim_flow():
           "ui: selecting and removing keeps one row per Concept")
 
 
+def _paper_union(source: str, claim_id: str) -> set[str]:
+    """The Brain's Concepts on the Source's other Claims, minus this Claim's."""
+    return ({c for cl in BRAIN.claims_of(source) if cl["id"] != claim_id
+             for c in BRAIN.concepts_of_claim(cl["id"])}
+            - set(BRAIN.concepts_of_claim(claim_id)))
+
+
+def _unused_concept(source: str) -> dict:
+    """A vocabulary Concept the Brain assigns to no Claim of the Source."""
+    used = {c for cl in BRAIN.claims_of(source) for c in BRAIN.concepts_of_claim(cl["id"])}
+    return next(e for e in BRAIN.vocabulary(spec.concept_grid())
+                if e["id"] not in used and e["family"])
+
+
+def test_paper_concepts():
+    vocabulary = BRAIN.vocabulary(spec.concept_grid())
+    statuses = set()
+    for source in BRAIN.sources:
+        claims = BRAIN.claims_of(source)
+        if not claims:
+            continue
+        by_brain, by_you = progress.paper_concepts(BRAIN, source, store.ReviewData(),
+                                                   claims[0]["id"], vocabulary)
+        if {e["id"] for e in by_brain} != _paper_union(source, claims[0]["id"]) or by_you:
+            check(False, f"shortcuts: {source} lists the Brain's Concepts of its other Claims")
+        statuses |= {e["status"] for e in by_brain}
+    check({"anchor", "candidate", "emergent"} <= statuses,
+          "shortcuts: Brain Concepts of every status are listed")
+
+    c0, current, c2 = (c["id"] for c in BRAIN.claims_of(AGR_SOURCE)[:3])
+    other_source = next(s for s in BRAIN.sources if s != AGR_SOURCE and BRAIN.claims_of(s))
+    foreign = BRAIN.claims_of(other_source)[0]["id"]
+    unused = _unused_concept(AGR_SOURCE)
+    assigned = sorted(_paper_union(AGR_SOURCE, current))[0]
+    own = BRAIN.concepts_of_claim(current)[0]
+    second = next(e["id"] for e in vocabulary
+                  if e["id"] != unused["id"] and e["id"] not in _paper_union(AGR_SOURCE, ""))
+    T, F = store.TRUE, store.FALSE
+
+    def missing(claim, concept, active=T):
+        return {"claim_id": claim, "concept_id": concept, "active": active}
+
+    def proposal(claim, name, when, active=T):
+        return {"claim_id": claim, "proposal_id": name.lower().replace(" ", "-") + "--legal_task",
+                "name": name, "family": "legal_task", "active": active,
+                "explanation": "why " + claim, "updated_at": when}
+
+    data = store.ReviewData()
+    for i, row in enumerate([missing(c0, unused["id"]), missing(c2, unused["id"]),
+                             missing(c0, second, F), missing(current, second),
+                             missing(foreign, second), missing(c0, assigned),
+                             missing(c0, own)]):
+        data.missing[str(i)] = row
+    for i, row in enumerate([proposal(c0, "Legal chatbots", "2026-10-01"),
+                             proposal(c2, "Legal chatbots", "2026-10-02"),
+                             proposal(c0, "Withdrawn idea", "2026-10-01", F),
+                             proposal(current, "Only here", "2026-10-01")]):
+        data.proposals[str(i)] = row
+    by_brain, by_you = progress.paper_concepts(BRAIN, AGR_SOURCE, data, current, vocabulary)
+    brain_ids, your_ids = [e["id"] for e in by_brain], [e["id"] for e in by_you]
+    check(own not in brain_ids and own not in your_ids,
+          "shortcuts: a Concept already assigned to this Claim is not offered")
+    check(assigned in brain_ids and assigned not in your_ids,
+          "shortcuts: a Concept is listed once, under the Brain when both apply")
+    check(your_ids.count(unused["id"]) == 1 and second not in your_ids,
+          "shortcuts: your other-Claim selections, once each; inactive, this-Claim "
+          "and other-Source rows excluded")
+    found = [e for e in by_you if e.get("proposal")]
+    check([e["label"] for e in found] == ["Legal chatbots"]
+          and found[0]["proposal"]["claim_id"] == c2,
+          "shortcuts: a proposal is listed once (latest row); withdrawn and this-Claim "
+          "proposals are not")
+    check(next(e for e in by_you if e["id"] == unused["id"])["status"] == unused["status"],
+          "shortcuts: a vocabulary Concept keeps its schema status")
+
+
+def test_ui_concept_shortcuts():
+    import views
+
+    book = fresh_round()
+    at = _app()
+    _login(at)
+    _open(at, "agreement", AGR_SOURCE)
+    at.checkbox[0].check()
+    at.run()
+    [b for b in at.button if b.label == "Start evaluation"][0].click()
+    at.run()
+    at.button(key="nav|claims").click()
+    at.run()
+    review = rid("agreement", EVALUATOR, AGR_SOURCE)
+    base = f"w|{review}"
+    first, second = (c["id"] for c in BRAIN.claims_of(AGR_SOURCE)[:2])
+    unused = _unused_concept(AGR_SOURCE)
+
+    # Claim 1: one vocabulary Concept and one proposal.
+    at.button(key=f"{base}|q14add|{first}|{unused['id']}").click()
+    at.run()
+    at.text_input(key=f"{base}|q14name|{first}").input("Legal chatbots")
+    at.selectbox(key=f"{base}|q14family|{first}").select("technical_task")
+    at.run()
+    at.button(key=f"{base}|q14propose|{first}").click()
+    at.run()
+    at.button(key="next_claim").click()
+    at.run()
+    check(not at.exception, f"ui: the next Claim renders ({[e.value for e in at.exception][:1]})")
+
+    pid = views.proposal_id("Legal chatbots", "technical_task")
+    use_key = f"{base}|q14use|{second}|{unused['id']}"
+    usep_key = f"{base}|q14usep|{second}|{pid}"
+    keys = {b.key: b for b in at.button if b.key}
+    brain_keys = {k for k in keys if f"|q14use|{second}|" in k} - {use_key}
+    check(brain_keys == {f"{base}|q14use|{second}|{c}"
+                         for c in _paper_union(AGR_SOURCE, second)},
+          "ui: Assigned by Brain lists the paper's other Concepts, not this Claim's")
+    check(use_key in keys and usep_key in keys,
+          "ui: your Concept and proposal from Claim 1 are shortcuts on Claim 2")
+    labels = [b.label for k, b in keys.items() if "|q14use" in k]
+    family = brain_module.family_label(unused["family"])
+    check(keys[use_key].label == f"{unused['label']}  \n:gray[{family}]"
+          and keys[usep_key].label == "Legal chatbots  \n:gray[New proposal]"
+          and not any(w in label for label in labels
+                      for w in ("Anchor", "Candidate", "Emergent")),
+          "ui: shortcuts show the name, with family or New proposal in gray below; never status")
+    check("All available concepts" in _markdown(at), "ui: the vocabulary browser is headed")
+
+    at.button(key=use_key).click()
+    at.run()
+    at.button(key=usep_key).click()
+    at.run()
+    keys = {b.key: b for b in at.button if b.key}
+    check(keys[use_key].disabled and keys[usep_key].disabled,
+          "ui: a used shortcut stays visible, disabled")
+    check(f"{base}|q14rm|{second}|{unused['id']}" in keys
+          and "Proposed · Legal chatbots" in _markdown(at),
+          "ui: a shortcut selection appears under Selected missing Concepts")
+    _flush(at)
+    stored = store.load_review(review)
+    check([r["concept_id"] for r in stored.active_missing(second)] == [unused["id"]]
+          and [(r["name"], r["family"], r["explanation"])
+               for r in stored.active_proposals(second)]
+          == [("Legal chatbots", "technical_task", "")]
+          and stored.response(spec.Q14.key, second)["answer"] == spec.Q14_MISSING,
+          "ui: a shortcut is stored exactly as Add and Add proposal store")
+    check(book.count(sheets.MISSING_CONCEPTS) == 2 and book.count(sheets.PROPOSED_CONCEPTS) == 2,
+          "ui: one row per Claim and Concept, no duplicates")
+
+
 def test_ui_no_datasets_and_completion():
     fresh_round()
     source = NO_DATASET_SOURCE
@@ -1358,9 +1505,44 @@ def test_ui_admin_exports():
           "ui: Exports offers the single XLSX first")
     csv = [e for e in at.expander if e.label == "Individual tables (CSV)"]
     check(csv and not csv[0].proto.expanded
-          and len(csv[0].get("download_button")) == len(analysis.export_tables()),
+          and len(csv[0].get("download_button")) == len(analysis.export_tables(BRAIN)),
           "ui: the per-table CSVs are in a closed expander")
     check(_stored_rows(book) == before, "ui: preparing exports writes nothing")
+
+
+def test_activity_statistics():
+    book = fresh_round()
+    review = rid("individual", EVALUATOR, IND_SOURCE)
+    start(review)
+    header = list(sheets.COLUMNS[sheets.REVIEWS])
+    for row in book.tabs[sheets.REVIEWS][1:]:
+        if row[header.index("review_id")] == review:
+            row[header.index("started_at")] = "2026-10-01T09:00:00+00:00"
+    columns = list(sheets.COLUMNS[sheets.RESPONSES])
+    mine = [r for r in book.tabs[sheets.RESPONSES][1:]
+            if r[columns.index("review_id")] == review
+            and r[columns.index("question_key")] == "CLAIM_Q02_CENTRAL_THESIS"][:3]
+    for row, stamp in zip(mine, ("09:01:00", "09:02:00", "11:00:00")):
+        row[columns.index("answer")] = "Yes"
+        row[columns.index("updated_at")] = f"2026-10-01T{stamp}+00:00"
+    store.forget_all()
+    table = analysis.activity(BRAIN, analysis.read_raw())
+    check(len(table) == 1 and table[0]["source_id"] == IND_SOURCE,
+          "activity: one row per started review only")
+    row = table[0]
+    total = len(progress.all_items(BRAIN, IND_SOURCE,
+                                   store.load_review(review)))
+    check(row["items_done"] == 3 and row["items_total"] == total
+          and row["rows_saved"] == 3,
+          "activity: items answered and rows saved are counted")
+    check(row["elapsed_minutes"] == 120.0 and row["active_minutes"] == 2.0
+          and row["sessions"] == 2 and row["seconds_per_item"] == 40.0,
+          "activity: a pause over ten minutes is a break, not active time")
+    check(not any(k in row for k in ("answer", "comment")),
+          "activity: completion counts only, no answer content")
+    check("activity" in analysis.export_tables(BRAIN)
+          and "activity" not in analysis.export_tables(),
+          "activity: exported as its own table when the Brain is given")
 
 
 # ============================================================ save semantics

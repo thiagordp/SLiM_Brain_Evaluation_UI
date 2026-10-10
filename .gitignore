@@ -52,6 +52,10 @@ new_brain/
 # Working documents, not needed by the deployed app
 Conversation_ChatGPT.md
 Review-Evaluation-Changes.md
+# Meeting recordings' transcripts: evaluators' own words, kept local.
+meetings/
+# The stand-alone allocation tool. Only its output, app/data/allocation/, is used.
+reviewer_allocation/
 
 # Python and tooling
 __pycache__/
@@ -80,6 +84,11 @@ ENV/
 *~
 .DS_Store
 Thumbs.db
+
+# Coding-assistant skill links into the local Streamlit install. They point
+# into one machine's conda environment, so they are broken anywhere else.
+.agents/
+.claude/
 
 # Scratch left by an interrupted edit or merge
 *.bak

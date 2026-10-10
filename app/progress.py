@@ -29,6 +29,7 @@ import dataclasses
 
 import spec
 import store
+from brain import concept_label
 
 AVAILABLE, INCOMPLETE, COMPLETE, INFO = "available", "incomplete", "complete", "info"
 
@@ -132,6 +133,51 @@ def comment_of(item: Item, data) -> str:
 
 def q14_selection(data, claim_id: str) -> tuple[list[dict], list[dict]]:
     return data.active_missing(claim_id), data.active_proposals(claim_id)
+
+
+def paper_concepts(brain, source_id: str, data, claim_id: str,
+                   vocabulary) -> tuple[list[dict], list[dict]]:
+    """Question 14 shortcuts: (assigned by the Brain, previously added by you).
+
+    Display only; nothing here is an answer. The first list is the Concepts the
+    Brain assigned to the Source's other Claims, whatever their status. The
+    second is this review's active missing Concepts and proposals on other
+    Claims of the Source, so only this evaluator's own answers. A Concept is
+    listed once, under the Brain when both apply, and a Concept already assigned
+    to this Claim is not listed. Proposals carry their stored row.
+    """
+    by_id = {e["id"]: e for e in vocabulary}
+
+    def entry(concept_id: str) -> dict:
+        concept = brain.concept(concept_id)
+        return by_id.get(concept_id) or {
+            "id": concept_id, "label": concept_label(concept_id),
+            "family": str(concept.get("concept_type") or ""),
+            "status": str(concept.get("status") or "")}
+
+    others = {c["id"] for c in brain.claims_of(source_id)} - {claim_id}
+    own = set(brain.concepts_of_claim(claim_id))
+    assigned = {c for other in others for c in brain.concepts_of_claim(other)}
+    by_brain = sorted((entry(c) for c in assigned - own),
+                      key=lambda e: e["label"].lower())
+
+    added = {r["concept_id"] for r in data.missing.values()
+             if r.get("active") == store.TRUE and r.get("claim_id") in others
+             and r.get("concept_id")} - assigned - own
+    proposals: dict[str, dict] = {}
+    for row in data.proposals.values():
+        if row.get("active") != store.TRUE or row.get("claim_id") not in others:
+            continue
+        pid = row.get("proposal_id")
+        if pid and (pid not in proposals or (row.get("updated_at") or "")
+                    > (proposals[pid].get("updated_at") or "")):
+            proposals[pid] = row
+    by_you = sorted((entry(c) for c in added), key=lambda e: e["label"].lower())
+    by_you += sorted(({"id": pid, "label": row.get("name", ""),
+                       "family": row.get("family", ""), "proposal": row}
+                      for pid, row in proposals.items()),
+                     key=lambda e: e["label"].lower())
+    return by_brain, by_you
 
 
 # ------------------------------------------------------------ restatements

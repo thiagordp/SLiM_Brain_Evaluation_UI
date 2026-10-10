@@ -449,6 +449,27 @@ def _admin_progress() -> None:
                              r["evaluator"]))
     st.dataframe(pd.DataFrame(rows), width="stretch", hide_index=True)
 
+    st.markdown("**Activity**")
+    st.caption("Started papers only: items answered and an estimate of the time spent, "
+               "from save times. Active time is a lower bound — a pause of more than "
+               f"{analysis.ACTIVITY_BREAK_SECONDS // 60} minutes counts as a break, and "
+               "reading without saving is not seen. Completion counts only; no answer "
+               "is shown.")
+    if st.button("Show activity", key="show_activity"):
+        table = analysis.activity(data, analysis.read_raw())
+        if not table:
+            st.info("No paper has been started yet.")
+        else:
+            st.dataframe(pd.DataFrame([{
+                "phase": r["phase_id"], "evaluator": r["evaluator_name"],
+                "paper": r["source_id"], "status": r["status"],
+                "items": f"{r['items_done']}/{r['items_total']} ({r['percent_done']}%)",
+                "claims": f"{r['claims_done']}/{r['claims_total']}",
+                "elapsed (min)": r["elapsed_minutes"], "active (min)": r["active_minutes"],
+                "sessions": r["sessions"], "s/item": r["seconds_per_item"],
+                "last answer": r["last_answer_at"][:16].replace("T", " "),
+            } for r in table]), width="stretch", hide_index=True)
+
 
 def _admin_assignments() -> None:
     locked = manifest.active_assignment_keys(store.all_reviews())
@@ -499,7 +520,7 @@ EXPORTS = "_admin_exports"
 
 def _prepare_exports() -> None:
     """Read the workbook once and build every download from that one read."""
-    tables = analysis.export_tables()
+    tables = analysis.export_tables(brain())
     st.session_state[EXPORTS] = {
         "xlsx": analysis.export_xlsx(tables),
         "csv": {name: (len(rows), pd.DataFrame(rows).to_csv(index=False).encode("utf-8"))

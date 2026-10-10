@@ -26,9 +26,11 @@ and each question's kappa pools those pairwise comparisons.
 from __future__ import annotations
 
 import collections
+import datetime as dt
 import io
 import itertools
 
+import progress
 import sheets
 import spec
 import store
@@ -38,7 +40,8 @@ REVIEW_COLUMNS = ("round_id", "eval_spec_version", "definitions_id",
                   "split_id", "source_id", "status")
 
 
-def _raw() -> dict[str, list[dict]]:
+def read_raw() -> dict[str, list[dict]]:
+    """Every round tab, in one batched read."""
     book = store.workbook()
     return dict(zip(sheets.ALL_TABS, book.read_ranges(
         [(tab, None, None) for tab in sheets.ALL_TABS])))
@@ -266,13 +269,89 @@ def export_xlsx(tables: dict[str, list[dict]]) -> bytes:
     return buffer.getvalue()
 
 
-def export_tables() -> dict[str, list[dict]]:
-    """Everything the administrator downloads: raw tabs, normalised, agreement."""
-    raw = _raw()
+# --------------------------------------------------------------- activity
+#: A pause longer than this between two saves counts as a break, not work.
+ACTIVITY_BREAK_SECONDS = 600
+_ANSWER_TABS = (sheets.RESPONSES, sheets.CONCEPT_RESPONSES, sheets.RELATION_RESPONSES,
+                sheets.MISSING_CONCEPTS, sheets.PROPOSED_CONCEPTS, sheets.RESTATEMENTS)
+
+
+def _when(text: str):
+    try:
+        return dt.datetime.fromisoformat(text) if text else None
+    except ValueError:
+        return None
+
+
+def activity(brain, raw: dict[str, list[dict]]) -> list[dict]:
+    """Per started review: how much is answered, and an estimate of time spent.
+
+    Items are the app's own completion units. Time comes from save stamps: a row
+    keeps only its latest save, so re-edits hide earlier activity and
+    ``active_minutes`` is a lower bound. Gaps longer than
+    `ACTIVITY_BREAK_SECONDS` count as breaks; reading without saving is not
+    seen. Completion counts only — no answer content.
+    """
+    stamps: dict[str, list] = collections.defaultdict(list)
+    for tab in _ANSWER_TABS:
+        for row in raw.get(tab, []):
+            when = _when(row.get("updated_at", ""))
+            if when and row.get("review_id"):
+                stamps[row["review_id"]].append(when)
+    out = []
+    for review in raw[sheets.REVIEWS]:
+        if review.get("status") in ("", store.STATUS_NOT_STARTED):
+            continue
+        rid, source = review["review_id"], review.get("source_id", "")
+        if source not in brain.sources:
+            continue
+        data = store.review_data(rid, raw)
+        items = progress.all_items(brain, source, data)
+        done = sum(1 for i in items if progress.item_complete(i, data))
+        claims = brain.claims_of(source)
+        claims_done = sum(1 for c in claims
+                          if progress.claim_complete(brain, source, c["id"], data))
+        saves = sorted(stamps.get(rid, []))
+        started = _when(review.get("started_at", ""))
+        events = ([started] if started else []) + saves
+        active, sessions = 0.0, 1 if events else 0
+        for earlier, later in zip(events, events[1:]):
+            gap = (later - earlier).total_seconds()
+            if gap <= ACTIVITY_BREAK_SECONDS:
+                active += max(gap, 0.0)
+            else:
+                sessions += 1
+        elapsed = (saves[-1] - started).total_seconds() if saves and started else 0.0
+        out.append({
+            "phase_id": review.get("phase_id", ""), "pair_id": review.get("pair_id", ""),
+            "evaluator_id": review.get("evaluator_id", ""),
+            "evaluator_name": review.get("evaluator_name", ""), "source_id": source,
+            "status": review.get("status", ""),
+            "items_done": done, "items_total": len(items),
+            "percent_done": round(100 * done / len(items)) if items else 0,
+            "claims_done": claims_done, "claims_total": len(claims),
+            "rows_saved": len(saves),
+            "started_at": review.get("started_at", ""),
+            "last_answer_at": saves[-1].isoformat() if saves else "",
+            "elapsed_minutes": round(elapsed / 60, 1),
+            "active_minutes": round(active / 60, 1),
+            "sessions": sessions,
+            "seconds_per_item": round(active / done, 1) if done else "",
+        })
+    out.sort(key=lambda r: (r["phase_id"], r["evaluator_name"], r["source_id"]))
+    return out
+
+
+def export_tables(brain=None) -> dict[str, list[dict]]:
+    """Everything the administrator downloads: raw tabs, normalised, agreement,
+    and evaluator activity (when the Brain is given)."""
+    raw = read_raw()
     tables = {f"raw_{tab.lower()}": rows for tab, rows in raw.items()}
     tables.update(normalised(raw))
     paired, metrics = agreement(raw)
     tables["agreement_pairs"] = paired
     tables["agreement_metrics"] = metrics
+    if brain is not None:
+        tables["activity"] = activity(brain, raw)
     return tables
 

@@ -82,7 +82,12 @@ it). Evaluators never see an internal identifier.
   Concepts are excluded. A separate *Selected missing Concepts* area lists each
   choice with its × on the right. There is an explicit "No additional Concepts
   are missing", and a new Concept can be proposed (name, family, optional
-  reason). Directly above the proposal form: "Propose a new Concept only when no
+  reason). Above the browser, *Concepts used in this paper* gives one-click
+  shortcuts: the Concepts the Brain assigned to the paper's other Claims, and
+  the Concepts and proposals this evaluator added on other Claims, shown as
+  the name with its family (or "New proposal") in gray below it. A click goes through the same Add or
+  proposal path, without the earlier proposal's reason. What the Claim already
+  has stays listed but disabled. Directly above the proposal form: "Propose a new Concept only when no
   existing Concept can represent this Claim without bending it." A proposal is stored with the evaluation and never creates a Brain
   Concept.
 - **Relations**: only SUPPORTS, ATTACKS and SAME_AS between Claims. Each graph
