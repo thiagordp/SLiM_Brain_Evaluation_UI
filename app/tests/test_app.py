@@ -294,10 +294,10 @@ def test_spec_wording_and_semantics():
           and not spec.problem(spec.RESTATEMENTS, "none"),
           "spec: Restatements are stored as none / present and shown as No / Yes")
     check([q.key for q in spec.relation_questions()]
-          == ["REL_GROUNDING", "REL_DIRECTION", "REL_TYPE"],
-          "spec: Relations ask Grounding, Direction, Relation type in that order")
+          == ["REL_TYPE", "REL_GROUNDING", "REL_DIRECTION"],
+          "spec: Relations ask Relation type first, then Grounding and Direction")
     check([q.key for q in spec.relation_questions({"type": "SAME_AS"})]
-          == ["REL_GROUNDING", "REL_TYPE"]
+          == ["REL_TYPE", "REL_GROUNDING"]
           and len(spec.relation_questions({"type": "SUPPORTS"})) == 3
           and len(spec.relation_questions({"type": "ATTACKS"})) == 3,
           "spec: Direction is asked for SUPPORTS and ATTACKS, never SAME_AS")
@@ -615,7 +615,7 @@ def test_progress_rules():
         keys = [i.question.key for i in progress.claim_items(
             BRAIN, relation["from_source"], relation["from"])
                 if i.object_id == relation["key"]]
-        check(keys == ["REL_GROUNDING", "REL_TYPE"],
+        check(keys == ["REL_TYPE", "REL_GROUNDING"],
               "progress: a SAME_AS relation has no Direction item")
     check(progress.dataset_items(BRAIN, "SRC-0003") == [],
           "progress: no Dataset question for a Source without Datasets")
@@ -1815,6 +1815,331 @@ def test_ui_relation_direction():
         check(not any(r["relation_key"] == relation["key"] and r["question_key"] == "REL_DIRECTION"
                       for r in tables["relation_judgments"]),
               "ui: no Direction row is exported for SAME_AS")
+
+
+# ================================================================== gating
+def _set_stored(review: str, responses=None, relations=None) -> None:
+    """Write answers straight through the store, as an earlier session would
+    have: responses {(question_key, object_id): answer}, relations {key: fields}."""
+    data = store.load_review(review)
+    records = []
+    for (question_key, object_id), answer in (responses or {}).items():
+        row = data.response(question_key, object_id)
+        records.append({"tab": sheets.RESPONSES, "key": row["response_key"],
+                        "values": {**row, "answer": answer}, "rid": review})
+    for key, fields in (relations or {}).items():
+        row = data.relation(key)
+        records.append({"tab": sheets.RELATION_RESPONSES, "key": row["response_key"],
+                        "values": {**row, **fields}, "rid": review})
+    store.save_many(records)
+
+
+def _gated(relation: dict) -> list[str]:
+    return [q.key for q in spec.relation_questions(relation) if spec.gate_of(q)]
+
+
+CLAIM_DEPENDENTS = [q.key for q in spec.claim_scalar_questions(spec.PART_CLAIM)
+                    + spec.claim_scalar_questions(spec.PART_FIELDS)
+                    if q is not spec.CLAIM_GATE]
+
+
+def test_gating_rules():
+    check(spec.GATES == {"CLAIM_Q02_CENTRAL_THESIS": tuple(CLAIM_DEPENDENTS),
+                         "REL_TYPE": ("REL_GROUNDING", "REL_DIRECTION")}
+          and len(CLAIM_DEPENDENTS) == 9,
+          "gating: Q02 gates Q03–Q11; Relation type gates Grounding and Direction")
+    check(not any(k.startswith(("CLAIM_Q12", "CLAIM_Q13", "CLAIM_Q14", "REL_"))
+                  for k in CLAIM_DEPENDENTS),
+          "gating: the Claim gate does not reach Concepts or Relations")
+    check(spec.CLAIM_GATE.definitions[0] == "claim.node"
+          and "central thesis or hypothesis that a paper advances"
+          in spec.definition("claim.node")["text"],
+          "gating: the Claim gate is the question carrying the Claim definition")
+    check(spec.NOT_APPLICABLE == "Not applicable"
+          and not any(spec.NOT_APPLICABLE in q.options for q in spec.QUESTIONS),
+          "gating: Not applicable is a label, never an answer option")
+    check(spec.GATING_POLICY == "Evaluation 4.1 — October 7, 2026 calibration gating"
+          and spec.EVAL_SPEC_VERSION == "4.1",
+          "gating: the policy is named and the instrument version is unchanged")
+
+    phase, source, index, relation = _hosting(("SUPPORTS", "ATTACKS"))
+    cid, key = relation["from"], relation["key"]
+    fresh_round()
+    review = rid(phase, EVALUATOR, source)
+    start(review)
+    answer_everything(review, source)
+    data = store.load_review(review)
+    full = progress.counts(BRAIN, source, data)["items"]
+    check(not progress.missing_items(BRAIN, source, data), "gating: the review starts complete")
+
+    # Relation type No: Grounding and Direction are skipped, their answers kept.
+    data.relations[key] = {**data.relations[key], "type_answer": spec.NO}
+    asked = [i.question.key for i in progress.claim_items(BRAIN, source, cid, data)
+             if i.object_id == key]
+    check(asked == ["REL_TYPE"], "gating: Relation type No leaves only Relation type")
+    check(progress.counts(BRAIN, source, data)["items"] == full - 2
+          and not progress.missing_items(BRAIN, source, data),
+          "gating: a relation with Type No is complete; totals drop by the skipped two")
+    check(data.relation(key)["grounding_answer"] == spec.YES
+          and data.relation(key)["direction_answer"] == spec.YES,
+          "gating: the skipped answers stay stored")
+    check(progress.counts(BRAIN, source, data)["items"]
+          == len(progress.all_items(BRAIN, source, data))
+          and len(progress.all_items(BRAIN, source, data, everything=True)) > full - 2,
+          "gating: the workbook layout (everything=True) still holds every item")
+    # Back to Yes: they apply again, and an empty one is unanswered, not skipped.
+    data.relations[key] = {**data.relations[key], "type_answer": spec.YES,
+                           "grounding_answer": ""}
+    reasons = [(m.what, m.reason) for m in progress.missing_items(BRAIN, source, data)]
+    check(reasons == [("Grounding", "unanswered")]
+          and progress.counts(BRAIN, source, data)["items"] == full,
+          "gating: Type Yes again asks Grounding and Direction; an empty one is unanswered")
+
+    # Claim gate No: Q03–Q11 skipped; Concepts and Relations still asked.
+    data = store.load_review(review)
+    data.responses[store.response_lookup(spec.CLAIM_GATE.key, cid)] = {
+        **data.response(spec.CLAIM_GATE.key, cid), "answer": spec.NO}
+    asked = {i.question.key for i in progress.claim_items(BRAIN, source, cid, data)}
+    check(not asked & set(CLAIM_DEPENDENTS) and spec.CLAIM_GATE.key in asked
+          and {"CLAIM_Q12_CONCEPT", "CLAIM_Q14_MISSING_CONCEPTS", "REL_TYPE"} <= asked,
+          "gating: Claim gate No skips Q03–Q11 only")
+    parts = {p: (done, total) for p, done, total, _ in
+             progress.claim_parts(BRAIN, source, cid, data)}
+    check(parts[spec.PART_FIELDS] == (0, 0) and parts[spec.PART_CLAIM] == (1, 1)
+          and progress.counts(BRAIN, source, data)["items"] == full - 9,
+          "gating: part counts and totals exclude the skipped Claim questions")
+    check(data.response("CLAIM_Q03_MODALITY", cid)["answer"] == spec.YES,
+          "gating: skipped Claim answers stay stored")
+    concept = BRAIN.concepts_of_claim(cid)[0]
+    data.concepts[store.concept_lookup(spec.Q12.key, cid, concept)]["answer"] = ""
+    check([m.what for m in progress.missing_items(BRAIN, source, data)]
+          == [spec.Q12.title], "gating: Concepts of a rejected Claim are still required")
+
+
+def test_gating_analysis():
+    fresh_round()
+    group = sorted(a["evaluator_id"] for a in ASSIGNMENTS
+                   if a["phase_id"] == "agreement" and a["source_id"] == AGR_SOURCE)
+    for evaluator in group:
+        review = rid("agreement", evaluator, AGR_SOURCE)
+        start(review)
+        answer_everything(review, AGR_SOURCE)
+    claims = [c["id"] for c in BRAIN.claims_of(AGR_SOURCE)]
+    relations = [r for c in claims for r in BRAIN.relations_from_claim(c)]
+    relation = relations[0]
+    gated = _gated(relation)
+    review = rid("agreement", EVALUATOR, AGR_SOURCE)
+    _set_stored(review,
+                responses={(spec.CLAIM_GATE.key, claims[0]): spec.NO,
+                           ("CLAIM_Q03_MODALITY", claims[1]): ""},
+                relations={relation["key"]: {"type_answer": spec.NO}})
+    tables = analysis.export_tables()
+
+    def claim_row(question_key, claim_id, evaluator=EVALUATOR):
+        return next(r for r in tables["claim_judgments"] if r["question_key"] == question_key
+                    and r["object_id"] == claim_id and r["evaluator_id"] == evaluator)
+
+    skipped = claim_row("CLAIM_Q03_MODALITY", claims[0])
+    check(skipped["status"] == "skipped" and skipped["applicable"] == store.FALSE
+          and skipped["effective_answer"] == spec.NOT_APPLICABLE
+          and skipped["answer"] == spec.NOT_APPLICABLE
+          and skipped["stored_answer"] == spec.YES and skipped["flags_problem"] == ""
+          and skipped["gating_policy"] == spec.GATING_POLICY,
+          "export: a skipped judgment reads Not applicable and keeps the stored answer")
+    unanswered = claim_row("CLAIM_Q03_MODALITY", claims[1])
+    check(unanswered["status"] == "unanswered" and unanswered["applicable"] == store.TRUE
+          and unanswered["effective_answer"] == "" and unanswered["answer"] == "",
+          "export: unanswered is distinct from skipped (empty, not Not applicable)")
+    answered = claim_row("CLAIM_Q03_MODALITY", claims[2])
+    check(answered["effective_answer"] == answered["stored_answer"] == spec.YES
+          and answered["status"] == "answered",
+          "export: an applicable answer is its stored answer")
+    gate = claim_row(spec.CLAIM_GATE.key, claims[0])
+    check(gate["status"] == "answered" and gate["answer"] == spec.NO
+          and gate["flags_problem"] is True and gate["applicable"] == store.TRUE,
+          "export: the gate itself is an ordinary judgment")
+    rel = {r["question_key"]: r for r in tables["relation_judgments"]
+           if r["relation_key"] == relation["key"] and r["evaluator_id"] == EVALUATOR}
+    check(all(rel[k]["status"] == "skipped" and rel[k]["stored_answer"] == spec.YES
+              and rel[k]["effective_answer"] == spec.NOT_APPLICABLE for k in gated)
+          and rel["REL_TYPE"]["status"] == "answered" and rel["REL_TYPE"]["answer"] == spec.NO,
+          "export: Grounding and Direction under Type No are skipped, stored answers kept")
+    check(any(r["question_key"] == "CLAIM_Q03_MODALITY" and r["object_id"] == claims[0]
+              and r["review_id"] == review and r["answer"] == spec.YES
+              for r in tables["raw_responses"]),
+          "export: the raw tab keeps the historical answer as stored")
+
+    n = len(group)
+    pairs = lambda k: k * (k - 1) // 2
+    metrics = {m["question_key"]: m for m in tables["agreement_metrics"]}
+    q03 = metrics["CLAIM_Q03_MODALITY"]
+    check(q03["eligible_pairs"] == (len(claims) - 2) * pairs(n) + 2 * pairs(n - 1)
+          and q03["units"] == q03["eligible_pairs"]
+          and q03["excluded_skipped_pairs"] == n - 1,
+          "agreement: skipped observations form no pair, and the loss is reported")
+    q02 = metrics[spec.CLAIM_GATE.key]
+    check(q02["eligible_pairs"] == len(claims) * pairs(n) and q02["excluded_skipped_pairs"] == 0,
+          "agreement: the gate keeps every evaluator pair")
+    grounding = metrics["REL_GROUNDING"]
+    check(grounding["eligible_pairs"] == (len(relations) - 1) * pairs(n) + pairs(n - 1)
+          and grounding["excluded_skipped_pairs"] == n - 1
+          and grounding["gating_policy"] == spec.GATING_POLICY,
+          "agreement: Grounding pairs drop by those with a skipping evaluator")
+    check(not any(r["question_key"] == "CLAIM_Q03_MODALITY" and r["unit_id"] == claims[0]
+                  and EVALUATOR in (r["evaluator_a"], r["evaluator_b"])
+                  for r in tables["agreement_pairs"]),
+          "agreement: no pair row involves a skipped observation")
+
+
+def test_training_extract_marks_skipped():
+    sys.path.insert(0, str(APP / "tools" / "training_report"))
+    import extract
+
+    key, cid = "REL-test", "CLM-test"
+    item = progress.Item(spec.BY_KEY["REL_GROUNDING"], "SRC-test", key, cid)
+    raters = {}
+    for name, fields in (("A", {"type_answer": spec.NO, "grounding_answer": spec.YES,
+                                "grounding_comment": "old"}),
+                         ("B", {"type_answer": spec.YES, "grounding_answer": spec.NO}),
+                         ("C", {"type_answer": spec.YES, "grounding_answer": ""})):
+        data = store.ReviewData()
+        data.relations[key] = fields
+        raters[name] = data
+    answers, comments, skipped = extract.rater_answers(item, raters)
+    check(answers == {"A": "", "B": spec.NO, "C": ""} and skipped == ["A"]
+          and comments["A"] == "",
+          "training report: a skipped answer is listed as skipped, not as an answer")
+    check("C" not in skipped and answers["C"] == "",
+          "training report: unanswered stays distinguishable from skipped")
+    gate = progress.Item(spec.RELATION_GATE, "SRC-test", key, cid)
+    answers, _, skipped = extract.rater_answers(gate, raters)
+    check(answers["A"] == spec.NO and not skipped,
+          "training report: the gate itself is an ordinary answer")
+
+
+def test_ui_gating():
+    import views
+
+    phase, source, index, relation = _hosting(("SUPPORTS", "ATTACKS"))
+    cid, rkey = relation["from"], relation["key"]
+    book = fresh_round()
+    review = rid(phase, EVALUATOR, source)
+    start(review)
+    at = _app()
+    _login(at)
+    _open_claim(at, phase, source, index)
+    base = f"w|{review}"
+    check(not any(spec.NOT_APPLICABLE in r.options for r in at.radio),
+          "ui: no control offers Not applicable")
+    rel = {q: f"{base}|{q}|{rkey}|a" for q in ("REL_TYPE", "REL_GROUNDING", "REL_DIRECTION")}
+    order = [r.key for r in at.radio]
+    check(order.index(rel["REL_TYPE"]) < order.index(rel["REL_GROUNDING"])
+          < order.index(rel["REL_DIRECTION"]),
+          "ui: Relation type is asked before Grounding and Direction")
+
+    at.radio(key=rel["REL_GROUNDING"]).set_value(spec.YES)
+    at.run()
+    at.radio(key=rel["REL_TYPE"]).set_value(spec.NO)
+    at.run()
+    keys = {r.key for r in at.radio}
+    captions = "\n".join(c.value for c in at.caption)
+    check(rel["REL_GROUNDING"] not in keys and rel["REL_DIRECTION"] not in keys
+          and views.RELATION_GATE_NOTE in captions,
+          "ui: Type No hides Grounding and Direction, with a one-line note")
+    check(any(t.key == f"{base}|REL_TYPE|{rkey}|c" for t in at.text_area),
+          "ui: Type No keeps its comment")
+    at.radio(key=rel["REL_TYPE"]).set_value(spec.YES)
+    at.run()
+    check(at.radio(key=rel["REL_GROUNDING"]).value == spec.YES
+          and at.radio(key=rel["REL_DIRECTION"]).value is None,
+          "ui: Type Yes again restores Grounding with its saved answer")
+
+    q02, q03 = f"{base}|CLAIM_Q02_CENTRAL_THESIS|{cid}|a", f"{base}|CLAIM_Q03_MODALITY|{cid}|a"
+    at.radio(key=q03).set_value(spec.YES)
+    at.run()
+    at.radio(key=q02).set_value(spec.NO)
+    at.run()
+    keys = {r.key for r in at.radio}
+    check(not any(f"{base}|{k}|{cid}|a" in keys for k in CLAIM_DEPENDENTS)
+          and views.CLAIM_GATE_NOTE in "\n".join(c.value for c in at.caption),
+          "ui: Claim gate No hides Q03–Q11")
+    check(any(f"|CLAIM_Q12_CONCEPT|{cid}|" in k for k in keys) and rel["REL_TYPE"] in keys,
+          "ui: Concepts and Relations are still asked under Claim gate No")
+    claims = BRAIN.claims_of(source)
+    if index + 1 < len(claims):
+        at.button(key="next_claim").click()
+        at.run()
+        at.button(key="prev_claim").click()
+        at.run()
+        check(q03 not in {r.key for r in at.radio} and at.radio(key=q02).value == spec.NO,
+              "ui: moving to another Claim and back keeps the gated state")
+    at.radio(key=q02).set_value(spec.YES)
+    at.run()
+    check(at.radio(key=q03).value == spec.YES, "ui: Claim gate Yes again restores Q03")
+
+    at.radio(key=q02).set_value(spec.NO)
+    at.run()
+    at.radio(key=rel["REL_TYPE"]).set_value(spec.NO)
+    at.run()
+    _flush(at)
+    stored = store.load_review(review)
+    check(stored.response("CLAIM_Q03_MODALITY", cid)["answer"] == spec.YES
+          and stored.relation(rkey)["grounding_answer"] == spec.YES,
+          "ui: answers to skipped questions remain in the workbook")
+    check(not any(spec.NOT_APPLICABLE in row for rows in book.tabs.values() for row in rows),
+          "ui: Not applicable is never stored")
+    check(not [m for m in progress.missing_items(BRAIN, source, stored)
+               if m.where.startswith(cid) and m.what in
+               ("Grounding", "Direction", "Strength and modality")],
+          "ui: skipped questions are not missing items")
+    at.button(key="nav|review").click()
+    at.run()
+    page = _markdown(at)
+    check(f"Strength and modality: {views.NOT_APPLICABLE}" in page
+          and f"Grounding · " in page and views.NOT_APPLICABLE in page.split("Grounding · ", 1)[1]
+          .split("\n", 1)[0] and "Skipped" not in page,
+          "ui: Review shows skipped questions as Not applicable")
+
+
+def test_ui_submitted_review_under_gates():
+    fresh_round()
+    sources = manifest.assigned_source_ids("thiago", "training")
+    phase, source, index, relation = next(
+        ("training", s, i, r) for s in sources
+        for i, c in enumerate(BRAIN.claims_of(s))
+        for r in BRAIN.relations_from_claim(c["id"]) if r["type"] in ("SUPPORTS", "ATTACKS"))
+    cid = relation["from"]
+    for s in sources:
+        review = rid("training", "thiago", s)
+        start(review)
+        answer_everything(review, s)
+    review = rid("training", "thiago", source)
+    # Historic answers: every dependent answered, then the gates answered No.
+    _set_stored(review, responses={(spec.CLAIM_GATE.key, cid): spec.NO},
+                relations={relation["key"]: {"type_answer": spec.NO}})
+    for s in sources:
+        store.mark_complete(rid("training", "thiago", s))
+    before = store.load_review(review)
+    check(not progress.missing_items(BRAIN, source, before),
+          "gating: a completed review with historic dependent answers stays complete")
+    at = _app()
+    _login(at)
+    at.sidebar.radio[0].set_value("Training")
+    at.run()
+    at.checkbox(key="confirm_batch|training").check()
+    at.run()
+    [b for b in at.button if b.label == "Submit all papers"][0].click()
+    at.run()
+    check(store.get_review(review)["status"] == "submitted",
+          "gating: the review can be submitted as before")
+    _open_claim(at, "training", source, index)
+    check(all(r.disabled for r in _questions(at))
+          and f"w|{review}|CLAIM_Q03_MODALITY|{cid}|a" not in {r.key for r in at.radio},
+          "gating: a submitted review stays read-only and shows the gates")
+    after = store.load_review(review)
+    check(after.response("CLAIM_Q03_MODALITY", cid) == before.response("CLAIM_Q03_MODALITY", cid)
+          and after.relation(relation["key"]) == before.relation(relation["key"]),
+          "gating: viewing under the new rules changes nothing stored")
 
 
 def test_ui_restatements():

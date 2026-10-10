@@ -315,11 +315,25 @@ def claim_evaluation(ctx: Ctx, claim: dict) -> None:
     anchors = claim.get("anchors") or []
     ui.definitions((), calibration=("claim.general",))
     for question in spec.claim_scalar_questions(spec.PART_CLAIM):
+        if progress.skipped(question, cid, ctx.data):
+            continue
         with st.container(border=True):
             if question.key in ("CLAIM_Q03_MODALITY", "CLAIM_Q05_GROUNDING"):
                 scalar_question(ctx, question, cid, before=lambda: _anchors(anchors))
             else:
                 scalar_question(ctx, question, cid)
+    _claim_gate_note(ctx, cid, spec.PART_CLAIM)
+
+
+#: Shown where gated questions are left out. Their stored answers are kept.
+CLAIM_GATE_NOTE = "Not asked: this statement was judged not to be a Claim."
+RELATION_GATE_NOTE = ("Grounding and Direction are not asked when the Relation type "
+                      "is not correct.")
+
+
+def _claim_gate_note(ctx: Ctx, cid: str, part: str) -> None:
+    if any(progress.skipped(q, cid, ctx.data) for q in spec.claim_scalar_questions(part)):
+        st.caption(CLAIM_GATE_NOTE)
 
 
 def _anchors(anchors) -> None:
@@ -329,7 +343,10 @@ def _anchors(anchors) -> None:
 
 
 def schema_fields(ctx: Ctx, claim: dict) -> None:
+    _claim_gate_note(ctx, claim["id"], spec.PART_FIELDS)
     for question in spec.claim_scalar_questions(spec.PART_FIELDS):
+        if progress.skipped(question, claim["id"], ctx.data):
+            continue
         value = claim.get(question.field)
         field_question(ctx, question, claim["id"], value,
                        ui.display_value(question.field, value))
@@ -607,8 +624,13 @@ def relations_part(ctx: Ctx, claim: dict) -> None:
         with st.container(border=True):
             _relation_card(ctx, relation, cid, n)
             record = ctx.data.relation(relation["key"])
-            # Independent judgments: none disables, answers or clears another.
+            # Relation type first. Its No leaves Grounding and Direction out
+            # (spec.GATES); otherwise no judgment answers or clears another.
+            gated = False
             for question in spec.relation_questions(relation):
+                if progress.skipped(question, relation["key"], ctx.data):
+                    gated = True
+                    continue
                 st.markdown(f"##### {question.title}")
                 if question is spec.DIRECTION:
                     ui.value_line("Assigned direction",
@@ -629,6 +651,8 @@ def relations_part(ctx: Ctx, claim: dict) -> None:
                 _comment_box(ctx, question, answer or "", record.get(comment_field, ""),
                              key + "|c", _relation_changed,
                              (ctx, relation["key"], key + "|c", comment_field))
+            if gated:
+                st.caption(RELATION_GATE_NOTE)
     if incoming:
         with st.expander(f"Relations ending at this Claim, evaluated in another "
                          f"Source's review ({len(incoming)})"):
@@ -974,6 +998,9 @@ def _missing_groups(ctx: Ctx, missing) -> None:
                       args=(ctx, "recall"))
 
 
+NOT_APPLICABLE = f"_{spec.NOT_APPLICABLE}_"
+
+
 def _shown(question: spec.Question, answer: str) -> str:
     if not answer:
         return "_Not answered_"
@@ -997,6 +1024,9 @@ def _review_claims(ctx: Ctx) -> None:
             st.caption(claim.get("statement", ""))
             for question in spec.claim_scalar_questions():
                 if question is spec.Q14:
+                    continue
+                if progress.skipped(question, cid, data):
+                    st.markdown(f"{question.title}: {NOT_APPLICABLE}")
                     continue
                 record = data.response(question.key, cid)
                 text = _shown(question, record.get("answer", ""))
@@ -1024,6 +1054,9 @@ def _review_claims(ctx: Ctx) -> None:
                 label = (f"{spec.value_label(relation['type'])} → {relation['to']} "
                          f"({spec.value_label(relation.get('grounding', ''))})")
                 for question in spec.relation_questions(relation):
+                    if progress.skipped(question, relation["key"], data):
+                        st.markdown(f"{question.title} · {label}: {NOT_APPLICABLE}")
+                        continue
                     st.markdown(
                         f"{question.title} · {label}: " + _with_comment(
                             _shown(question, record.get(f"{question.column}_answer", "")),

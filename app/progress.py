@@ -10,6 +10,9 @@ Items are generated from the Brain record, never from a fixed count:
     per Source    Claim recall, Missing Claims when recall is not "All", and
                   Restatements
 
+A No to a gating question (`spec.GATES`: the Claim definition question, the
+Relation type) leaves out the questions it gates on that Claim or Relation.
+
 There is no Source evaluation, no CITES, no Dataset recall and no Source-level
 Concept completeness. A Source with no Datasets asks no Dataset question; a
 Source with no Claims still asks Claim recall.
@@ -69,7 +72,9 @@ class Item:
 
 
 # ------------------------------------------------------------- generation
-def claim_items(brain, source_id: str, claim_id: str) -> list[Item]:
+def claim_items(brain, source_id: str, claim_id: str, data=None) -> list[Item]:
+    """The Claim's items. Given the review's data, only those still asked: an
+    item whose gate was answered No is left out (see `skipped`)."""
     items = [Item(q, source_id, claim_id, claim_id)
              for q in spec.claim_scalar_questions() if q is not spec.Q14]
     items += [Item(spec.Q12, source_id, concept_id, claim_id)
@@ -80,6 +85,8 @@ def claim_items(brain, source_id: str, claim_id: str) -> list[Item]:
     for relation in brain.relations_from_claim(claim_id):
         items += [Item(q, source_id, relation["key"], claim_id)
                   for q in spec.relation_questions(relation)]
+    if data is not None:
+        items = [i for i in items if not skipped(i.question, i.object_id, data)]
     return items
 
 
@@ -101,7 +108,7 @@ def recall_items(brain, source_id: str, data=None, everything: bool = False) -> 
 def all_items(brain, source_id: str, data, everything: bool = False) -> list[Item]:
     items: list[Item] = []
     for claim in brain.claims_of(source_id):
-        items += claim_items(brain, source_id, claim["id"])
+        items += claim_items(brain, source_id, claim["id"], None if everything else data)
     items += dataset_items(brain, source_id)
     items += recall_items(brain, source_id, data, everything)
     return items
@@ -129,6 +136,16 @@ def comment_of(item: Item, data) -> str:
     if item.question.table == spec.TAB_RELATION_RESPONSES:
         return str(record.get(f"{item.question.column}_comment") or "")
     return str(record.get("comment") or "")
+
+
+def skipped(question: spec.Question, object_id: str, data) -> bool:
+    """Not asked: the question's gate on the same Claim or Relation was answered
+    No (`spec.GATES`). The one applicability rule for rendering, completion,
+    Review and analysis. Stored answers are never touched; a gate answered Yes
+    again makes them apply again."""
+    gate = spec.gate_of(question)
+    return (gate is not None and data is not None
+            and answer_of(Item(gate, "", object_id), data) == spec.NO)
 
 
 def q14_selection(data, claim_id: str) -> tuple[list[dict], list[dict]]:
@@ -295,7 +312,7 @@ def _state(done: int, total: int, started: bool) -> str:
 # ------------------------------------------------------------------ claims
 def claim_parts(brain, source_id: str, claim_id: str, data) -> list[tuple]:
     """(part, done, total, state) for the four parts of a Claim page."""
-    items = claim_items(brain, source_id, claim_id)
+    items = claim_items(brain, source_id, claim_id, data)
     out = []
     for part in spec.CLAIM_PARTS:
         mine = [i for i in items if i.part == part]
@@ -306,7 +323,7 @@ def claim_parts(brain, source_id: str, claim_id: str, data) -> list[tuple]:
 
 
 def claim_progress(brain, source_id: str, claim_id: str, data) -> tuple[int, int]:
-    items = claim_items(brain, source_id, claim_id)
+    items = claim_items(brain, source_id, claim_id, data)
     return sum(1 for i in items if item_complete(i, data)), len(items)
 
 
@@ -318,7 +335,7 @@ def claim_complete(brain, source_id: str, claim_id: str, data) -> bool:
 def claim_states(brain, source_id: str, data) -> dict[str, str]:
     states = {}
     for claim in brain.claims_of(source_id):
-        items = claim_items(brain, source_id, claim["id"])
+        items = claim_items(brain, source_id, claim["id"], data)
         done = sum(1 for i in items if item_complete(i, data))
         states[claim["id"]] = _state(done, len(items),
                                      any(item_started(i, data) for i in items))
@@ -334,7 +351,7 @@ def claims_done(brain, source_id: str, data) -> int:
 def section_items(section: str, brain, source_id: str, data) -> list[Item]:
     if section == "claims":
         return [i for c in brain.claims_of(source_id)
-                for i in claim_items(brain, source_id, c["id"])]
+                for i in claim_items(brain, source_id, c["id"], data)]
     if section == "datasets":
         return dataset_items(brain, source_id)
     if section == "recall":

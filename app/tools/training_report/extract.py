@@ -43,6 +43,22 @@ def split_label(counts: collections.Counter) -> tuple[str, int]:
     return "–".join(str(v) for v in values), sum(values) - values[0]
 
 
+def rater_answers(item, data: dict) -> tuple[dict, dict, list]:
+    """(answers, comments, skipped) for one item, by rater name.
+
+    Under the gating policy (`spec.GATES`) a rater whose gate was answered No
+    has no answer here and is listed in ``skipped``: skipped is never an
+    answer, never missing. Their stored answer stays in the workbook.
+    """
+    skipped = [r for r, d in data.items()
+               if progress.skipped(item.question, item.object_id, d)]
+    answers = {r: "" if r in skipped else progress.answer_of(item, d)
+               for r, d in data.items()}
+    comments = {r: "" if r in skipped else progress.comment_of(item, d).strip()
+                for r, d in data.items()}
+    return answers, comments, skipped
+
+
 def main() -> int:
     out_path = pathlib.Path(sys.argv[1])
     brain = load_brain()
@@ -51,7 +67,7 @@ def main() -> int:
     name = {e["evaluator_id"]: e["name"] for e in raw["EVALUATORS"]}
     status = {(r["source_id"], r["evaluator_id"]): r["status"] for r in raw["REVIEWS"]
               if r["phase_id"] == PHASE}
-    out = {"snapshot": dt.datetime.now(dt.timezone(dt.timedelta(hours=2))).strftime("%Y-%m-%d %H:%M CEST"),
+    out = {"gating_policy": spec.GATING_POLICY, "snapshot": dt.datetime.now(dt.timezone(dt.timedelta(hours=2))).strftime("%Y-%m-%d %H:%M CEST"),
            "raters": [name[r] for r in raters], "papers": {}}
 
     for source in PAPERS:
@@ -73,14 +89,18 @@ def main() -> int:
         }
 
         # ---- single-label items
-        items, missing, not_asked = [], 0, 0
+        items, missing, not_asked, skipped_answers, all_skipped = [], 0, 0, 0, 0
         for item in every:
             q = item.question
             if q.key in SET_VALUED or q.free_text:
                 continue
-            answers = {name[e]: progress.answer_of(item, data[e]) for e in raters}
-            comments = {name[e]: progress.comment_of(item, data[e]).strip() for e in raters}
-            missing += sum(1 for v in answers.values() if not v)
+            answers, comments, skipped = rater_answers(
+                item, {name[e]: data[e] for e in raters})
+            missing += sum(1 for r, v in answers.items() if not v and r not in skipped)
+            skipped_answers += len(skipped)
+            if not any(answers.values()):
+                all_skipped += bool(skipped)
+                continue
             obj = {"kind": q.unit}
             if q.unit == spec.UNIT_CLAIM and q.field:
                 obj["assigned"] = brain.claim(item.claim_id).get(q.field)
@@ -101,7 +121,7 @@ def main() -> int:
             items.append({
                 "key": q.key, "title": q.title, "text": q.text, "section": SECTION[q.part],
                 "claim": item.claim_id or "", "object_id": item.object_id, "object": obj,
-                "answers": answers, "comments": {k: v for k, v in comments.items() if v},
+                "answers": answers, "skipped": skipped, "comments": {k: v for k, v in comments.items() if v},
                 "flags": {k: spec.problem(q, v) for k, v in answers.items() if v},
                 "distribution": dict(given.most_common()), "split": split, "minority": minority,
                 "values": len(given), "unanimous": len(given) == 1,
@@ -156,6 +176,7 @@ def main() -> int:
         out["papers"][source] = {
             "counts": counts, "items": items, "pairs": pairs, "per_question": per_q,
             "missing_answers": missing, "not_asked": not_asked,
+            "skipped_answers": skipped_answers, "items_all_skipped": all_skipped,
             "alpha_defect": alpha, "pos_agreement": pa, "neg_agreement": na,
             "q14": q14, "source_level": source_level,
             "claims": [{"id": c["id"], "statement": c.get("statement", ""),
@@ -170,7 +191,8 @@ def main() -> int:
     out_path.write_text(json.dumps(out, ensure_ascii=False, indent=1), encoding="utf-8")
     for s, p in out["papers"].items():
         print(s, len(p["items"]), "items,", sum(1 for i in p["items"] if not i["unanimous"]), "contested,",
-              "missing", p["missing_answers"], "not asked", p["not_asked"])
+              "missing", p["missing_answers"], "not asked", p["not_asked"],
+              "skipped", p["skipped_answers"])
     return 0
 
 

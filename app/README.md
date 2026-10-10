@@ -96,13 +96,13 @@ it). Evaluators never see an internal identifier.
   context. The card keeps the true From → To direction, marks the current
   Claim, and shows grounding and Note. Grounding has a short Quick guide above
   its question; the create-edges rule itself is under Instructions, word for
-  word. For SUPPORTS and ATTACKS a **Direction** judgment sits between
-  Grounding and Relation type: the assigned arrow ("CLM-a → CLM-b"), "Is the
-  direction of this relation correct?", Yes / No, an optional comment on No, and
-  Instructions with the edge schema's from/to text and the Direction
-  calibration. SAME_AS is treated as symmetric and asks no Direction. Grounding,
-  Direction and Relation type are independent: none disables, answers or clears
-  another.
+  word. **Relation type** is asked first. For SUPPORTS and ATTACKS a
+  **Direction** judgment follows Grounding: the assigned arrow ("CLM-a →
+  CLM-b"), "Is the direction of this relation correct?", Yes / No, an optional
+  comment on No, and Instructions with the edge schema's from/to text and the
+  Direction calibration. SAME_AS is treated as symmetric and asks no Direction.
+  A No to Relation type leaves Grounding and Direction out (see *Gating
+  questions*); otherwise no judgment disables, answers or clears another.
 - **Restatements** (Claim recall, after completeness and Missing Claims): "Are
   any extracted Claims restatements of the same proposition?" No / Yes. On Yes
   the evaluator selects two or more of the Source's Claims and adds them as a
@@ -136,6 +136,27 @@ blocks completion.
 `ordinal4` (recall), `qualitative` and `restatement_groups` (stored `none` /
 `present`, shown No / Yes). Review highlighting, progress and
 analysis read these. Nothing infers correctness from the literal word "Yes".
+
+### Gating questions
+
+Policy **"Evaluation 4.1 — October 7, 2026 calibration gating"**
+(`spec.GATING_POLICY`, from the calibration of 7 October and the emails of
+8–9 October): first judge whether the extracted item is acceptable, then its
+attributes.
+
+- **Claim:** a No to "Central thesis or hypothesis" — the question that shows
+  the schema's Claim definition — leaves out Q3–Q11 for that Claim. Its
+  Concepts and Relations are still asked.
+- **Relation:** a No to Relation type leaves out Grounding and Direction.
+
+`spec.GATES` declares the gates; `progress.skipped` is the one rule that
+rendering, completion, Review and analysis all use. A gated question is hidden,
+not required, and shown as *Not applicable* in Review (a label only: never an
+answer option, never stored; the internal status is `skipped`). **Nothing stored is changed or
+deleted**: answers given before the gate was answered No stay in the workbook
+and apply again if the gate goes back to Yes. Which answers apply is decided
+when they are read, so the same rule covers answers given before the policy.
+The instrument version stays 4.1 (the workbook's ROUND metadata must match it).
 
 ## Definitions shown to evaluators
 
@@ -273,6 +294,16 @@ Admin → Exports gives:
 
   In a group of three, every pair of its members is compared and the metric
   pools those pairwise comparisons.
+
+Under the gating policy, `claim_judgments` and `relation_judgments` carry
+`status` (`answered` / `unanswered` / `skipped`), `applicable`,
+`effective_answer`, `stored_answer` and `gating_policy`. A skipped judgment has
+`effective_answer` (and `answer`) "Not applicable", an empty `flags_problem`
+and never a No; an unanswered one has them empty. Calculations read `status` /
+`applicable`, never the label. The raw tabs keep every answer as stored.
+A skipped observation forms no agreement pair: each `agreement_metrics` row
+reports `eligible_pairs` and `excluded_skipped_pairs`, and gates are ordinary
+items.
 
 Direction is exported as its own row in `relation_judgments` (SUPPORTS and
 ATTACKS only) and, being binary, gets Cohen's κ like Grounding and Type.

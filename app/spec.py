@@ -270,6 +270,14 @@ QUESTIONS: tuple[Question, ...] = (
        text="Are any mapping-relevant Concepts missing from this Claim?",
        options=(), semantics=SET_VALUED),
     # ------------------------------------------------------ Relations
+    # Relation type first: it gates the other two (see GATES).
+    _q(key="REL_TYPE", unit=UNIT_RELATION, part=PART_RELATIONS,
+       title="Relation type",
+       text="Is the Relation type correct for the relationship between these two "
+            "Claims?",
+       options=BINARY, semantics=CORRECTNESS_BINARY, table=TAB_RELATION_RESPONSES,
+       field="type", definitions=("edge.relation_type",),
+       optional_comment_on=(NO,), column="type"),
     _q(key="REL_GROUNDING", unit=UNIT_RELATION, part=PART_RELATIONS,
        title="Grounding",
        text="Is the Grounding value correctly assigned according to the schema "
@@ -284,13 +292,6 @@ QUESTIONS: tuple[Question, ...] = (
        definitions=("edge.from_to", "edge.relation_type"),
        calibration=("relation.direction",), optional_comment_on=(NO,),
        column="direction", relation_types=("SUPPORTS", "ATTACKS")),
-    _q(key="REL_TYPE", unit=UNIT_RELATION, part=PART_RELATIONS,
-       title="Relation type",
-       text="Is the Relation type correct for the relationship between these two "
-            "Claims?",
-       options=BINARY, semantics=CORRECTNESS_BINARY, table=TAB_RELATION_RESPONSES,
-       field="type", definitions=("edge.relation_type",),
-       optional_comment_on=(NO,), column="type"),
     # ------------------------------------------------------- Datasets
     _q(key="DATASET_NODE", unit=UNIT_DATASET, part=PART_DATASET,
        title="Dataset node",
@@ -369,6 +370,34 @@ RECALL = BY_KEY["SOURCE_CLAIM_RECALL"]
 MISSING_CLAIMS = BY_KEY["SOURCE_MISSING_CLAIMS"]
 RESTATEMENTS = BY_KEY["SOURCE_RESTATEMENTS"]
 DIRECTION = BY_KEY["REL_DIRECTION"]
+CLAIM_GATE = BY_KEY["CLAIM_Q02_CENTRAL_THESIS"]
+RELATION_GATE = BY_KEY["REL_TYPE"]
+
+# ------------------------------------------------------------------ gates
+#: The calibration of 7 October 2026 (and the emails of 8–9 October): first
+#: judge whether the extracted item is acceptable, then its attributes. A No to
+#: a gate makes the listed questions on the same Claim or Relation not asked.
+#: Nothing stored is changed: which answers apply is decided when they are read,
+#: by `progress.skipped`, for old and new answers alike. Exports name the policy.
+GATING_POLICY = "Evaluation 4.1 — October 7, 2026 calibration gating"
+#: How a gated (skipped) question is shown in Review and in exports. A label
+#: only: never an answer option and never stored.
+NOT_APPLICABLE = "Not applicable"
+GATES: dict[str, tuple[str, ...]] = {
+    # The Claim definition question gates the Claim's own questions; Concepts
+    # and Relations are not gated by it.
+    CLAIM_GATE.key: tuple(q.key for q in QUESTIONS
+                          if q.unit == UNIT_CLAIM and q.part in (PART_CLAIM, PART_FIELDS)
+                          and q is not CLAIM_GATE),
+    RELATION_GATE.key: ("REL_GROUNDING", "REL_DIRECTION"),
+}
+_GATE_OF = {dependent: BY_KEY[gate] for gate, dependents in GATES.items()
+            for dependent in dependents}
+
+
+def gate_of(question: Question) -> Question | None:
+    """The question whose No makes this one not asked, or None."""
+    return _GATE_OF.get(question.key)
 
 
 # ---------------------------------------------------------------- meaning

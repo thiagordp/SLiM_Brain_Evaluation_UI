@@ -41,11 +41,15 @@ const F = (s, claim, key, obj) => dist(find(s, claim, key, obj));
 const splitCount = (s, label) => contested(s).filter(i => i.split === label).length;
 const unanimousCount = s => items(s).filter(i => i.unanimous).length;
 
+// Under the gating policy a rater may have skipped an item (its gate answered No).
+const skippedBy = (i, r) => (i.skipped || []).includes(r);
+
 // evaluator statistics, both papers
 const ev = Object.fromEntries(R.map(r => [r, { n: 0, flag: 0, com: 0, lone: 0, lonePass: 0, minority: 0, dom: {} }]));
 for (const s of PAPERS) for (const i of items(s)) {
   const top = Math.max(...Object.values(i.distribution));
   for (const r of R) {
+    if (skippedBy(i, r)) continue;   // gated out: neither an answer nor missing
     const v = i.answers[r], e = ev[r];
     e.n++; if (i.flags[r]) e.flag++; if (i.comments[r]) e.com++;
     if (i.distribution[v] < top) { e.minority++; e.dom[i.section] = (e.dom[i.section] || 0) + 1; }
@@ -95,7 +99,7 @@ const add = (...x) => body.push(...x);
 
 // ================================================================== title
 add(new Paragraph({ spacing: { after: 60 }, children: [run("Training-phase calibration report", { size: 36, bold: true, color: "1F3864" })] }));
-add(para([it(`SLiM Brain human evaluation, round ROUND-2026-01, instrument 4.1. Training papers SRC-0006 and SRC-0009, seven evaluators. Data snapshot: ${SNAPSHOT_DATE}.`)]));
+add(para([it(`SLiM Brain human evaluation, round ROUND-2026-01, instrument 4.1. Training papers SRC-0006 and SRC-0009, seven evaluators. Data snapshot: ${SNAPSHOT_DATE}.` + (D.gating_policy ? ` Applicability: ${D.gating_policy}.` : ""))]));
 const TOC_AT = body.length;
 
 const a6 = P("SRC-0006"), a9 = P("SRC-0009");
@@ -270,6 +274,7 @@ for (const r of R) {
   for (const s of PAPERS) {
     per[s] = { n: 0, flag: 0, com: 0 };
     for (const i of items(s)) {
+      if (skippedBy(i, r)) continue;
       const v = i.answers[r], topN = Math.max(...Object.values(i.distribution));
       per[s].n++;
       if (i.flags[r]) { per[s].flag++; flagQ[i.key] = (flagQ[i.key] || 0) + 1; }
@@ -380,7 +385,9 @@ const headRow = () => new TableRow({ tableHeader: true, cantSplit: true,
   children: ["Claim", "Question", "Assigned", ...R].map((t, k) => xcell([p16(t, { bold: true })], WIDTHS[k], HEAD)) });
 // row: {id, section, question, assigned, values: {rater: shown value}, comments: {rater: text}}
 function matrixRow(x) {
-  const n = {}; R.forEach(r => { n[x.values[r]] = (n[x.values[r]] || 0) + 1; });
+  // Not-applicable (skipped) cells are not answers: they neither form a majority nor are highlighted.
+  const skip = r => (x.skipped || []).includes(r);
+  const n = {}; R.filter(r => !skip(r)).forEach(r => { n[x.values[r]] = (n[x.values[r]] || 0) + 1; });
   const topN = Math.max(...Object.values(n));
   const tie = Object.values(n).filter(c => c === topN).length > 1;
   return new TableRow({ cantSplit: true, children: [
@@ -389,7 +396,7 @@ function matrixRow(x) {
     xcell(String(x.assigned || "").split("\n").map(t => p16(t)), WIDTHS[2]),
     ...R.map((r, k) => xcell([p16(x.values[r] || "–", { bold: true }),
       ...(x.comments[r] ? x.comments[r].split(/\s*\n\s*/).filter(Boolean).map(t => p16(t, { size: 15 })) : [])],
-      WIDTHS[3 + k], tie ? YELLOW : (n[x.values[r]] < topN ? ORANGE : undefined))),
+      WIDTHS[3 + k], skip(r) ? undefined : (tie ? YELLOW : (n[x.values[r]] < topN ? ORANGE : undefined)))),
   ] });
 }
 const matrix = rows => new Table({ width: { size: LW, type: WidthType.DXA }, columnWidths: WIDTHS,
@@ -401,7 +408,8 @@ const assignedOf = i => { const o = i.object;
   if (i.section === "Claim evaluation") return "";
   return Array.isArray(o.assigned) ? o.assigned.join(", ") : (o.assigned || "(empty)"); };
 const itemRow = i => ({ id: i.claim || i.object_id, section: i.section, question: i.title, assigned: assignedOf(i),
-  values: Object.fromEntries(R.map(r => [r, LABEL[i.answers[r]] || i.answers[r]])), comments: i.comments });
+  values: Object.fromEntries(R.map(r => [r, skippedBy(i, r) ? "Not applicable" : (LABEL[i.answers[r]] || i.answers[r])])),
+  comments: i.comments, skipped: i.skipped || [] });
 const q14Row = (s, c) => { const e = P(s).q14[c];
   const shown = r => { const x = e[r]; const v = [...x.selected.map(y => y.name), ...x.proposed.map(y => `NEW: ${y.name}`)];
     return v.length ? v.join("\n") : (x.state ? "none" : ""); };

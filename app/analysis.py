@@ -56,9 +56,40 @@ def _with_review(row: dict, reviews: dict, round_meta: dict) -> dict:
     return {**out, **row}
 
 
+#: Effective status of a judgment under the gating policy (`spec.GATES`).
+ANSWERED, UNANSWERED, SKIPPED = "answered", "unanswered", "skipped"
+
+
+def _review_data(raw: dict[str, list[dict]]):
+    """review id -> its `store.ReviewData`, built once each, on demand."""
+    cache: dict = {}
+
+    def get(review_id: str):
+        if review_id not in cache:
+            cache[review_id] = store.review_data(review_id, raw)
+        return cache[review_id]
+    return get
+
+
+def _effective(question: spec.Question, object_id: str, stored: str, data) -> dict:
+    """The answer that counts, beside the one stored. A question its gate left
+    out is `skipped`: shown as "Not applicable", no flag, never a No; `answer`
+    mirrors `effective_answer`. Calculations read `status` / `applicable`, never
+    the label. The stored answer is kept."""
+    if progress.skipped(question, object_id, data):
+        return {"answer": spec.NOT_APPLICABLE, "effective_answer": spec.NOT_APPLICABLE,
+                "flags_problem": "", "stored_answer": stored,
+                "status": SKIPPED, "applicable": store.FALSE,
+                "gating_policy": spec.GATING_POLICY}
+    return {"answer": stored, "effective_answer": stored, "stored_answer": stored,
+            "status": ANSWERED if stored else UNANSWERED, "applicable": store.TRUE,
+            "gating_policy": spec.GATING_POLICY}
+
+
 def normalised(raw: dict[str, list[dict]]) -> dict[str, list[dict]]:
     reviews = {r["review_id"]: r for r in raw[sheets.REVIEWS]}
     meta = {r["key"]: r["value"] for r in raw[sheets.ROUND]}
+    review_data = _review_data(raw)
 
     def question_columns(question: spec.Question, answer: str) -> dict:
         return {"question": question.title, "question_text": question.text,
@@ -75,7 +106,9 @@ def normalised(raw: dict[str, list[dict]]) -> dict[str, list[dict]]:
         if question is spec.Q14:
             q14_state.append(full)
         elif question.unit == spec.UNIT_CLAIM:
-            claim_rows.append(full)
+            claim_rows.append({**full, **_effective(
+                question, row["object_id"], row.get("answer", ""),
+                review_data(row["review_id"]))})
         elif question.unit == spec.UNIT_DATASET:
             dataset_rows.append(full)
         else:
@@ -97,7 +130,9 @@ def normalised(raw: dict[str, list[dict]]) -> dict[str, list[dict]]:
                                 if not k.startswith(judgment_columns)},
                                reviews, meta),
                 **question_columns(question, answer), "question_key": question.key,
-                "answer": answer, "comment": row.get(f"{question.column}_comment", "")})
+                "answer": answer, "comment": row.get(f"{question.column}_comment", ""),
+                **_effective(question, row["relation_key"], answer,
+                             review_data(row["review_id"]))})
 
     missing = [_with_review(r, reviews, meta) for r in
                store.effective(raw[sheets.MISSING_CONCEPTS], "selection_key").values()]
@@ -170,25 +205,44 @@ def agreement(raw: dict[str, list[dict]]) -> tuple[list[dict], list[dict]]:
     reviews = {r["review_id"]: r for r in raw[sheets.REVIEWS]
                if r.get("phase_id") == "agreement"}
     units: dict[tuple, dict[str, str]] = collections.defaultdict(dict)
+    # Evaluators for whom a unit was left out by its gate: no observation.
+    skipped_by: dict[tuple, set[str]] = collections.defaultdict(set)
+    review_data = _review_data(raw)
 
-    def add(review_id: str, question_key: str, unit_id: str, answer: str):
+    def add(review_id: str, question_key: str, unit_id: str, answer: str,
+            object_id: str = ""):
         review = reviews.get(review_id)
-        if review is None or not answer:
+        if review is None:
             return
-        units[(review["pair_id"], review["source_id"], question_key, unit_id)][
-            review["evaluator_id"]] = answer
+        unit = (review["pair_id"], review["source_id"], question_key, unit_id)
+        if object_id and progress.skipped(spec.BY_KEY[question_key], object_id,
+                                          review_data(review_id)):
+            skipped_by[unit].add(review["evaluator_id"])
+            return
+        if answer:
+            units[unit][review["evaluator_id"]] = answer
 
     for row in raw[sheets.RESPONSES]:
         question = spec.BY_KEY.get(row["question_key"])
         if question and _metric_for(question)[0]:
-            add(row["review_id"], question.key, row["object_id"], row.get("answer", ""))
+            add(row["review_id"], question.key, row["object_id"], row.get("answer", ""),
+                row["object_id"])
     for row in raw[sheets.CONCEPT_RESPONSES]:
         add(row["review_id"], row["question_key"],
             f"{row['claim_id']}|{row['concept_id']}", row.get("answer", ""))
     for row in raw[sheets.RELATION_RESPONSES]:
         for question in spec.relation_questions({"type": row.get("relation_type")}):
             add(row["review_id"], question.key, row["relation_key"],
-                row.get(f"{question.column}_answer", ""))
+                row.get(f"{question.column}_answer", ""), row["relation_key"])
+
+    # Pairs lost because one or both evaluators skipped the unit, so a smaller
+    # denominator is visible: pairs among everyone who answered or skipped,
+    # minus the pairs among those who answered.
+    excluded = collections.Counter()
+    for unit, skippers in skipped_by.items():
+        answered = len(units.get(unit, {}))
+        n = answered + len(skippers)
+        excluded[unit[2]] += n * (n - 1) // 2 - answered * (answered - 1) // 2
 
     paired, by_question = [], collections.defaultdict(list)
     for (pair_id, source_id, question_key, unit_id), answers in sorted(units.items()):
@@ -205,18 +259,23 @@ def agreement(raw: dict[str, list[dict]]) -> tuple[list[dict], list[dict]]:
             by_question[question_key].append((ans_a, ans_b))
 
     metrics = []
-    for question_key, pairs in sorted(by_question.items()):
+    for question_key in sorted(set(by_question) | set(excluded)):
         question = spec.BY_KEY[question_key]
         name, categories, weighted = _metric_for(question)
-        pairs = [(a, b) for a, b in pairs if a in categories and b in categories]
-        if not pairs:
+        pairs = [(a, b) for a, b in by_question.get(question_key, [])
+                 if a in categories and b in categories]
+        if not pairs and not excluded[question_key]:
             continue
-        value = weighted_kappa(pairs, categories, weighted=weighted)
+        value = weighted_kappa(pairs, categories, weighted=weighted) if pairs else None
         metrics.append({
             "question_key": question_key, "question": question.title,
             "semantics": question.semantics, "units": len(pairs),
-            "observed_agreement": round(sum(a == b for a, b in pairs) / len(pairs), 4),
+            "eligible_pairs": len(pairs),
+            "excluded_skipped_pairs": excluded[question_key],
+            "observed_agreement": (round(sum(a == b for a, b in pairs) / len(pairs), 4)
+                                   if pairs else ""),
             "metric": name, "value": "" if value is None else round(value, 4),
+            "gating_policy": spec.GATING_POLICY,
         })
     return paired, metrics
 

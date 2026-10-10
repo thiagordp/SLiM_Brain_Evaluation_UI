@@ -27,6 +27,16 @@ The interpretive text (Sections 1, 4–9) names specific items and quotes
 comments through lookups that fail loudly if an item no longer exists. Each
 time the data change, reread that text against the new figures.
 
+**Gating** ("Evaluation 4.1 — October 7, 2026 calibration gating", see
+`app/README.md`): a rater whose gate was answered No has no answer for the
+gated item. The JSON lists them per item in `skipped` and per paper in
+`skipped_answers`. They are not missing answers, and items nobody could answer
+are counted in `items_all_skipped`. Appendix B shows such cells as "Not applicable"
+(a label; the statistics read the `skipped` list, never the text) and the
+per-evaluator statistics leave them out. Sentences such as "there are
+no missing answers" or "every item has seven answers" must be reread after a
+rerun.
+
 **Appendix B** lists every contested item (landscape, one table per Claim):
 - **Above each table:** the Claim statement in a box, then its anchors.
 - **Columns:** one per evaluator; each cell holds the answer and the verbatim comment.
