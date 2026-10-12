@@ -58,3 +58,14 @@ rerun.
 style. Edit the .md, then run:
 
     NODE_PATH=<dir with node_modules/docx> node app/tools/training_report/build_cases.js docs/CALIBRATION_CASES.md docs/CALIBRATION_CASES.docx
+
+**Timelines** (work sessions per evaluator and paper, read-only):
+
+    python app/tools/training_report/timeline.py docs/TRAINING_TIMELINE.md              # Training
+    python app/tools/training_report/timeline.py docs/AGREEMENT_TIMELINE.md agreement    # any other phase
+
+Render the Mermaid chart to SVG/PNG with mermaid-cli. If puppeteer has no
+browser of its own, point it at the system Chrome with a config file
+`{"executablePath": "/usr/bin/google-chrome"}`:
+
+    mmdc -p puppeteer.json -i chart.mmd -o docs/AGREEMENT_TIMELINE.svg --size 1500 -b white

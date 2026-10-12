@@ -1,4 +1,4 @@
-"""Write the Training timeline (Mermaid Gantt + time table) as Markdown.
+"""Write a phase timeline (Mermaid Gantt + time table) as Markdown.
 
 Read-only: reads the save stamps of the round workbook. One bar per work
 session; a pause longer than BREAK starts a new session. Time per paper is the
@@ -7,6 +7,11 @@ within a session, as in analysis.activity(). A row keeps only
 its latest save, so re-edits hide earlier activity (the figures are lower bounds).
 
     python app/tools/training_report/timeline.py docs/TRAINING_TIMELINE.md
+    python app/tools/training_report/timeline.py docs/AGREEMENT_TIMELINE.md agreement
+
+Training (the default) covers its two papers, one column each. Any other phase
+covers every paper of that phase someone has saved answers on, one row per
+evaluator and paper, since each group has its own papers.
 """
 from __future__ import annotations
 
@@ -36,9 +41,12 @@ def hm(seconds: float) -> str:
 
 def main() -> int:
     out = pathlib.Path(sys.argv[1])
+    phase = sys.argv[2] if len(sys.argv) > 2 else PHASE
     raw = analysis.read_raw()
     evaluators = [(e["evaluator_id"], e["name"]) for e in raw[sheets.EVALUATORS]]
-    reviews = {r["review_id"]: r for r in raw[sheets.REVIEWS] if r["phase_id"] == PHASE and r["source_id"] in PAPERS}
+    papers = PAPERS if phase == PHASE else tuple(sorted(
+        {r["source_id"] for r in raw[sheets.REVIEWS] if r["phase_id"] == phase}))
+    reviews = {r["review_id"]: r for r in raw[sheets.REVIEWS] if r["phase_id"] == phase and r["source_id"] in papers}
     stamps = collections.defaultdict(list)
     for tab in analysis._ANSWER_TABS:
         for row in raw.get(tab, []):
@@ -54,7 +62,7 @@ def main() -> int:
     gantt, table, totals, latest = [], [], collections.Counter(), None
     for k, (eid, name) in enumerate(evaluators):
         row = {}
-        for source in PAPERS:
+        for source in papers:
             rid = by.get((eid, source))
             saves = sorted(stamps.get(rid, []))
             if not saves:
@@ -71,30 +79,48 @@ def main() -> int:
             gantt.append(f"    section {name} · {source}")
             for n, (s, e) in enumerate(sessions):
                 minutes = max(MIN_BAR, round((e - s).total_seconds() / 60))
-                gantt.append(f"    ·  :e{k}{source[-2:]}s{n}, {s:%Y-%m-%d %H:%M}, {minutes}m")
+                gantt.append(f"    ·  :e{k}{source[-4:] if phase != PHASE else source[-2:]}s{n}, "
+                             f"{s:%Y-%m-%d %H:%M}, {minutes}m")
             status = reviews[rid].get("status", "")
             row[source] = (active, status)
             totals[source] += active
         if any(row.values()):
             table.append((name, row))
 
+    if latest is None:
+        print("no saved answers in phase", phase)
+        return 1
+    label = phase.capitalize()
     table.sort(key=lambda t: -sum(v[0] for v in t[1].values() if v))
     lines = [
-        "# Training timeline", "",
+        f"# {label} timeline", "",
         f"Snapshot: {latest:%d %B %Y, %H:%M} CEST (latest saved answer).", "",
-        "Work sessions on the Training papers, one line per evaluator and paper, grouped by evaluator. "
+        f"Work sessions on the {label} papers, one line per evaluator and paper, grouped by evaluator. "
         "Times are when answers were saved, in CEST. A pause of more than 10 minutes starts a new bar; "
         "bars are at least 5 minutes long so short sessions stay visible. Re-editing an answer keeps only "
         "its latest save time, and reading without saving is not shown.", "",
         "```mermaid", "---", "displayMode: compact", "---", "gantt",
-        "    title Training — work sessions per evaluator and paper (CEST)",
+        f"    title {label} — work sessions per evaluator and paper (CEST)",
         "    dateFormat YYYY-MM-DD HH:mm", "    axisFormat %d %b %Hh", "    tickInterval 12hour",
         "    todayMarker off", *gantt, "```", "",
         "## Time per evaluator and paper", "",
         "Time between consecutive saved answers within each session (pauses over 10 minutes excluded). "
-        "Empty: no answers saved on that paper.", "",
-        "| Evaluator | " + " | ".join(PAPERS) + " | Total |", "|---|" + "---|" * (len(PAPERS) + 1),
+        + ("Empty: no answers saved on that paper." if phase == PHASE
+           else "Only papers with saved answers are listed."), "",
     ]
+    if phase != PHASE:
+        lines += ["| Evaluator | Paper | Time | Status |", "|---|---|---|---|"]
+        for name, row in table:
+            for source in papers:
+                if row.get(source):
+                    active, status = row[source]
+                    lines.append(f"| {name} | {source} | {hm(active)} | {status.replace('_', ' ')} |")
+        lines.append(f"| **All** | | **{hm(sum(totals.values()))}** | |")
+        out.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        print("wrote", out, "latest save", latest)
+        return 0
+    lines += ["| Evaluator | " + " | ".join(PAPERS) + " | Total |",
+              "|---|" + "---|" * (len(PAPERS) + 1)]
     for name, row in table:
         cells = []
         for source in PAPERS:
