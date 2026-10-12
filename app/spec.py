@@ -171,9 +171,17 @@ GROUNDING_QUICK_GUIDE = (
 CALIBRATION_SOURCE = "calibration meeting (spec 4.1)"
 CALIBRATION: dict[str, tuple[str, ...]] = {
     "claim.general": (
-        "Evaluate this Claim from its statement and anchors.",
-        "Judge the Claim fields from what the anchors support.",
+        "Evaluate this Claim in the context of the paper, not only its statement and anchors.",
+        "Judge the Claim fields from what the paper supports, including reasonable inferences about the author's intended meaning.",
+        "A Claim need not be the paper's main or original thesis. Supporting propositions, including those drawn from prior literature, may also qualify when the paper uses them in its argument.",
+        "For Q04, assess whether the statement can be understood on its own. For Q05, assess the anchors.",
         "Restatements are assessed in Claim recall.",
+    ),
+    "claim.modality": (
+        "Evaluate the Claim's strength and modality against the paper, not only its anchors. Different wording is not necessarily an error if the author's degree of certainty and strength are preserved.",
+    ),
+    "claim.grounding": (
+        "Judge whether the anchors sufficiently ground the Claim, not whether they reproduce it completely. Check the quotations against the source paper and consider the 50-word limit per anchor. Missing bibliographic citations alone do not make the grounding insufficient. Check whether important quoted expressions in the Claim are supported by the anchors.",
     ),
     "claim_object": (
         "Classify what the Claim asserts, not what it merely mentions.",
@@ -189,9 +197,8 @@ CALIBRATION: dict[str, tuple[str, ...]] = {
     "basis": (
         "Abstract means abstract or conceptual considerations. It does not mean the "
         "Abstract section of the paper.",
-        "Literature means that the Claim and its anchors present the point as coming "
-        "from prior literature.",
-        "Judge the Basis from the anchors attached to this Claim.",
+        "Literature means that the paper presents the point as coming from prior literature.",
+        "Judge the Basis in the context of the paper, not only the anchors attached to this Claim.",
     ),
     "claim_jurisdiction": (
         "General: the Claim is explicitly jurisdiction-independent or concerns law in "
@@ -204,6 +211,18 @@ CALIBRATION: dict[str, tuple[str, ...]] = {
     "relation.direction": (
         "Judge whether the arrow runs from the Claim doing the supporting or "
         "attacking to the Claim being supported or attacked.",
+    ),
+    "concept.assignment": (
+        "Accept a Concept if it is a defensible label for what the Claim is about, even if it captures only part of the Claim. Judge its fit to the Claim, not its Concept family. Overlapping Concepts can be reviewed later.",
+    ),
+    "concept.candidate": (
+        "Evaluate whether the candidate Concept is necessary for mapping this Claim, given the existing vocabulary. Correct assignment (Q12) and necessity (Q13) are separate judgments.",
+    ),
+    "concept.missing": (
+        "Focus on clear omissions, especially from the existing vocabulary. You do not need to propose every possible Concept.",
+    ),
+    "relation.type": (
+        "Evaluate whether the extracted relation is correctly classified as SUPPORTS, ATTACKS, or SAME_AS. Answer No if the relation does not hold or its type is incorrect, even when another kind of relationship exists. Judge the type separately from Direction and Grounding. Use the comment field to explain incorrect relations.",
     ),
 }
 
@@ -229,7 +248,8 @@ QUESTIONS: tuple[Question, ...] = (
        title="Strength and modality",
        text="Does the Claim preserve the strength and modality of the source?",
        options=BINARY, semantics=CORRECTNESS_BINARY,
-       definitions=("skill.extract_claims.modality",), optional_comment_on=(NO,),
+       definitions=("skill.extract_claims.modality",), calibration=("claim.modality",),
+       optional_comment_on=(NO,),
        comment_label=COMMENT_LABEL),
     _q(key="CLAIM_Q04_STANDALONE", unit=UNIT_CLAIM, part=PART_CLAIM,
        title="Understood on its own",
@@ -243,7 +263,8 @@ QUESTIONS: tuple[Question, ...] = (
        text="Do the anchors provide sufficient textual grounding for this Claim in "
             "the source?",
        options=TERNARY, semantics=CORRECTNESS_TERNARY,
-       definitions=("claim.anchors",), optional_comment_on=(IN_PART, NO),
+       definitions=("claim.anchors",), calibration=("claim.grounding",),
+       optional_comment_on=(IN_PART, NO),
        comment_label=COMMENT_LABEL),
     # ------------------------------------------------- Schema fields
     *(_q(key=key, unit=UNIT_CLAIM, part=PART_FIELDS, title=label,
@@ -257,18 +278,20 @@ QUESTIONS: tuple[Question, ...] = (
        title="Concept assignment",
        text="Is this Concept correctly assigned to the Claim?",
        options=BINARY, semantics=CORRECTNESS_BINARY, table=TAB_CONCEPT_RESPONSES,
+       calibration=("concept.assignment",),
        optional_comment_on=(NO,), comment_label=COMMENT_LABEL),
     _q(key="CLAIM_Q13_CANDIDATE", unit=UNIT_CLAIM_CANDIDATE, part=PART_CONCEPTS,
        title="Candidate Concept necessary",
        text="Is this candidate Concept necessary for representing this Claim, given "
             "the existing Concept vocabulary?",
        options=BINARY, semantics=CORRECTNESS_BINARY, table=TAB_CONCEPT_RESPONSES,
-       definitions=("concept.status",), optional_comment_on=(NO,),
+       definitions=("concept.status",), calibration=("concept.candidate",),
+       optional_comment_on=(NO,),
        comment_label=COMMENT_LABEL),
     _q(key="CLAIM_Q14_MISSING_CONCEPTS", unit=UNIT_CLAIM, part=PART_CONCEPTS,
        title="Missing Concepts",
        text="Are any mapping-relevant Concepts missing from this Claim?",
-       options=(), semantics=SET_VALUED),
+       options=(), semantics=SET_VALUED, calibration=("concept.missing",)),
     # ------------------------------------------------------ Relations
     # Relation type first: it gates the other two (see GATES).
     _q(key="REL_TYPE", unit=UNIT_RELATION, part=PART_RELATIONS,
@@ -277,7 +300,7 @@ QUESTIONS: tuple[Question, ...] = (
             "Claims?",
        options=BINARY, semantics=CORRECTNESS_BINARY, table=TAB_RELATION_RESPONSES,
        field="type", definitions=("edge.relation_type",),
-       optional_comment_on=(NO,), column="type"),
+       calibration=("relation.type",), optional_comment_on=(NO,), column="type"),
     _q(key="REL_GROUNDING", unit=UNIT_RELATION, part=PART_RELATIONS,
        title="Grounding",
        text="Is the Grounding value correctly assigned according to the schema "

@@ -50,8 +50,11 @@ it). Evaluators never see an internal identifier.
   practical guidance, the block has two separately headed parts: **Schema /
   skill** (the frozen text, unchanged) and **Calibration** (from
   `spec.CALIBRATION`). Calibration appears at the start of Claim evaluation
-  (three lines, Calibration only), under Basis, under Claim jurisdiction and
-  under Relation Direction. It is not schema text: it is kept out of
+  (Calibration only) and under Strength and modality, Textual grounding, Claim
+  object, Basis, Claim jurisdiction, Concept assignment, Candidate Concept and
+  Missing Concepts (once per question, not per Concept), Relation type and
+  Direction; the calibration revision of 11 October replaced the general and
+  Basis notes and added six. It is not schema text: it is kept out of
   `definitions_v4.json` and `definitions_id`, and is recorded in the round's
   DEFINITIONS tab as `calibration.*` with source "calibration meeting (spec
   4.1)". Values and evidence (statement, assigned

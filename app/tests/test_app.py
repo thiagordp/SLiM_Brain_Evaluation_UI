@@ -277,6 +277,58 @@ AGREED = {
 }
 
 
+#: The calibration text approved on 11 October 2026, word for word.
+APPROVED_CALIBRATION = {
+    "claim.general": (
+        "Evaluate this Claim in the context of the paper, not only its statement and anchors.",
+        "Judge the Claim fields from what the paper supports, including reasonable inferences about the author's intended meaning.",
+        "A Claim need not be the paper's main or original thesis. Supporting propositions, including those drawn from prior literature, may also qualify when the paper uses them in its argument.",
+        "For Q04, assess whether the statement can be understood on its own. For Q05, assess the anchors.",
+        "Restatements are assessed in Claim recall.",
+    ),
+    "claim.modality": (
+        "Evaluate the Claim's strength and modality against the paper, not only its anchors. Different wording is not necessarily an error if the author's degree of certainty and strength are preserved.",
+    ),
+    "claim.grounding": (
+        "Judge whether the anchors sufficiently ground the Claim, not whether they reproduce it completely. Check the quotations against the source paper and consider the 50-word limit per anchor. Missing bibliographic citations alone do not make the grounding insufficient. Check whether important quoted expressions in the Claim are supported by the anchors.",
+    ),
+    "basis": (
+        "Abstract means abstract or conceptual considerations. It does not mean the Abstract section of the paper.",
+        "Literature means that the paper presents the point as coming from prior literature.",
+        "Judge the Basis in the context of the paper, not only the anchors attached to this Claim.",
+    ),
+    "concept.assignment": (
+        "Accept a Concept if it is a defensible label for what the Claim is about, even if it captures only part of the Claim. Judge its fit to the Claim, not its Concept family. Overlapping Concepts can be reviewed later.",
+    ),
+    "concept.candidate": (
+        "Evaluate whether the candidate Concept is necessary for mapping this Claim, given the existing vocabulary. Correct assignment (Q12) and necessity (Q13) are separate judgments.",
+    ),
+    "concept.missing": (
+        "Focus on clear omissions, especially from the existing vocabulary. You do not need to propose every possible Concept.",
+    ),
+    "relation.type": (
+        "Evaluate whether the extracted relation is correctly classified as SUPPORTS, ATTACKS, or SAME_AS. Answer No if the relation does not hold or its type is incorrect, even when another kind of relationship exists. Judge the type separately from Direction and Grounding. Use the comment field to explain incorrect relations.",
+    ),
+}
+#: Calibration entries the 11 October revision keeps exactly as they were.
+UNCHANGED_CALIBRATION = {
+    "claim_object": (
+        "Classify what the Claim asserts, not what it merely mentions.",
+        "Law: the Claim is about law or legal/regulatory practice. This includes law regulating technology and the impact of technology on legal or regulatory practice.",
+        "Technology: the Claim is about a technology, system or model. This includes how a technology behaves when applied to a legal task.",
+        "Other: the Claim is substantively about both Law and Technology, or about either Law or Technology together with another substantive object, so neither category describes the Claim on its own.",
+    ),
+    "claim_jurisdiction": (
+        "General: the Claim is explicitly jurisdiction-independent or concerns law in general.",
+        "Undetermined: the jurisdiction is not stated and the context does not settle it.",
+        "Do not choose General only because a technology Claim sounds broadly applicable.",
+    ),
+    "relation.direction": (
+        "Judge whether the arrow runs from the Claim doing the supporting or attacking to the Claim being supported or attacked.",
+    ),
+}
+
+
 def test_spec_wording_and_semantics():
     check(set(AGREED) == set(spec.BY_KEY), "spec: exactly the agreed questions exist")
     for key, text in AGREED.items():
@@ -307,11 +359,33 @@ def test_spec_wording_and_semantics():
     frozen = json.dumps(spec.definitions(), ensure_ascii=False)
     check(not any(line in frozen for lines in spec.CALIBRATION.values() for line in lines),
           "spec: calibration text is not in the frozen definitions")
-    check(spec.CALIBRATION["claim.general"] == (
-        "Evaluate this Claim from its statement and anchors.",
-        "Judge the Claim fields from what the anchors support.",
-        "Restatements are assessed in Claim recall."),
-        "spec: the Claim-level calibration has exactly the three agreed lines")
+    for key, lines in APPROVED_CALIBRATION.items():
+        check(spec.CALIBRATION[key] == lines,
+              f"spec: calibration {key} is exactly the approved text")
+    for key, lines in UNCHANGED_CALIBRATION.items():
+        check(spec.CALIBRATION[key] == lines, f"spec: calibration {key} is unchanged")
+    check(set(spec.CALIBRATION) == set(APPROVED_CALIBRATION) | set(UNCHANGED_CALIBRATION),
+          "spec: no calibration entry beyond the approved and the unchanged ones")
+    check({q.key: q.calibration for q in spec.QUESTIONS if q.calibration} == {
+        "CLAIM_Q03_MODALITY": ("claim.modality",),
+        "CLAIM_Q05_GROUNDING": ("claim.grounding",),
+        "CLAIM_Q06_CLAIM_OBJECT": ("claim_object",),
+        "CLAIM_Q08_BASIS": ("basis",),
+        "CLAIM_Q09_CLAIM_JURISDICTION": ("claim_jurisdiction",),
+        "CLAIM_Q12_CONCEPT": ("concept.assignment",),
+        "CLAIM_Q13_CANDIDATE": ("concept.candidate",),
+        "CLAIM_Q14_MISSING_CONCEPTS": ("concept.missing",),
+        "REL_TYPE": ("relation.type",),
+        "REL_DIRECTION": ("relation.direction",)},
+        "spec: each calibration note is attached to its question and nowhere else")
+    check(spec.BY_KEY["CLAIM_Q03_MODALITY"].definitions == ("skill.extract_claims.modality",)
+          and spec.BY_KEY["CLAIM_Q05_GROUNDING"].definitions == ("claim.anchors",)
+          and spec.BY_KEY["CLAIM_Q05_GROUNDING"].options == spec.TERNARY
+          and spec.Q13.definitions == ("concept.status",)
+          and spec.BY_KEY["REL_TYPE"].definitions == ("edge.relation_type",)
+          and spec.BY_KEY["REL_TYPE"].optional_comment_on == (spec.NO,)
+          and spec.EVAL_SPEC_VERSION == "4.1",
+          "spec: definitions, options and comment rules are unchanged by the calibration")
     q6 = spec.BY_KEY["CLAIM_Q06_CLAIM_OBJECT"]
     check(not spec.problem(q6, spec.YES) and spec.problem(q6, spec.NO),
           "spec: Questions 6–11 Yes means correct")
@@ -2277,10 +2351,11 @@ def test_ui_calibration_and_doi():
     at.run()
     instructions = [_inside(e) for e in _expanders(at, "Instructions")]
     general = [t for t in instructions if spec.CALIBRATION["claim.general"][0] in t]
-    check(general and all(line in general[0] for line in spec.CALIBRATION["claim.general"])
+    check(general and all(html.escape(line) in general[0]
+                          for line in spec.CALIBRATION["claim.general"])
           and "Schema / skill" not in general[0]
           and "This instruction applies" not in general[0],
-          "ui: the Claim-level Instructions hold the three calibration lines only")
+          "ui: the Claim-level Instructions hold the five calibration lines only")
     check(all(not e.proto.expanded for e in _expanders(at, "Instructions")),
           "ui: calibration Instructions start closed")
     for field, key in (("basis", "claim.basis"),
@@ -2305,12 +2380,7 @@ def test_ui_calibration_and_doi():
             "Other: the Claim is substantively about both Law and Technology, or about "
             "either Law or Technology together with another substantive object, so "
             "neither category describes the Claim on its own."),
-        "claim.basis": (
-            "Abstract means abstract or conceptual considerations. It does not mean the "
-            "Abstract section of the paper.",
-            "Literature means that the Claim and its anchors present the point as "
-            "coming from prior literature.",
-            "Judge the Basis from the anchors attached to this Claim."),
+        "claim.basis": APPROVED_CALIBRATION["basis"],
         "claim.claim_jurisdiction": (
             "General: the Claim is explicitly jurisdiction-independent or concerns law "
             "in general.",
@@ -2352,6 +2422,63 @@ def test_ui_calibration_and_doi():
     q2 = next((t for t in instructions
                if html.escape(spec.plain(spec.definition("claim.node")["text"])) in t), "")
     check(q2 and "Calibration" not in q2, "ui: Question 2's Instructions are unchanged")
+
+
+def test_ui_calibration_locations():
+    """Every calibration note under its own question; frozen text untouched."""
+    found = next(((p, s, i) for p in ("training", "agreement", "individual")
+                  for s in _assigned(EVALUATOR, p)
+                  for i, c in enumerate(BRAIN.claims_of(s))
+                  if BRAIN.candidates_of_claim(c["id"]) and BRAIN.relations_from_claim(c["id"])),
+                 None)
+    check(found is not None, "ui: a Claim with a candidate Concept and a Relation exists")
+    if not found:
+        return
+    phase, source, index = found
+    cid = BRAIN.claims_of(source)[index]["id"]
+    book = fresh_round()
+    start(rid(phase, EVALUATOR, source))
+    at = _app()
+    _login(at)
+    before = _stored_rows(book)
+    _open_claim(at, phase, source, index)
+    blocks = [_inside(e) for e in _expanders(at, "Instructions")]
+    shown = lambda key: [html.escape(line) for line in spec.CALIBRATION[key]]
+    holding = lambda key: [b for b in blocks if all(line in b for line in shown(key))]
+
+    check(len(holding("claim.general")) == 1, "ui: the general calibration appears once")
+    for key, definition, count, label in (
+            ("claim.modality", "skill.extract_claims.modality", 1, "Strength and modality"),
+            ("claim.grounding", "claim.anchors", 1, "Textual grounding"),
+            ("concept.candidate", "concept.status", 1, "Candidate Concept"),
+            ("relation.type", "edge.relation_type", len(BRAIN.relations_from_claim(cid)),
+             "Relation type")):
+        found_blocks = holding(key)
+        # A frozen passage's line breaks render as <br>.
+        frozen = html.escape(spec.plain(spec.definition(definition)["text"])).replace("\n", "<br>")
+        ordered = all(0 <= b.find("Schema / skill") < b.find("Calibration")
+                      and frozen in b[b.find("Schema / skill"):b.find("Calibration")]
+                      and all(line in b[b.find("Calibration"):] for line in shown(key))
+                      for b in found_blocks)
+        check(len(found_blocks) == count and ordered,
+              f"ui: {label} shows its frozen text under Schema / skill, then its Calibration")
+    for key, label in (("concept.assignment", "Concept assignment"),
+                       ("concept.missing", "Missing Concepts")):
+        found_blocks = holding(key)
+        check(len(found_blocks) == 1 and "Schema / skill" not in found_blocks[0],
+              f"ui: {label} calibration appears once, as Calibration only")
+    captions = "\n".join(c.value for c in at.caption)
+    check(spec.PROPOSAL_HINT in captions
+          and any(t.key == f"q14search|{rid(phase, EVALUATOR, source)}|{cid}"
+                  for t in at.text_input),
+          "ui: the Missing Concepts hint and search are unchanged")
+    check(all(not e.proto.expanded for e in _expanders(at, "Instructions")),
+          "ui: every Instructions expander starts closed")
+    frozen = json.dumps(spec.definitions(), ensure_ascii=False)
+    check(not any(line in frozen for lines in spec.CALIBRATION.values() for line in lines)
+          and spec.definitions_id() == "629aebacc9a701ee",
+          "ui: calibration stays out of the frozen definitions; definitions_id unchanged")
+    check(_stored_rows(book) == before, "ui: showing the calibration writes nothing")
 
 
 def ui_doi(source: str) -> bool:

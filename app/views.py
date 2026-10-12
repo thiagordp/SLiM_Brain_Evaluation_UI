@@ -360,6 +360,7 @@ def concepts_part(ctx: Ctx, claim: dict) -> None:
     with st.container(border=True):
         st.markdown(f"**{spec.Q12.text}**")
         st.caption("Each Concept assigned to this Claim is judged on its own.")
+        ui.definitions((), calibration=spec.Q12.calibration)
         for family, ids in brain.group_by_family(assigned).items():
             if not ids:
                 continue
@@ -374,7 +375,7 @@ def concepts_part(ctx: Ctx, claim: dict) -> None:
     if candidates:
         with st.container(border=True):
             st.markdown(f"**{spec.Q13.text}**")
-            ui.definitions(spec.Q13.definitions)
+            ui.definitions(spec.Q13.definitions, calibration=spec.Q13.calibration)
             for concept_id in candidates:
                 _concept_judgment(ctx, spec.Q13, cid, concept_id)
 
@@ -520,6 +521,7 @@ def _used_in_paper(ctx: Ctx, cid: str, vocabulary, selected_ids: set,
 def missing_concepts(ctx: Ctx, claim: dict) -> None:
     brain, cid = ctx.brain, claim["id"]
     st.markdown(f"**{spec.Q14.text}**")
+    ui.definitions((), calibration=spec.Q14.calibration)
     vocabulary = brain.vocabulary(spec.concept_grid())
     existing, proposed = progress.q14_selection(ctx.data, cid)
     selected_ids = {r["concept_id"] for r in existing}
