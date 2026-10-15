@@ -58,16 +58,33 @@ def go_to_section(ctx: Ctx, section: str, claim_index: int | None = None,
     ui.request_scroll()
 
 
+def _valid(value, total: int) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool) and 0 <= value < total
+
+
 def _index(key: str, total: int) -> int:
     value = st.session_state.get(key, 0)
-    if isinstance(value, bool) or not isinstance(value, int) or not 0 <= value < total:
+    if not _valid(value, total):
         value = 0
     st.session_state[key] = value
     return value
 
 
 def _move(key: str, delta: int, total: int) -> None:
-    st.session_state[key] = max(0, min(total - 1, st.session_state.get(key, 0) + delta))
+    value = st.session_state.get(key, 0)
+    current = value if _valid(value, total) else 0
+    st.session_state[key] = max(0, min(total - 1, current + delta))
+    ui.close_wiki()
+    ui.request_scroll()
+
+
+def _pick(key: str, pick_key: str, total: int) -> None:
+    # The "Go to" selectbox has its own key: a selectbox stores its formatted
+    # label, and the Claim labels carry a progress mark that changes as answers
+    # come in, so a stale label would come back as a str instead of an index.
+    value = st.session_state.get(pick_key)
+    if _valid(value, total):
+        st.session_state[key] = value
     ui.close_wiki()
     ui.request_scroll()
 
@@ -211,12 +228,13 @@ def claims_section(ctx: Ctx) -> None:
     head.subheader(f"Claim {index + 1} of {len(claims)}")
     head.caption(cid)
     with pick:
+        st.session_state[f"{idx_key}|pick"] = index
         st.selectbox(
-            "Go to Claim", range(len(claims)), key=idx_key,
+            "Go to Claim", range(len(claims)), key=f"{idx_key}|pick",
             format_func=lambda i: (f"{MARK[states[claims[i]['id']]]} {i + 1}. "
                                    f"{claims[i]['id']} — "
                                    f"{claims[i].get('statement', '')[:70]}…"),
-            on_change=lambda: (ui.close_wiki(), ui.request_scroll()))
+            on_change=_pick, args=(idx_key, f"{idx_key}|pick", len(claims)))
     claim_panel(cid, claim.get("statement", ""))
     parts = progress.claim_parts(brain, ctx.source_id, cid, ctx.data)
     st.caption("  ·  ".join(f"{MARK[state]} {part} {done}/{total}"
@@ -715,9 +733,10 @@ def datasets_section(ctx: Ctx) -> None:
     head.markdown(f"#### Dataset {index + 1} of {len(ids)}")
     head.caption(did)
     if len(ids) > 1:
-        pick.selectbox("Go to Dataset", range(len(ids)), key=idx_key,
+        st.session_state[f"{idx_key}|pick"] = index
+        pick.selectbox("Go to Dataset", range(len(ids)), key=f"{idx_key}|pick",
                        format_func=lambda i: f"{i + 1}. {brain.dataset(ids[i]).get('name', ids[i])}",
-                       on_change=lambda: (ui.close_wiki(), ui.request_scroll()))
+                       on_change=_pick, args=(idx_key, f"{idx_key}|pick", len(ids)))
     ui.statement_card("Dataset", dataset.get("name", did))
     ui.wiki_button("Open Dataset wiki", ui.DATASET, did, key=f"ds_wiki|{did}")
     resting = brain.claims_using_dataset(ctx.source_id, did)

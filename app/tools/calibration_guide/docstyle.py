@@ -22,9 +22,9 @@ STATUS_STYLE = {   # text colour, fill
     "PROVISIONAL": ("6E4300", "FBE9C6"),
     "OPEN": ("8A1C2B", "F8DDE1"),
 }
-STATUS_LABEL = {"AGREED": "AGREED", "PROVISIONAL": "PROVISIONAL", "OPEN": "OPEN"}
-IMPL_LABEL = {"Implemented": "In UI ✓", "Reported implemented": "Reported", "Not implemented": "Not in UI",
-              "Unknown": "Unknown", "n/a": "—"}
+STATUS_LABEL = {"AGREED": "Agreed", "PROVISIONAL": "Provisional", "OPEN": "Open"}
+IMPL_LABEL = {"Implemented": "In the app", "Reported implemented": "Reported", "Not implemented": "Not in the app",
+              "Unknown": "Unknown", "n/a": "Principle"}
 
 
 # ------------------------------------------------------------------ document
@@ -208,11 +208,16 @@ def chip(p, status, size=7.5):
 
 
 def impl_tag(p, impl, size=7.5):
-    r = p.add_run(" " + IMPL_LABEL[impl] + " ")
-    style_run(r, size=size, color=MUTED)
-    if impl != "n/a":
-        run_border(r, "8A929C", sz=4)
+    r = p.add_run(IMPL_LABEL[impl])
+    style_run(r, size=size, color=MUTED, italic=True)
     return r
+
+
+def tag(p, pid, anchor=None, size=7):
+    """A small grey rule id, linked to its entry when an anchor is given."""
+    if anchor:
+        return link(p, pid, anchor, size=size, color=MUTED)
+    return style_run(p.add_run(pid), size=size, color=MUTED)
 
 
 def para_border(p, side, color=RULE, sz=4, space=1):
@@ -257,7 +262,7 @@ def bm_name(pid: str) -> str:
 
 
 # ------------------------------------------------------------------ tables
-def table(container, widths_cm, header=None, header_fill=PANEL, size=8.5, rules=True, outer=True):
+def table(container, widths_cm, header=None, header_fill=PANEL, size=8.5, rules=True, outer=True, pad=45):
     """A fixed-layout table with hairline horizontal rules. Returns the Table."""
     ncols = len(widths_cm)
     t = container.add_table(rows=0, cols=ncols)
@@ -280,7 +285,7 @@ def table(container, widths_cm, header=None, header_fill=PANEL, size=8.5, rules=
         borders.append(b)
     tblPr.append(borders)
     mar = OxmlElement("w:tblCellMar")
-    for side, w in (("top", 45), ("bottom", 45), ("left", 85), ("right", 85)):
+    for side, w in (("top", pad), ("bottom", pad), ("left", 85), ("right", 85)):
         m = OxmlElement(f"w:{side}"); m.set(qn("w:w"), str(w)); m.set(qn("w:type"), "dxa"); mar.append(m)
     tblPr.append(mar)
     grid = tbl.tblGrid

@@ -129,6 +129,60 @@ def recompute_differs(r: dict) -> list[str]:
     return [e for e in EVALUATORS if e not in r["gated"] and r["answers"][e] and r["answers"][e] != r["final_value"]]
 
 
+# House style for the prose we write (quotations are exempt): no rule or decision
+# ids inside sentences (they appear only as tags), no em dashes, no stock phrases.
+PROSE_IDS = re.compile(r"\b(?:(?:GEN|CL|GR|FD|CO|RE|RC|CC)-\d+|D\d{1,2})\b")
+BANNED = re.compile(r"\b(explicitly|substantively|crucial|ensure|robust|leverage|delve|note that|it is worth)\b", re.I)
+BRIEF_MAX = 130
+
+
+def prose_fields():
+    """(owner, text) for every hand-written prose string of the content model."""
+    for p in pol.POLICIES:
+        for k in ("title", "brief", "rule", "apply", "basis", "limits"):
+            yield f'{p["id"]}.{k}', p.get(k, "")
+    for d in pol.OPEN_DECISIONS:
+        for k in ("title", "brief", "readings", "meanwhile", "question", "why", "decide"):
+            yield f'{d["id"]}.{k}', d.get(k, "")
+        for n, s in enumerate(d["interpretations"], 1):
+            yield f'{d["id"]}.reading{n}', s
+    for c in pol.CONSISTENCY_CHECKS:
+        yield f'{c["id"]}.point', c["point"]
+    for b in pol.BASELINE:
+        yield f'BASELINE {b["field"]} {b["value"]}.reading', b["reading"]
+    yield from ((f"STATUS_RULES.{k}", v) for k, v in pol.STATUS_RULES.items())
+
+
+def builder_strings():
+    """Literal strings of 30+ characters in the two document builders."""
+    for name in ("build_guide.py", "build_annex.py"):
+        tree = ast.parse((HERE / name).read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Constant) and isinstance(node.value, str) and len(node.value) >= 30:
+                yield f"{name}:{node.lineno}", node.value
+
+
+def style_errors() -> list[str]:
+    errors = []
+    for p in pol.POLICIES:
+        if p.get("group") not in dict(pol.GROUPS):
+            errors.append(f'{p["id"]}: missing or unknown group')
+    for owner, s in list(prose_fields()):
+        key = owner.rsplit(".", 1)[-1]
+        if key in ("brief", "title", "readings", "meanwhile") and not s:
+            errors.append(f"{owner}: empty")
+        if key == "brief" and len(s) > BRIEF_MAX:
+            errors.append(f"{owner}: longer than {BRIEF_MAX} characters")
+        if PROSE_IDS.search(s):
+            errors.append(f"{owner}: rule or decision id inside prose: {PROSE_IDS.search(s).group(0)}")
+    for owner, s in list(prose_fields()) + list(builder_strings()):
+        if "—" in s:
+            errors.append(f"{owner}: em dash in prose")
+        if BANNED.search(s):
+            errors.append(f"{owner}: stock phrase “{BANNED.search(s).group(0)}”")
+    return errors
+
+
 def main(build: pathlib.Path) -> int:
     reg = json.loads((build / "register.json").read_text(encoding="utf-8"))
     src = Sources(reg)
@@ -194,6 +248,8 @@ def main(build: pathlib.Path) -> int:
             errors.append(f"{tag}: Final cell marked yellow but item not OPEN")
         if r["final_category"] == "REPLACEMENT" and r["final_value"] != "No":
             errors.append(f"{tag}: replacement Final without evaluation No")
+    errors += style_errors()
+
     for p in reg["proposals"]:
         if p["disposition"] == "CONSIDERED_REASONABLE" and p["status"] == "AGREED":
             errors.append(f'{p["claim"]} {p["concept"]}: \u201creasonable\u201d read as agreed')

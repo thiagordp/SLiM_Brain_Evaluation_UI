@@ -2175,6 +2175,47 @@ def test_ui_gating():
           "ui: Review shows skipped questions as Not applicable")
 
 
+def test_ui_claim_navigation_survives_changing_marks():
+    """The Go to Claim labels carry a progress mark; when it changes, a selectbox
+    keyed on the index used to hand back a str and crash Next Claim."""
+    found = next(((phase, source) for phase in ("training", "agreement", "individual")
+                  for source in _assigned(EVALUATOR, phase)
+                  if len(BRAIN.claims_of(source)) >= 3), None)
+    check(found is not None, "ui: an assigned Source with three Claims exists for the check")
+    if not found:
+        return
+    phase, source = found
+    claims = BRAIN.claims_of(source)
+    fresh_round()
+    review = rid(phase, EVALUATOR, source)
+    start(review)
+    at = _app()
+    _login(at)
+    _open_claim(at, phase, source, 0)
+    idx_key = f"claim_idx|{review}"
+
+    at.selectbox(key=f"{idx_key}|pick").set_value(1)
+    at.run()
+    check(not at.exception and at.session_state[idx_key] == 1,
+          "ui: Go to Claim moves to the chosen Claim")
+    radio = next(r for r in at.radio if r.key.startswith(f"w|{review}|"))
+    radio.set_value(radio.options[0])
+    at.run()
+    at.button(key="next_claim").click()
+    at.run()
+    check(not at.exception and at.session_state[idx_key] == 2,
+          f"ui: Next Claim works after the Claim's mark changed "
+          f"({[e.value for e in at.exception][:1]})")
+    check(at.selectbox(key=f"{idx_key}|pick").value == 2,
+          "ui: Go to Claim follows the Next button")
+
+    at.session_state[idx_key] = f"● 3. {claims[2]['id']} — stale label"
+    at.button(key="prev_claim").click()
+    at.run()
+    check(not at.exception and isinstance(at.session_state[idx_key], int),
+          "ui: a stale non-index value never crashes Claim navigation")
+
+
 def test_ui_submitted_review_under_gates():
     fresh_round()
     sources = manifest.assigned_source_ids("thiago", "training")
