@@ -432,11 +432,11 @@ def test_allocation_rules():
                   f"allocation: {split} {entry['source']} is evaluated by every group member")
     agreement_papers = {r["source_id"] for r in phases["agreement"]}
     remaining = len(BRAIN.sources) - len(training) - len(agreement_papers)
-    check(len(phases["individual"]) == remaining,
+    check(len({r["source_id"] for r in phases["individual"]}) == remaining,
           f"allocation: the other {remaining} papers are Individual")
     per = sorted(sum(1 for r in phases["individual"] if r["evaluator_id"] == e["evaluator_id"])
                  for e in evaluators)
-    check(per[-1] - per[0] <= 1 and sum(per) == remaining,
+    check(per[-1] - per[0] <= 1 and sum(per) == len(phases["individual"]),
           "allocation: Individual papers as even as possible")
 
     def broken(mutate):

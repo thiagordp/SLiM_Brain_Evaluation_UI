@@ -111,6 +111,8 @@ individual:
     sources:
     - source: SRC-0004
       title: 'Less is Better: A Comparative Analysis of Guidance Methods for Long-Context Window-Based Legal Interpretation'
+    - source: SRC-0013
+      title: 'The Privacy Quagmire: Where Computer Scientists and Lawyers May Disagree'
   IND-5:
     evaluator: giuseppe
     sources:
@@ -123,6 +125,8 @@ individual:
     sources:
     - source: SRC-0025
       title: Contract Law Illusions and Delusions
+    - source: SRC-0012
+      title: 'LicenseGPT: A Fine-tuned Foundation Model for Publicly Available Dataset License Compliance'
   IND-7:
     evaluator: vaclav
     sources:

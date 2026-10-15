@@ -59,7 +59,7 @@ def main() -> int:
         if started and stamps.get(rid):
             stamps[rid].append(started.astimezone(CEST))
 
-    gantt, table, totals, latest = [], [], collections.Counter(), None
+    gantt, table, totals, latest, earliest = [], [], collections.Counter(), None, None
     for k, (eid, name) in enumerate(evaluators):
         row = {}
         for source in papers:
@@ -69,6 +69,7 @@ def main() -> int:
                 row[source] = None
                 continue
             latest = max(latest, saves[-1]) if latest else saves[-1]
+            earliest = min(earliest, saves[0]) if earliest else saves[0]
             sessions, active = [[saves[0], saves[0]]], 0.0
             for a, b in zip(saves, saves[1:]):
                 if b - a > BREAK:
@@ -91,6 +92,11 @@ def main() -> int:
         print("no saved answers in phase", phase)
         return 1
     label = phase.capitalize()
+    # A fixed 12-hour tick leaves a chart spanning less than a day with no axis.
+    span = latest - earliest
+    axis = (("%d %b %Hh", "12hour") if span > dt.timedelta(days=1)
+            else ("%d %b %H:%M", "1hour") if span > dt.timedelta(hours=3)
+            else ("%H:%M", "10minute"))
     table.sort(key=lambda t: -sum(v[0] for v in t[1].values() if v))
     lines = [
         f"# {label} timeline", "",
@@ -101,7 +107,7 @@ def main() -> int:
         "its latest save time, and reading without saving is not shown.", "",
         "```mermaid", "---", "displayMode: compact", "---", "gantt",
         f"    title {label} — work sessions per evaluator and paper (CEST)",
-        "    dateFormat YYYY-MM-DD HH:mm", "    axisFormat %d %b %Hh", "    tickInterval 12hour",
+        "    dateFormat YYYY-MM-DD HH:mm", f"    axisFormat {axis[0]}", f"    tickInterval {axis[1]}",
         "    todayMarker off", *gantt, "```", "",
         "## Time per evaluator and paper", "",
         "Time between consecutive saved answers within each session (pauses over 10 minutes excluded). "

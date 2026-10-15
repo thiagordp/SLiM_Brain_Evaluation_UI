@@ -397,14 +397,6 @@ def validate(known_source_ids: set[str], reviews=None) -> list[str]:
         if row.get("source_id") not in known_source_ids:
             problems.append(f"assignment {row.get('assignment_key')} names a Source "
                             f"not in the Brain")
-    holders: dict[str, set] = {}
-    for row in assignments():
-        if row.get("phase_id") == INDIVIDUAL and state_of(row) == ASSIGNED:
-            holders.setdefault(row["source_id"], set()).add(row.get("evaluator_id"))
-    for source_id, names in sorted(holders.items()):
-        if len(names) > 1:
-            problems.append(f"{source_id} is assigned to {len(names)} evaluators in "
-                            f"the individual phase")
     for name in missing_secrets():
         problems.append(f"{name} is not set")
     return problems

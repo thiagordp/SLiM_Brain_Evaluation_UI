@@ -151,7 +151,7 @@ def validate(data: dict, brain) -> list[str]:
         if source in training_ids:
             problems.append(f"{source} is a Training Source and is also in "
                             f"{', '.join(splits)}")
-        if len(splits) > 1:
+        if len(splits) > 1 and not all(s in individual for s in splits):
             problems.append(f"{source} appears more than once: {', '.join(splits)}")
     unplaced = sorted(known - set(training_ids) - set(placed))
     if unplaced:
@@ -182,14 +182,6 @@ def validate(data: dict, brain) -> list[str]:
                 if len(made) != expected:
                     problems.append(f"{split}: {entry['source']} yields {len(made)} "
                                     f"assignments, not {expected} (one per group member)")
-        individual_rows = [r for r in rows if r["phase_id"] == INDIVIDUAL
-                           and r["assignment_state"] == ASSIGNED]
-        holders: dict[str, set] = {}
-        for row in individual_rows:
-            holders.setdefault(row["source_id"], set()).add(row["evaluator_id"])
-        for source, who in sorted(holders.items()):
-            if len(who) != 1:
-                problems.append(f"{source} has {len(who)} Individual evaluators")
     return problems
 
 

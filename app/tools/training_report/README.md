@@ -69,3 +69,5 @@ browser of its own, point it at the system Chrome with a config file
 `{"executablePath": "/usr/bin/google-chrome"}`:
 
     mmdc -p puppeteer.json -i chart.mmd -o docs/AGREEMENT_TIMELINE.svg --size 1500 -b white
+
+(Older mermaid-cli releases take `-w 1500` instead of `--size 1500`.)
